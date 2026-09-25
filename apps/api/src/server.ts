@@ -14,7 +14,7 @@ await app.listen({ port: cfg.API_PORT, host: cfg.API_HOST });
 const metrics = createServer(async (_req, res) => {
   res.setHeader('content-type', registry.contentType);
   res.end(await registry.metrics());
-}).listen(cfg.METRICS_PORT, '127.0.0.1');
+}).listen(cfg.METRICS_PORT, cfg.METRICS_HOST);
 
 const shutdown = async (signal: string) => {
   log.info({ signal }, 'shutting down');

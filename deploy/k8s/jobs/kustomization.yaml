@@ -1,0 +1,14 @@
+# One-shot Jobs, applied separately from the long-running workloads (Job templates are immutable, and
+# migrations must complete BEFORE new pods start). Overlays: deploy/k8s/overlays/<env>/jobs.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ksp-vms
+labels:
+  - pairs: { app.kubernetes.io/part-of: ksp-vms }
+    includeSelectors: false
+resources:
+  - migrate.yaml
+  - ai-models.yaml
+images:
+  - { name: ksp/api, newName: ghcr.io/ksp/api, newTag: 1.0.0 }
+  - { name: ksp/ai-worker, newName: ghcr.io/ksp/ai-worker, newTag: 1.0.0 }

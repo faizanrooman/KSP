@@ -1,0 +1,152 @@
+# Zero-trust network model: deny everything, then allow exactly the flows the design needs.
+# Assumptions (patch in overlays): PostgreSQL = CloudNativePG cluster "ksp-db" in this namespace (pods labelled
+# cnpg.io/cluster=ksp-db); object storage is OUTSIDE the cluster at the CIDR below; ingress-nginx runs in namespace
+# "ingress-nginx"; Prometheus in namespace "monitoring".
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny-all }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-dns }
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+          podSelector: { matchLabels: { k8s-app: kube-dns } }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+# Every pod labelled db-client may reach PostgreSQL; every s3-client may reach the object store.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-db-egress }
+spec:
+  podSelector: { matchLabels: { ksp.police/db-client: "true" } }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector: { matchLabels: { cnpg.io/cluster: ksp-db } }
+      ports: [{ protocol: TCP, port: 5432 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-s3-egress }
+spec:
+  podSelector: { matchLabels: { ksp.police/s3-client: "true" } }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock: { cidr: 10.60.0.0/24 }   # object storage endpoints (patched per environment)
+      ports:
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 9000 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: db-ingress }
+spec:
+  podSelector: { matchLabels: { cnpg.io/cluster: ksp-db } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { ksp.police/db-client: "true" } }
+        - podSelector: { matchLabels: { cnpg.io/cluster: ksp-db } }   # replication between instances
+      ports: [{ protocol: TCP, port: 5432 }]
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: cnpg-system } }   # operator status
+      ports: [{ protocol: TCP, port: 8000 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: api }
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: ksp-api } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: ksp-web } }
+      ports: [{ protocol: TCP, port: 4000 }]
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } }
+      ports: [{ protocol: TCP, port: 9464 }]
+  egress:
+    # External integrations (CCTNS etc.) over HTTPS only, to the allow-listed integration networks.
+    - to:
+        - ipBlock: { cidr: 10.70.0.0/24 }
+      ports: [{ protocol: TCP, port: 443 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: worker }
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: ksp-worker } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } }
+      ports: [{ protocol: TCP, port: 9465 }]
+  egress:
+    - to:
+        - ipBlock: { cidr: 10.70.0.0/24 }
+      ports: [{ protocol: TCP, port: 443 }]
+---
+# AI worker: NO ingress at all; egress ONLY to PostgreSQL and object storage (granted by the two policies above
+# via its db-client / s3-client labels) + DNS. No internet, no API, no other pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: ai-worker }
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: ksp-ai-worker } }
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: web }
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: ksp-web } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } }
+      ports: [{ protocol: TCP, port: 8080 }]
+  egress:
+    - to:
+        - podSelector: { matchLabels: { app.kubernetes.io/name: ksp-api } }
+      ports: [{ protocol: TCP, port: 4000 }]
+---
+# The models Job downloads pinned artefacts from the internet (HTTPS). Only that Job carries this label.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: model-download }
+spec:
+  podSelector: { matchLabels: { ksp.police/model-download: "true" } }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock: { cidr: 0.0.0.0/0, except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16] }
+      ports: [{ protocol: TCP, port: 443 }]
+---
+# Backups: DB (label) + primary S3 (label) + the backup / DR object store at a different site.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: backup }
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: ksp-backup } }
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - ipBlock: { cidr: 10.80.0.0/24 }   # DR site object storage (patched per environment)
+      ports:
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 9000 }

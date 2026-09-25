@@ -1,0 +1,6 @@
+{
+  "name": "ksp-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Ops/backup/CI scripts. Not a workspace; resolves dependencies from the root node_modules."
+}

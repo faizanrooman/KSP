@@ -1,0 +1,57 @@
+# Prometheus Operator scrape targets (metrics ports are cluster-internal; never exposed via the Ingress).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ksp-api
+  labels: { release: prometheus }
+spec:
+  selector: { matchLabels: { app.kubernetes.io/name: ksp-api } }
+  endpoints:
+    - { port: metrics, interval: 15s, path: / }
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ksp-worker
+  labels: { release: prometheus }
+spec:
+  selector: { matchLabels: { app.kubernetes.io/name: ksp-worker } }
+  endpoints:
+    - { port: metrics, interval: 30s, path: / }
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ksp-vms
+  labels: { release: prometheus }
+spec:
+  groups:
+    - name: ksp-availability
+      rules:
+        - alert: KspApiNoHealthyInstances
+          expr: sum(up{job=~".*ksp-api.*"}) == 0
+          for: 1m
+          labels: { severity: critical }
+          annotations: { summary: "No API instance is up", runbook: "docs/RUNBOOK.md#api-down" }
+        - alert: KspWorkerDown
+          expr: sum(up{job=~".*ksp-worker.*"}) == 0
+          for: 5m
+          labels: { severity: critical }
+          annotations: { summary: "No worker is up — ingestion/transcoding stopped", runbook: "docs/RUNBOOK.md#queue-backlog" }
+        - alert: KspApiHighErrorRate
+          expr: |
+            sum(rate(ksp_api_http_request_duration_seconds_count{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(ksp_api_http_request_duration_seconds_count[5m])), 1e-9) > 0.02
+          for: 10m
+          labels: { severity: warning }
+          annotations: { summary: "API 5xx ratio above 2%", runbook: "docs/RUNBOOK.md#api-errors" }
+    - name: ksp-backups
+      rules:
+        - alert: KspBackupJobFailed
+          expr: kube_job_status_failed{namespace="ksp-vms", job_name=~"ksp-(pg-backup|backup-verify|s3-replicate).*"} > 0
+          labels: { severity: critical }
+          annotations: { summary: "Backup job {{ $labels.job_name }} failed", runbook: "docs/RUNBOOK.md#backup-failed" }
+        - alert: KspBackupMissing
+          expr: time() - max(kube_cronjob_status_last_successful_time{namespace="ksp-vms", cronjob="ksp-pg-backup"}) > 93600
+          labels: { severity: critical }
+          annotations: { summary: "No successful database backup in 26 hours", runbook: "docs/RUNBOOK.md#backup-failed" }

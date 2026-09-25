@@ -78,6 +78,8 @@ export const AUDIT_ACTIONS = {
   EVIDENCE_INTEGRITY_VERIFIED: { category: 'CUSTODY', custody: true },
   EVIDENCE_INTEGRITY_FAILED: { category: 'CUSTODY', custody: true },
   EVIDENCE_TIER_CHANGED: { category: 'CUSTODY', custody: true },
+  /** DR failover: storage_version_id re-pointed to the verified (same SHA-256) copy in the DR object store. */
+  EVIDENCE_STORAGE_REPOINTED: { category: 'CUSTODY', custody: true },
   EVIDENCE_LEGAL_HOLD_SET: { category: 'CUSTODY', custody: true },
   EVIDENCE_LEGAL_HOLD_RELEASED: { category: 'CUSTODY', custody: true },
   EVIDENCE_RETENTION_ASSIGNED: { category: 'CUSTODY', custody: true },

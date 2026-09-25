@@ -1,0 +1,164 @@
+# KSP VMS continuous integration. STATUS: UNVERIFIED — authored and validated with actionlint; never executed on
+# GitHub (no remote CI available to the development team yet).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  FFMPEG_IMAGE: mwader/static-ffmpeg:7.1.1@sha256:11a44711684c0b9f754c047dcd64235b8b52deab251bd0e0a86f22faa160749c
+  VERSITYGW_IMAGE: versity/versitygw:v1.8.0@sha256:30292fc2eeacc67a36993b01f7a7a5e3361a19cced0e80c1d71cfa2a4b0a2499
+
+jobs:
+  static:
+    name: lint · typecheck · build · deploy validators
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Production layouts start (no dev deps)
+        run: |
+          for app in api worker ai-worker; do scripts/ci/simulate-image.sh "$app" "$RUNNER_TEMP/img-$app"; done
+      - name: Install validators
+        run: |
+          mkdir -p .local/bin && cd .local/bin
+          curl -fsSL -o hadolint https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64 && chmod +x hadolint
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz | tar xz actionlint
+          curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz | tar xz
+          curl -fsSL https://github.com/FiloSottile/age/releases/download/v1.2.1/age-v1.2.1-linux-amd64.tar.gz | tar xz --strip-components=1 age/age age/age-keygen
+      - run: scripts/ci/validate-deploy.sh
+
+  test:
+    name: tests (PostgreSQL 16 + S3 + FFmpeg)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16.10-bookworm@sha256:38471f330eb885e04de130b768d6db4e10469e2311879c7e5c699f6d2d8a1c74
+        env: { POSTGRES_PASSWORD: ci-only-password }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: ci-only-password
+      S3_ENDPOINT: http://127.0.0.1:7070
+      S3_ACCESS_KEY: kspciaccess
+      S3_SECRET_KEY: kspcisecret-not-secret
+      FFMPEG_DIR: /usr/local/bin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - name: S3 gateway with versioning + Object Lock (same server as development)
+        # Service containers cannot take arguments, so the gateway is started explicitly.
+        run: |
+          docker run -d --name s3 -p 7070:7070 -e ROOT_ACCESS_KEY="$S3_ACCESS_KEY" -e ROOT_SECRET_KEY="$S3_SECRET_KEY" \
+            --tmpfs /data "$VERSITYGW_IMAGE" --port :7070 posix --versioning-dir /data/v --sidecar /data/s /data/b
+          sleep 2 && docker logs s3
+      - name: FFmpeg (same pinned static build as the worker image) + capability check
+        run: |
+          id=$(docker create "$FFMPEG_IMAGE" /ffmpeg)
+          sudo docker cp "$id:/ffmpeg" /usr/local/bin/ffmpeg && sudo docker cp "$id:/ffprobe" /usr/local/bin/ffprobe && docker rm "$id"
+          scripts/ops/check-ffmpeg.sh /usr/local/bin/ffmpeg
+      - run: npm ci
+      - run: scripts/ci/ci-env.sh
+      - run: npm run build -w @ksp/shared && npm run build -w @ksp/core
+      - run: npm run db:migrate && npm run db:seed
+      - name: AI models (pinned, SHA-256 verified)
+        uses: actions/cache@v4
+        with: { path: .local/models, key: "ai-models-${{ hashFiles('apps/ai-worker/src/models/manifest.ts') }}" }
+      - run: npm run fetch-models -w @ksp/ai-worker -- --no-db
+      - name: API tests
+        working-directory: apps/api
+        run: npx vitest run
+      - name: Worker tests
+        working-directory: apps/worker
+        run: npx vitest run
+      - name: AI worker tests
+        working-directory: apps/ai-worker
+        run: npx vitest run
+      - name: Web tests + production build
+        working-directory: apps/web
+        run: npx vitest run && npx vite build
+      - name: Station client tests
+        working-directory: tools/station-client
+        run: npx vitest run
+      - name: Backup verification tests (corrupted / tampered backups must be rejected)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+          mkdir -p .local/bin && curl -fsSL https://github.com/FiloSottile/age/releases/download/v1.2.1/age-v1.2.1-linux-amd64.tar.gz | tar xz -C .local/bin --strip-components=1 age/age age/age-keygen
+          PATH="$PWD/.local/bin:$PATH" PGDATABASE=ksp scripts/backup/test/verify-backup.test.sh
+      - name: DR drill (backup -> loss -> restore -> verify)
+        env:
+          PGADMIN_URL: postgres://postgres:ci-only-password@127.0.0.1:5432/postgres
+          PRIMARY_S3_ENDPOINT: http://127.0.0.1:7070
+          S3_ROOT_ACCESS: kspciaccess
+          S3_ROOT_SECRET: kspcisecret-not-secret
+        run: |
+          curl -fsSL https://github.com/versity/versitygw/releases/download/v1.8.0/versitygw_v1.8.0_Linux_x86_64.tar.gz | tar xz -C .local/bin versitygw
+          npm run build
+          PATH="$PWD/.local/bin:$PATH" tests/dr/drill.sh --ci
+
+  security:
+    name: security (audit · SAST · secrets · SBOM · filesystem scan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - run: npm ci
+      - name: npm audit (high and critical fail the build)
+        run: npm audit --audit-level=high --omit=dev
+      - name: npm audit (all, informational)
+        run: npm audit || true
+      - name: CodeQL init
+        uses: github/codeql-action/init@v3
+        with: { languages: javascript-typescript, queries: security-extended }
+      - name: CodeQL analyze
+        uses: github/codeql-action/analyze@v3
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Trivy filesystem scan (dependencies, IaC misconfig, secrets)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,misconfig,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: sarif
+          output: trivy-fs.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with: { sarif_file: trivy-fs.sarif, category: trivy-fs }
+      - name: SBOM (CycloneDX, source)
+        uses: anchore/sbom-action@v0
+        with: { path: ., format: cyclonedx-json, output-file: sbom-source.cdx.json, upload-artifact: true }

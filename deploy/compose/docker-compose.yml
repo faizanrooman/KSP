@@ -1,0 +1,371 @@
+# KSP VMS — single-host / staging deployment.
+#
+#   cp deploy/compose/.env.example deploy/compose/.env        # then fill in (see docs/DEPLOYMENT.md)
+#   scripts/ops/generate-secrets.sh --out deploy/compose/secrets --format compose
+#   docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/.env up -d
+#
+# STATUS: UNVERIFIED — never started (no Docker daemon access on the development host). `docker compose config`
+# validation passes (scripts/ci/validate-deploy.sh). Images are built from deploy/docker/Dockerfile.
+#
+# Network zones:
+#   edge      web (published port) <-> api
+#   backend   api, worker, migrate, postgres, s3 (internal: no route to the internet)
+#   ai        ai-worker, postgres, s3 ONLY (internal). The AI worker cannot reach api/worker and holds only the
+#             derived-bucket S3 identity + the ksp_ai DB role — never the evidence credentials.
+#   egress    api/worker outbound (integrations, model downloads by the one-shot models job)
+#   monitoring prometheus/grafana/alertmanager + scrape targets
+
+name: ksp-vms
+
+x-app-env: &app-env
+  NODE_ENV: production
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  APP_BASE_URL: ${APP_BASE_URL:?set APP_BASE_URL}
+  CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS}
+  COOKIE_SECURE: "true"
+  TRUST_PROXY: "true"
+  DATABASE_URL: postgres://ksp_app:${KSP_APP_DB_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-ksp}
+  DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
+  S3_ENDPOINT: ${S3_ENDPOINT:-http://s3:7070}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+  S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+  S3_BUCKET_STAGING: ${S3_BUCKET_STAGING:-ksp-staging}
+  S3_BUCKET_EVIDENCE: ${S3_BUCKET_EVIDENCE:-ksp-evidence}
+  S3_BUCKET_ARCHIVE: ${S3_BUCKET_ARCHIVE:-ksp-evidence-archive}
+  S3_BUCKET_LONG_TERM: ${S3_BUCKET_LONG_TERM:-ksp-evidence-longterm}
+  S3_BUCKET_DERIVED: ${S3_BUCKET_DERIVED:-ksp-derived}
+  S3_BUCKET_EXPORTS: ${S3_BUCKET_EXPORTS:-ksp-exports}
+  S3_BUCKET_REPORTS: ${S3_BUCKET_REPORTS:-ksp-reports}
+  OBJECT_LOCK_MODE: ${OBJECT_LOCK_MODE:-GOVERNANCE}
+  OBJECT_LOCK_DAYS: ${OBJECT_LOCK_DAYS:-3650}
+  JWT_PRIVATE_KEY: file:/run/secrets/jwt_private_key
+  JWT_PUBLIC_KEY: file:/run/secrets/jwt_public_key
+  JWT_ISSUER: ${JWT_ISSUER:-ksp-vms}
+  ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-900}
+  REFRESH_TOKEN_TTL_HOURS: ${REFRESH_TOKEN_TTL_HOURS:-12}
+  DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?}
+  MEDIA_TOKEN_SECRET: ${MEDIA_TOKEN_SECRET:?}
+  MEDIA_TOKEN_TTL_SECONDS: ${MEDIA_TOKEN_TTL_SECONDS:-300}
+  SIGNING_PRIVATE_KEY: file:/run/secrets/signing_private_key
+  SIGNING_CERTIFICATE: file:/run/secrets/signing_certificate
+  SIGNING_KEY_ID: ${SIGNING_KEY_ID:?}
+  WORK_DIR: /work
+  WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+  METRICS_PORT: "9464"
+  METRICS_HOST: 0.0.0.0
+
+x-app-secrets: &app-secrets
+  - jwt_private_key
+  - jwt_public_key
+  - signing_private_key
+  - signing_certificate
+
+x-hardening: &hardening
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "50m", max-file: "5" }
+
+services:
+  postgres:
+    image: postgres:16.10-bookworm@sha256:38471f330eb885e04de130b768d6db4e10469e2311879c7e5c699f6d2d8a1c74
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    shm_size: 512m
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_superuser_password
+      POSTGRES_DB: ${POSTGRES_DB:-ksp}
+      POSTGRES_INITDB_ARGS: --data-checksums --encoding=UTF8
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-1GB}
+      - -c
+      - max_connections=${PG_MAX_CONNECTIONS:-200}
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - log_min_duration_statement=1000
+    secrets: [pg_superuser_password, ksp_owner_db_password, ksp_app_db_password, ksp_ai_db_password, ksp_backup_db_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../../db/bootstrap/roles.sql:/ksp/roles.sql:ro
+      - ./postgres/10-ksp-roles.sh:/docker-entrypoint-initdb.d/10-ksp-roles.sh:ro
+    networks: [backend, ai]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-ksp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "4", memory: 8g }
+
+  s3:
+    # Versity S3 gateway (same server as development; Object Lock + versioning verified in tests). For multi-node
+    # production use MinIO / Ceph RGW / NetApp StorageGRID with erasure coding (docs/INFRASTRUCTURE.md).
+    image: versity/versitygw:v1.8.0@sha256:30292fc2eeacc67a36993b01f7a7a5e3361a19cced0e80c1d71cfa2a4b0a2499
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    environment:
+      ROOT_ACCESS_KEY: ${S3_ROOT_ACCESS_KEY:?}
+      ROOT_SECRET_KEY: ${S3_ROOT_SECRET_KEY:?}
+      VGW_IAM_DIR: /data/iam
+    command: ["--port", ":7070", "--admin-port", ":7071", "posix", "--versioning-dir", "/data/versions", "--sidecar", "/data/sidecar", "/data/buckets"]
+    volumes:
+      - s3data:/data
+    networks: [backend, ai]
+    # No healthcheck: the image ships no shell/HTTP client; the migrate job fails fast if S3 is unreachable.
+    deploy:
+      resources:
+        limits: { cpus: "2", memory: 2g }
+
+  # One-shot: schema migrations (owner role), then buckets with versioning + Object Lock. Re-run on every upgrade.
+  migrate:
+    image: ${KSP_IMAGE_REGISTRY:-ghcr.io/ksp}/api:${KSP_VERSION:-latest}
+    <<: *hardening
+    restart: "no"
+    environment:
+      <<: *app-env
+      DATABASE_MIGRATION_URL: postgres://ksp_owner:${KSP_OWNER_DB_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-ksp}
+    command: ["sh", "-c", "node packages/core/dist/bin/migrate.js && node scripts/ops/ensure-buckets.mjs"]
+    secrets: *app-secrets
+    networks: [backend]
+    depends_on:
+      postgres: { condition: service_healthy }
+      s3: { condition: service_started }
+
+  api:
+    image: ${KSP_IMAGE_REGISTRY:-ghcr.io/ksp}/api:${KSP_VERSION:-latest}
+    <<: *hardening
+    environment:
+      <<: *app-env
+      API_HOST: 0.0.0.0
+      API_PORT: "4000"
+    secrets: *app-secrets
+    tmpfs: ["/work:size=256m,uid=1000,gid=1000", "/tmp:size=64m"]
+    networks: [edge, backend, egress, monitoring]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health/ready').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    deploy:
+      replicas: ${API_REPLICAS:-2}
+      resources:
+        limits: { cpus: "2", memory: 2g }
+
+  worker:
+    image: ${KSP_IMAGE_REGISTRY:-ghcr.io/ksp}/worker:${KSP_VERSION:-latest}
+    <<: *hardening
+    environment:
+      <<: *app-env
+      FFMPEG_PATH: /usr/local/bin/ffmpeg
+      FFPROBE_PATH: /usr/local/bin/ffprobe
+    secrets: *app-secrets
+    volumes:
+      # Transcoding scratch space: sized for the largest expected upload x WORKER_CONCURRENCY x ~2.
+      - workerscratch:/work
+    tmpfs: ["/tmp:size=256m"]
+    networks: [backend, egress, monitoring]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    deploy:
+      resources:
+        limits: { cpus: "4", memory: 6g }
+
+  # One-shot: download + SHA-256-verify pinned AI models into the models volume and register them (app role).
+  models:
+    image: ${KSP_IMAGE_REGISTRY:-ghcr.io/ksp}/ai-worker:${KSP_VERSION:-latest}
+    <<: *hardening
+    restart: "no"
+    environment:
+      <<: *app-env
+      AI_MODELS_DIR: /models
+    command: ["node", "scripts/ops/fetch-models.mjs"]
+    secrets: *app-secrets
+    volumes: ["aimodels:/models"]
+    networks: [backend, egress]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    profiles: [ai]
+
+  ai-worker:
+    image: ${KSP_IMAGE_REGISTRY:-ghcr.io/ksp}/ai-worker:${KSP_VERSION:-latest}
+    <<: *hardening
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      COOKIE_SECURE: "true"
+      # The ai-worker loads the shared config schema, so app-only values must be present; it never uses them to
+      # reach evidence: DB is ksp_ai (column grants only), S3 is the derived-bucket-only identity.
+      DATABASE_URL: postgres://ksp_ai:${KSP_AI_DB_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-ksp}
+      DATABASE_AI_URL: postgres://ksp_ai:${KSP_AI_DB_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-ksp}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://s3:7070}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_AI_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_AI_SECRET_KEY:?}
+      S3_AI_ACCESS_KEY: ${S3_AI_ACCESS_KEY:?}
+      S3_AI_SECRET_KEY: ${S3_AI_SECRET_KEY:?}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      S3_BUCKET_DERIVED: ${S3_BUCKET_DERIVED:-ksp-derived}
+      OBJECT_LOCK_MODE: ${OBJECT_LOCK_MODE:-GOVERNANCE}
+      JWT_PRIVATE_KEY: unused-by-ai-worker
+      JWT_PUBLIC_KEY: unused-by-ai-worker
+      DATA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      MEDIA_TOKEN_SECRET: unused-by-ai-worker-unused-by-ai-worker
+      SIGNING_PRIVATE_KEY: unused-by-ai-worker
+      SIGNING_CERTIFICATE: unused-by-ai-worker
+      AI_MODELS_DIR: /models
+      AI_WORKER_CONCURRENCY: ${AI_WORKER_CONCURRENCY:-1}
+      WORK_DIR: /work
+    volumes: ["aimodels:/models:ro"]
+    tmpfs: ["/work:size=1g,uid=1000,gid=1000", "/tmp:size=64m"]
+    networks: [ai]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    profiles: [ai]
+    deploy:
+      resources:
+        limits: { cpus: "4", memory: 4g }
+
+  web:
+    image: ${KSP_IMAGE_REGISTRY:-ghcr.io/ksp}/web:${KSP_VERSION:-latest}
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM_HOSTPORT: api:4000
+    tmpfs: ["/etc/nginx/conf.d:uid=101,gid=101", "/tmp:uid=101,gid=101", "/var/cache/nginx:uid=101,gid=101"]
+    ports:
+      # Put a TLS-terminating reverse proxy / load balancer in front; never expose plain HTTP beyond it.
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:8080"
+    networks: [edge]
+    depends_on:
+      api: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "1", memory: 256m }
+
+  # Nightly encrypted logical backup + weekly restore verification (see docs/BACKUP-RESTORE-RUNBOOK.md).
+  # Compose has no scheduler: run `docker compose run --rm backup` from host cron / a systemd timer.
+  backup:
+    image: ${KSP_IMAGE_REGISTRY:-ghcr.io/ksp}/backup:${KSP_VERSION:-latest}
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-ksp}
+      PGUSER: ksp_backup
+      PGPASSWORD: ${KSP_BACKUP_DB_PASSWORD:?}
+      BACKUP_RECORD_URL: postgres://ksp_app:${KSP_APP_DB_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-ksp}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:?}
+      BACKUP_S3_REGION: ${BACKUP_S3_REGION:-us-east-1}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:?}
+      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:?}
+      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:?}
+      BACKUP_AGE_RECIPIENTS_FILE: /run/secrets/backup_age_recipients
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-35}
+    secrets: [backup_age_recipients]
+    volumes: ["backupwork:/work"]
+    networks: [backend, egress]
+    profiles: [ops]
+
+  prometheus:
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
+    restart: unless-stopped
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=30d", "--web.enable-lifecycle=false"]
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - promdata:/prometheus
+    networks: [monitoring]
+    deploy:
+      resources:
+        limits: { cpus: "1", memory: 2g }
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba
+    restart: unless-stopped
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager"]
+    volumes:
+      - ../monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - amdata:/alertmanager
+    networks: [monitoring]
+
+  grafana:
+    image: grafana/grafana:12.1.1@sha256:a1701c2180249361737a99a01bc770db39381640e4d631825d38ff4535efa47d
+    restart: unless-stopped
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    secrets: [grafana_admin_password]
+    volumes:
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/var/lib/grafana-dashboards:ro
+      - grafanadata:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    networks: [monitoring]
+
+networks:
+  edge: {}
+  backend: { internal: true }
+  ai: { internal: true }
+  egress: {}
+  monitoring: { internal: true }
+
+volumes:
+  pgdata: {}
+  s3data: {}
+  workerscratch: {}
+  aimodels: {}
+  promdata: {}
+  amdata: {}
+  grafanadata: {}
+  backupwork: {}
+
+# Files produced by scripts/ops/generate-secrets.sh --out deploy/compose/secrets --format compose
+secrets:
+  pg_superuser_password: { file: ./secrets/pg_superuser_password }
+  ksp_owner_db_password: { file: ./secrets/ksp_owner_db_password }
+  ksp_app_db_password: { file: ./secrets/ksp_app_db_password }
+  ksp_ai_db_password: { file: ./secrets/ksp_ai_db_password }
+  ksp_backup_db_password: { file: ./secrets/ksp_backup_db_password }
+  jwt_private_key: { file: ./secrets/jwt_private_key }
+  jwt_public_key: { file: ./secrets/jwt_public_key }
+  signing_private_key: { file: ./secrets/signing_private_key }
+  signing_certificate: { file: ./secrets/signing_certificate }
+  backup_age_recipients: { file: ./secrets/backup_age_recipients }
+  grafana_admin_password: { file: ./secrets/grafana_admin_password }

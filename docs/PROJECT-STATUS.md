@@ -26,7 +26,7 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 Test totals on `main` at last merge: API 278 · worker 55 · ai-worker 17 · web 15 · station client 3 (368 total) — all passing; root typecheck and web build green.
 
 ## In Progress
-DevOps, CI/CD, backup & DR · Security testing & threat model.
+Security testing & threat model. (DevOps, CI/CD, backup & DR: delivered on the devops branch — see Deployment.)
 
 ## Queued
 E2E, performance, accessibility · Final documentation & production audit.
@@ -44,7 +44,14 @@ See totals above. Commands: `npm run typecheck`; `(cd apps/api && npx vitest run
 Implemented: RBAC + jurisdiction scoping (404 for out-of-scope), least-privilege DB roles, CSRF, rate limiting, security headers/CSP, tokenised media, no storage URLs to clients, audit of every evidence touch. Not yet done: SAST/dependency/container scanning, full security test suite, threat model document.
 
 ## Deployment
-Not started (queued).
+DevOps/DR workstream (see DEPLOYMENT.md, DISASTER-RECOVERY.md): multi-target Dockerfile, compose stack, kustomize base +
+staging/production overlays, CI/CD workflows, monitoring config, encrypted backups, restore, S3 replication with hash
+verification. **Verified locally:** `npm run build`; every production entrypoint (api, worker, ai-worker, migrate, seed)
+started from a reproduction of the image layout with `npm ci --omit=dev` in `NODE_ENV=production`; static validation
+(hadolint, shellcheck, kustomize+kubeconform 94 objects, actionlint, `docker compose config`); backup verification
+rejects 7/7 corrupted or forged backups; **DR drill passed** (5 videos, restore→service ready 3.9 s, fixity of every
+original from the DR copy, audit chain intact). **UNVERIFIED:** image builds, compose/k8s runtime, GitHub Actions runs,
+CNPG failover/PITR, native object replication, production-scale RTO (2 h target).
 
 ## Known Issues
 See `docs/KNOWN-ISSUES.md`.

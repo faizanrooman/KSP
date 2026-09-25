@@ -1,0 +1,26 @@
+# KSP VMS Kubernetes base. Render with: kustomize build deploy/k8s/overlays/<staging|production>
+# STATUS: UNVERIFIED on a cluster — manifests are schema-validated with kubeconform (scripts/ci/validate-deploy.sh).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ksp-vms
+labels:
+  - pairs: { app.kubernetes.io/part-of: ksp-vms }
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - serviceaccounts.yaml
+  - config.yaml
+  - api.yaml
+  - worker.yaml
+  - ai-worker.yaml
+  - web.yaml
+  - ingress.yaml
+  - networkpolicies.yaml
+  - backup-cronjobs.yaml
+  - servicemonitor.yaml
+images:
+  - { name: ksp/api, newName: ghcr.io/ksp/api, newTag: 1.0.0 }
+  - { name: ksp/worker, newName: ghcr.io/ksp/worker, newTag: 1.0.0 }
+  - { name: ksp/ai-worker, newName: ghcr.io/ksp/ai-worker, newTag: 1.0.0 }
+  - { name: ksp/web, newName: ghcr.io/ksp/web, newTag: 1.0.0 }
+  - { name: ksp/backup, newName: ghcr.io/ksp/backup, newTag: 1.0.0 }

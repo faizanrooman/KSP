@@ -1,0 +1,47 @@
+# Production: HA PostgreSQL (CloudNativePG), secrets from the secrets manager (External Secrets Operator),
+# multi-zone spread, larger scratch volumes. Image tags are set by the deploy pipeline to immutable digests.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ksp-vms
+resources:
+  - ../../base
+components:
+  - ../../components/external-secrets
+  - ../../components/cloudnative-pg
+images:
+  - { name: ksp/api, newName: ghcr.io/ksp/api, newTag: 1.0.0 }
+  - { name: ksp/worker, newName: ghcr.io/ksp/worker, newTag: 1.0.0 }
+  - { name: ksp/ai-worker, newName: ghcr.io/ksp/ai-worker, newTag: 1.0.0 }
+  - { name: ksp/web, newName: ghcr.io/ksp/web, newTag: 1.0.0 }
+  - { name: ksp/backup, newName: ghcr.io/ksp/backup, newTag: 1.0.0 }
+patches:
+  - target: { kind: Deployment, name: ksp-api }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 3 }
+  - target: { kind: HorizontalPodAutoscaler, name: ksp-api }
+    patch: |-
+      - { op: replace, path: /spec/minReplicas, value: 3 }
+      - { op: replace, path: /spec/maxReplicas, value: 24 }
+  - target: { kind: HorizontalPodAutoscaler, name: ksp-worker }
+    patch: |-
+      - { op: replace, path: /spec/minReplicas, value: 4 }
+      - { op: replace, path: /spec/maxReplicas, value: 40 }
+  - target: { kind: Deployment, name: ksp-ai-worker }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 2 }
+  - target: { kind: PodDisruptionBudget, name: ksp-api }
+    patch: |-
+      - { op: replace, path: /spec/minAvailable, value: 2 }
+  # Transcoding scratch on local NVMe via a generic ephemeral volume instead of node emptyDir.
+  - target: { kind: Deployment, name: ksp-worker }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/1
+        value:
+          name: work
+          ephemeral:
+            volumeClaimTemplate:
+              spec:
+                accessModes: [ReadWriteOnce]
+                storageClassName: local-nvme
+                resources: { requests: { storage: 500Gi } }

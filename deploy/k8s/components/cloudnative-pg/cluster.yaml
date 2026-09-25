@@ -1,0 +1,73 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ksp-db
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.10
+  primaryUpdateStrategy: unsupervised
+  # Zero data loss for committed transactions (audit ledger, custody): a commit waits for one standby.
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+      dataDurability: required
+    parameters:
+      shared_buffers: 8GB
+      effective_cache_size: 24GB
+      max_connections: "400"
+      wal_compression: "on"
+      log_min_duration_statement: "1000"
+      password_encryption: scram-sha-256
+  enableSuperuserAccess: false
+  bootstrap:
+    initdb:
+      database: ksp
+      owner: ksp_owner
+      dataChecksums: true
+      postInitSQL:
+        - CREATE ROLE ksp_app LOGIN
+        - CREATE ROLE ksp_ai LOGIN
+        - CREATE ROLE ksp_backup LOGIN IN ROLE pg_read_all_data
+  managed:
+    roles:
+      - { name: ksp_owner, ensure: present, login: true, passwordSecret: { name: ksp-db-owner } }
+      - { name: ksp_app, ensure: present, login: true, passwordSecret: { name: ksp-db-app } }
+      - { name: ksp_ai, ensure: present, login: true, passwordSecret: { name: ksp-db-ai } }
+      - { name: ksp_backup, ensure: present, login: true, inRoles: [pg_read_all_data], passwordSecret: { name: ksp-db-backup } }
+  storage:
+    size: 2Ti
+    storageClass: fast-ssd
+  walStorage:
+    size: 500Gi
+    storageClass: fast-ssd
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: topology.kubernetes.io/zone
+    podAntiAffinityType: required
+  resources:
+    requests: { cpu: "8", memory: 32Gi }
+    limits: { cpu: "16", memory: 32Gi }
+  monitoring:
+    enablePodMonitor: true
+  # PITR: continuous WAL archive + weekly base backups to the DR site (encrypted at rest by the store; the
+  # nightly logical dump is additionally age-encrypted by scripts/backup/pg-backup.sh).
+  backup:
+    retentionPolicy: 35d
+    barmanObjectStore:
+      destinationPath: s3://ksp-pg-wal/ksp-db
+      endpointURL: https://backup-s3.dr.ksp.internal
+      s3Credentials:
+        accessKeyId: { name: ksp-db-wal-s3, key: ACCESS_KEY_ID }
+        secretAccessKey: { name: ksp-db-wal-s3, key: SECRET_ACCESS_KEY }
+      wal: { compression: gzip, maxParallel: 4 }
+      data: { compression: gzip, jobs: 4 }
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: ksp-db-weekly
+spec:
+  schedule: "0 0 21 * * 6"   # Saturday 21:00 UTC (seconds field first)
+  backupOwnerReference: self
+  cluster: { name: ksp-db }

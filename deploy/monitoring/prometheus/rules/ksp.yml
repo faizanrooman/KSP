@@ -1,0 +1,67 @@
+# Infrastructure-level alerts. Business alerts (integrity failure, audit chain broken, brute force, excessive
+# downloads, …) are raised inside the application (alerts table / dashboards workstream).
+groups:
+  - name: ksp-availability
+    rules:
+      - alert: KspApiDown
+        expr: up{job="ksp-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "API instance {{ $labels.instance }} is not scrapeable"
+          runbook: "docs/RUNBOOK.md#api-down"
+      - alert: KspApiNoHealthyInstances
+        expr: sum(up{job="ksp-api"}) == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "No API instance is up — service outage"
+          runbook: "docs/RUNBOOK.md#api-down"
+      - alert: KspWorkerDown
+        expr: sum(up{job="ksp-worker"}) == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "No worker is up — ingestion/transcoding stopped"
+          runbook: "docs/RUNBOOK.md#queue-backlog"
+  - name: ksp-api-slo
+    rules:
+      - record: ksp:api_http_5xx_ratio:rate5m
+        expr: |
+          sum(rate(ksp_api_http_request_duration_seconds_count{status=~"5.."}[5m]))
+          / clamp_min(sum(rate(ksp_api_http_request_duration_seconds_count[5m])), 1e-9)
+      - alert: KspApiHighErrorRate
+        expr: ksp:api_http_5xx_ratio:rate5m > 0.02
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "API 5xx ratio {{ $value | humanizePercentage }} over 10 minutes"
+          runbook: "docs/RUNBOOK.md#api-errors"
+      - alert: KspApiHighLatency
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(ksp_api_http_request_duration_seconds_bucket{route!~".*/media/.*|.*/uploads/.*"}[5m]))) > 1.5
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "API p95 latency (non-media) {{ $value }}s"
+      - alert: KspAuthFailureSpike
+        expr: sum(rate(ksp_api_auth_failures_total[5m])) * 60 > 30
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "More than 30 failed logins/minute — possible brute force"
+          runbook: "docs/RUNBOOK.md#auth-attack"
+  - name: ksp-process
+    rules:
+      - alert: KspProcessMemoryHigh
+        expr: max by (job, instance) ({__name__=~"ksp_(api|worker)_process_resident_memory_bytes"}) > 1.8e9
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.instance }} RSS above 1.8 GB"
+      - alert: KspEventLoopLag
+        expr: max by (job, instance) ({__name__=~"ksp_(api|worker)_nodejs_eventloop_lag_p99_seconds"}) > 0.5
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $labels.job }} event-loop p99 lag {{ $value }}s"

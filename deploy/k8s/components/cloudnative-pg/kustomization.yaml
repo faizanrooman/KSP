@@ -1,0 +1,6 @@
+# PostgreSQL HA with CloudNativePG: 3 instances across zones, synchronous replication (zero RPO for committed
+# ledger writes), continuous WAL archiving + base backups to the DR object store (PITR). Requires the CNPG operator.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - cluster.yaml

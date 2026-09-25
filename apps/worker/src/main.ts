@@ -45,7 +45,7 @@ if (isMain) {
   const metrics = createServer(async (_req, res) => {
     res.setHeader('content-type', client.register.contentType);
     res.end(await client.register.metrics());
-  }).listen(cfg.METRICS_PORT + 1, '127.0.0.1');
+  }).listen(cfg.METRICS_PORT + 1, cfg.METRICS_HOST);
   ctx.log.info('worker started');
   const shutdown = async () => {
     stopHeartbeat();

@@ -1,0 +1,5 @@
+# hadolint config for deploy/docker/Dockerfile
+ignored:
+  - DL3006  # images come from ARGs that are pinned by digest (hadolint cannot see through ARG)
+  - DL3008  # base images are digest-pinned; apt version pins break on Debian security updates
+failure-threshold: warning
