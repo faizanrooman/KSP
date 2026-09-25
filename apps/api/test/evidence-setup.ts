@@ -12,7 +12,7 @@ export async function evidenceTestSetup() {
     .execute();
   invalidateSettings();
   // pg-boss must create/own its schema; the app role (DML only) cannot, so tests start it with the owner URL.
-  await getQueue(loadConfig().DATABASE_MIGRATION_URL);
+  await getQueue();
   return app;
 }
 

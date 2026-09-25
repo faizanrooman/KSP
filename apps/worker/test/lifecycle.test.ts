@@ -15,7 +15,7 @@ let requester: string;
 beforeAll(async () => {
   const cfg = loadConfig();
   db = createDb(cfg.DATABASE_URL, 4).db;
-  await getQueue(cfg.DATABASE_MIGRATION_URL);
+  await getQueue();
   deps = { db, storage: storage() };
   const id = async (u: string) => (await db.selectFrom('users').select('id').where('username', '=', u).executeTakeFirstOrThrow()).id;
   uploader = await id('op.cubbon');
