@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import pg from 'pg';
 import { loadConfig, repoRoot } from '../config.js';
 import { sha256Hex } from '../crypto.js';
+import { installQueueSchema } from '../queue.js';
 
 export interface MigrationResult {
   applied: string[];
@@ -54,5 +55,7 @@ export async function migrate(connectionString?: string, log: (m: string) => voi
     await client.query('SELECT pg_advisory_unlock(7340033)').catch(() => undefined);
     await client.end();
   }
+  log('installing queue schema (pg-boss)');
+  await installQueueSchema(url);
   return result;
 }
