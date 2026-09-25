@@ -44,7 +44,7 @@ export default async function search(fastify: FastifyInstance) {
 
   app.post(
     '/evidence',
-    { preHandler: guard, schema: { tags: ['search'], summary: 'Permission-aware advanced evidence search (text, metadata, location, case/FIR, AI-derived) with facets', body: searchBody } },
+    { preValidation: guard, schema: { tags: ['search'], summary: 'Permission-aware advanced evidence search (text, metadata, location, case/FIR, AI-derived) with facets', body: searchBody } },
     async (req) => {
       const p = req.requirePrincipal();
       const { sort, page, pageSize, includeFacets, ...criteria } = req.body;
@@ -60,7 +60,7 @@ export default async function search(fastify: FastifyInstance) {
 
   app.get(
     '/evidence/:id/related',
-    { preHandler: guard, schema: { tags: ['search'], summary: 'Related-evidence suggestions (same case / officer / device / place & time / approved AI hits / explicit relations) — visible items only', params: idParams } },
+    { preValidation: guard, schema: { tags: ['search'], summary: 'Related-evidence suggestions (same case / officer / device / place & time / approved AI hits / explicit relations) — visible items only', params: idParams } },
     async (req) => {
       const p = req.requirePrincipal();
       const ev = await loadEvidenceFor(app.db, p, req.params.id, 'evidence:read', req.actor());
@@ -74,13 +74,13 @@ export default async function search(fastify: FastifyInstance) {
     },
   );
 
-  app.get('/saved', { preHandler: guard, schema: { tags: ['search'], summary: 'My saved searches' } }, async (req) => {
+  app.get('/saved', { preValidation: guard, schema: { tags: ['search'], summary: 'My saved searches' } }, async (req) => {
     const p = req.requirePrincipal();
     const rows = await app.db.selectFrom('saved_searches').select(['id', 'name', 'criteria', 'created_at', 'updated_at']).where('user_id', '=', ownerId(p)).orderBy('name').execute();
     return { items: rows.map((r) => ({ id: r.id, name: r.name, criteria: r.criteria, createdAt: r.created_at, updatedAt: r.updated_at })) };
   });
 
-  app.post('/saved', { preHandler: guard, schema: { tags: ['search'], summary: 'Save a search (criteria are validated like POST /search/evidence)', body: savedBody } }, async (req, reply) => {
+  app.post('/saved', { preValidation: guard, schema: { tags: ['search'], summary: 'Save a search (criteria are validated like POST /search/evidence)', body: savedBody } }, async (req, reply) => {
     const p = req.requirePrincipal();
     try {
       const row = await app.db.transaction().execute(async (tx) => {
@@ -99,7 +99,7 @@ export default async function search(fastify: FastifyInstance) {
     }
   });
 
-  app.delete('/saved/:id', { preHandler: guard, schema: { tags: ['search'], summary: 'Delete one of my saved searches', params: idParams } }, async (req, reply) => {
+  app.delete('/saved/:id', { preValidation: guard, schema: { tags: ['search'], summary: 'Delete one of my saved searches', params: idParams } }, async (req, reply) => {
     const p = req.requirePrincipal();
     await app.db.transaction().execute(async (tx) => {
       const r = await tx.deleteFrom('saved_searches').where('id', '=', req.params.id).where('user_id', '=', ownerId(p)).returning(['id', 'name']).executeTakeFirst();
