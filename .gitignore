@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.local/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
+apps/ai-worker/models/*.onnx
+.DS_Store
