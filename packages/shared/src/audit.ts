@@ -118,8 +118,12 @@ export const AUDIT_ACTIONS = {
   AI_WATCHLIST_CHANGED: { category: 'AI', custody: false },
   // Search & investigation
   SEARCH_PERFORMED: { category: 'SEARCH', custody: false },
+  SAVED_SEARCH_CHANGED: { category: 'SEARCH', custody: false },
   WORKSPACE_CREATED: { category: 'INVESTIGATION', custody: false },
   WORKSPACE_UPDATED: { category: 'INVESTIGATION', custody: false },
+  WORKSPACE_MEMBER_CHANGED: { category: 'INVESTIGATION', custody: false },
+  /** sync offset / order / notes of an evidence item inside a workspace changed */
+  WORKSPACE_ITEM_UPDATED: { category: 'INVESTIGATION', custody: false },
   WORKSPACE_EVIDENCE_ADDED: { category: 'INVESTIGATION', custody: true },
   WORKSPACE_EVIDENCE_REMOVED: { category: 'INVESTIGATION', custody: true },
   BOOKMARK_CREATED: { category: 'INVESTIGATION', custody: true },
@@ -139,6 +143,13 @@ export const AUDIT_ACTIONS = {
   EVIDENCE_LINKED_TO_CASE: { category: 'CUSTODY', custody: true },
   EVIDENCE_UNLINKED_FROM_CASE: { category: 'CUSTODY', custody: true },
   INTEGRATION_SYNC: { category: 'INTEGRATION', custody: false },
+  CASE_STATUS_CHANGED: { category: 'CASE', custody: false },
+  INTEGRATION_TESTED: { category: 'INTEGRATION', custody: false },
+  INTEGRATION_VERIFIED: { category: 'INTEGRATION', custody: false },
+  INTEGRATION_API_REQUEST: { category: 'INTEGRATION', custody: false },
+  API_CLIENT_SECRET_ROTATED: { category: 'ADMIN', custody: false },
+  API_CLIENT_UPDATED: { category: 'ADMIN', custody: false },
+  EVIDENCE_DOWNLOAD_LINK_ISSUED: { category: 'CUSTODY', custody: true },
   // Export & sharing
   EXPORT_REQUESTED: { category: 'EXPORT', custody: true },
   EXPORT_APPROVED: { category: 'EXPORT', custody: true },

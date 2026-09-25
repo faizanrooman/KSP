@@ -9,6 +9,7 @@ import { signMediaToken, verifyMediaToken, type AuditActor, type Database, type 
 import { API_PREFIX } from '@ksp/shared';
 import { AppError, forbidden, unauthenticated } from '../../lib/errors.js';
 import type { Principal } from '../../lib/principal.js';
+import { ipInCidr } from '../../plugins/auth.js';
 
 export const IMAGE_TOKEN_TTL_SECONDS = 900;
 export const DOWNLOAD_TOKEN_TTL_SECONDS = 60;
@@ -78,6 +79,18 @@ export async function authenticateMediaToken(
       .executeTakeFirst();
     if (!share) throw unauthenticated('Share no longer active');
     return { claims, actor: { type: 'EXTERNAL_RECIPIENT', id: share.id, name: share.recipient_name ?? null, ...base }, shareAllowsDownload: share.allow_download };
+  }
+  if (claims.typ === 'API_CLIENT') {
+    // Integration API clients may only hold download tokens (issued by GET /integration/evidence/:id/download).
+    if (claims.scope !== 'download') throw new AppError(403, 'TOKEN_SCOPE', 'Media token not valid for this resource');
+    const c = await db
+      .selectFrom('api_clients')
+      .select(['id', 'client_id', 'allowed_ips', 'expires_at', 'revoked_at'])
+      .where('id', '=', claims.sub)
+      .executeTakeFirst();
+    if (!c || c.revoked_at || (c.expires_at && c.expires_at <= now)) throw unauthenticated('API client no longer active');
+    if (c.allowed_ips.length && !c.allowed_ips.some((cidr) => ipInCidr(req.ip, cidr))) throw unauthenticated('API client not allowed from this address');
+    return { claims, actor: { type: 'API_CLIENT', id: c.id, name: c.client_id, ...base }, shareAllowsDownload: false };
   }
   throw unauthenticated('Media token invalid or expired');
 }

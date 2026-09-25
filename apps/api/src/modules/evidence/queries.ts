@@ -36,14 +36,72 @@ const thumbSql = sql<string | null>`(SELECT dv.id FROM evidence_derivatives dv W
   ORDER BY (dv.kind = 'THUMBNAIL') DESC, dv.created_at DESC LIMIT 1)`;
 const tagsSql = sql<string[]>`ARRAY(SELECT t.tag FROM evidence_tags t WHERE t.evidence_id = e.id ORDER BY t.tag)`;
 
-function baseList(db: Database, p: Principal, f: ListFilters) {
-  let q = db
+/** Columns of the evidence list item (evidence e + listItemBase joins). Reused by search results. */
+export const LIST_ITEM_COLUMNS = [
+  'e.id', 'e.evidence_number', 'e.status', 'e.status_reason', 'e.media_status', 'e.title', 'e.category', 'e.recorded_at', 'e.duration_ms',
+  'e.size_bytes', 'e.width', 'e.height', 'e.storage_tier', 'e.legal_hold', 'e.created_at', 'e.registered_at',
+  'o.id as org_id', 'o.name as org_name', 'o.code as org_code',
+  'off.id as off_id', 'off.full_name as off_name', 'off.badge_number as off_badge',
+  'd.id as dev_id', 'd.serial_number as dev_serial',
+  'up.id as up_id', 'up.full_name as up_name',
+] as const;
+
+/** evidence e + org unit / uploader / officer / device joins used by list-style queries. */
+function listItemBase(db: Database) {
+  return db
     .selectFrom('evidence as e')
     .innerJoin('org_units as o', 'o.id', 'e.org_unit_id')
     .innerJoin('users as up', 'up.id', 'e.uploaded_by')
     .leftJoin('users as off', 'off.id', 'e.officer_id')
-    .leftJoin('devices as d', 'd.id', 'e.device_id')
-    .where(evidenceVisibleSql(p, 'e'));
+    .leftJoin('devices as d', 'd.id', 'e.device_id');
+}
+
+async function selectListRows(db: Database, ids: string[]) {
+  return listItemBase(db).select(LIST_ITEM_COLUMNS).select([tagsSql.as('tags'), thumbSql.as('thumb_id')]).where('e.id', 'in', ids).execute();
+}
+type ListRow = Awaited<ReturnType<typeof selectListRows>>[number];
+
+/**
+ * Hydrate list items by id, preserving the order of `ids`. The CALLER must have produced `ids` from a query
+ * filtered by evidenceVisibleSql (search, workspaces).
+ */
+export async function loadListItems(db: Database, p: Principal, ids: string[]) {
+  if (!ids.length) return [];
+  const rows = await selectListRows(db, ids);
+  const byId = new Map(rows.map((r) => [r.id, mapListItem(p, r)]));
+  return ids.map((id) => byId.get(id)).filter((x): x is ReturnType<typeof mapListItem> => !!x);
+}
+
+/** Evidence list item (camelCase) — the shape returned by GET /evidence and by search results. */
+export function mapListItem(p: Principal, r: ListRow) {
+  return {
+    id: r.id,
+    evidenceNumber: r.evidence_number,
+    status: r.status,
+    statusReason: r.status_reason,
+    mediaStatus: r.media_status,
+    title: r.title,
+    category: r.category,
+    orgUnit: { id: r.org_id, name: r.org_name, code: r.org_code },
+    officer: r.off_id ? { id: r.off_id, fullName: r.off_name, badgeNumber: r.off_badge } : null,
+    device: r.dev_id ? { id: r.dev_id, serialNumber: r.dev_serial } : null,
+    uploadedBy: { id: r.up_id, fullName: r.up_name },
+    recordedAt: r.recorded_at,
+    durationMs: r.duration_ms,
+    sizeBytes: r.size_bytes,
+    width: r.width,
+    height: r.height,
+    storageTier: r.storage_tier,
+    legalHold: r.legal_hold,
+    tags: r.tags ?? [],
+    thumbnailUrl: thumbnailUrl(p, r.id, r.thumb_id),
+    createdAt: r.created_at,
+    registeredAt: r.registered_at,
+  };
+}
+
+function baseList(db: Database, p: Principal, f: ListFilters) {
+  let q = listItemBase(db).where(evidenceVisibleSql(p, 'e'));
   if (f.q) {
     const like = `%${f.q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
     q = q.where(
@@ -75,14 +133,7 @@ export async function listEvidence(db: Database, p: Principal, f: ListFilters, s
   const key = (desc ? sort.slice(1) : sort) as (typeof LIST_SORTS)[number];
   const dir = desc ? sql.raw('DESC NULLS LAST') : sql.raw('ASC NULLS LAST');
   const rows = await baseList(db, p, f)
-    .select([
-      'e.id', 'e.evidence_number', 'e.status', 'e.status_reason', 'e.media_status', 'e.title', 'e.category', 'e.recorded_at', 'e.duration_ms',
-      'e.size_bytes', 'e.width', 'e.height', 'e.storage_tier', 'e.legal_hold', 'e.created_at', 'e.registered_at',
-      'o.id as org_id', 'o.name as org_name', 'o.code as org_code',
-      'off.id as off_id', 'off.full_name as off_name', 'off.badge_number as off_badge',
-      'd.id as dev_id', 'd.serial_number as dev_serial',
-      'up.id as up_id', 'up.full_name as up_name',
-    ])
+    .select(LIST_ITEM_COLUMNS)
     .select([tagsSql.as('tags'), thumbSql.as('thumb_id'), sql<number>`count(*) OVER ()`.as('total')])
     .orderBy(sql`${sql.ref(`e.${key}`)} ${dir}`)
     .orderBy('e.id')
@@ -95,30 +146,7 @@ export async function listEvidence(db: Database, p: Principal, f: ListFilters, s
     total = Number(c?.n ?? 0);
   }
   return {
-    items: rows.map((r) => ({
-      id: r.id,
-      evidenceNumber: r.evidence_number,
-      status: r.status,
-      statusReason: r.status_reason,
-      mediaStatus: r.media_status,
-      title: r.title,
-      category: r.category,
-      orgUnit: { id: r.org_id, name: r.org_name, code: r.org_code },
-      officer: r.off_id ? { id: r.off_id, fullName: r.off_name, badgeNumber: r.off_badge } : null,
-      device: r.dev_id ? { id: r.dev_id, serialNumber: r.dev_serial } : null,
-      uploadedBy: { id: r.up_id, fullName: r.up_name },
-      recordedAt: r.recorded_at,
-      durationMs: r.duration_ms,
-      sizeBytes: r.size_bytes,
-      width: r.width,
-      height: r.height,
-      storageTier: r.storage_tier,
-      legalHold: r.legal_hold,
-      tags: r.tags ?? [],
-      thumbnailUrl: thumbnailUrl(p, r.id, r.thumb_id),
-      createdAt: r.created_at,
-      registeredAt: r.registered_at,
-    })),
+    items: rows.map((r) => mapListItem(p, r)),
     total: Number(total),
     page,
     pageSize,
@@ -137,7 +165,7 @@ export async function loadDetail(db: Database, p: Principal, id: string): Promis
     .leftJoin('users as lh', 'lh.id', 'e.legal_hold_by')
     .leftJoin('evidence as dup', 'dup.id', 'e.duplicate_of')
     .select([
-      'e.id', 'e.evidence_number', 'e.status', 'e.status_reason', 'e.media_status', 'e.media_error', 'e.org_unit_id', 'e.org_path', 'e.title',
+  'e.id', 'e.evidence_number', 'e.status', 'e.status_reason', 'e.media_status', 'e.media_error', 'e.org_unit_id', 'e.org_path', 'e.title',
       'e.description', 'e.category', 'e.incident_at', 'e.location_text', 'e.original_filename', 'e.mime_type', 'e.size_bytes', 'e.sha256',
       'e.sha512', 'e.storage_tier', 'e.object_lock_until', 'e.recorded_at', 'e.recorded_end_at', 'e.duration_ms', 'e.container_format',
       'e.video_codec', 'e.audio_codec', 'e.width', 'e.height', 'e.frame_rate', 'e.bit_rate', 'e.gps_latitude', 'e.gps_longitude',

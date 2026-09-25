@@ -90,6 +90,10 @@ export default fp(async (app) => {
       }
       await app.db.updateTable('api_clients').set({ last_used_at: new Date() }).where('id', '=', client.id).execute();
       req.principal = await loadApiClientPrincipal(app.db, client);
+      // API clients may only use the external integration REST API (/api/v1/integration/*) and tokenised downloads.
+      if (!req.url.startsWith('/api/v1/integration/') && !req.url.startsWith('/api/v1/media/download/')) {
+        throw new AppError(403, 'API_CLIENT_ROUTE_FORBIDDEN', 'API clients may only call the integration API (/api/v1/integration)');
+      }
       return;
     } else {
       token = req.cookies[ACCESS_COOKIE];

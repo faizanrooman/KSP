@@ -55,8 +55,8 @@ export function decryptSecret(token: string, keyB64 = loadConfig().DATA_ENCRYPTI
  * without exposing bearer tokens or storage URLs). Format: base64url(json).base64url(hmac).
  */
 export interface MediaTokenClaims {
-  sub: string; // principal id (user id or share id)
-  typ: 'USER' | 'SHARE';
+  sub: string; // principal id (user id, share id or api_clients.id)
+  typ: 'USER' | 'SHARE' | 'API_CLIENT';
   eid: string; // evidence id
   scope: 'stream' | 'download' | 'image' | 'export';
   sid?: string; // session id

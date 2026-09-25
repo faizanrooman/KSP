@@ -198,19 +198,30 @@ export interface Annotations {
   workspace_id: string | null;
 }
 
+export interface ApiClientRateWindows {
+  api_client_id: string;
+  count: Generated<number>;
+  window_start: Timestamp;
+}
+
 export interface ApiClients {
   allowed_ips: Generated<string[]>;
   client_id: string;
   created_at: Generated<Timestamp>;
   created_by: string | null;
+  description: string | null;
   expires_at: Timestamp | null;
   id: Generated<string>;
   last_used_at: Timestamp | null;
   name: string;
   org_unit_id: string;
+  rate_limit_per_minute: Generated<number>;
+  revoke_reason: string | null;
   revoked_at: Timestamp | null;
+  revoked_by: string | null;
   scopes: Generated<string[]>;
   secret_hash: string;
+  secret_rotated_at: Timestamp | null;
 }
 
 export interface AuditCheckpoints {
@@ -282,6 +293,12 @@ export interface CaseNotes {
   case_id: string;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
+}
+
+export interface CaseNumberCounters {
+  last_value: Generated<number>;
+  org_unit_id: string;
+  year: number;
 }
 
 export interface Cases {
@@ -544,6 +561,7 @@ export interface IntegrationSystems {
   code: string;
   config: Generated<Json>;
   created_at: Generated<Timestamp>;
+  created_by: string | null;
   credentials_ref: string | null;
   enabled: Generated<boolean>;
   id: Generated<string>;
@@ -553,6 +571,8 @@ export interface IntegrationSystems {
   system_type: string;
   updated_at: Generated<Timestamp>;
   verified: Generated<boolean>;
+  verified_at: Timestamp | null;
+  verified_by: string | null;
 }
 
 export interface IntegrityChecks {
@@ -679,6 +699,15 @@ export interface Roles {
   name: string;
   permissions: Generated<string[]>;
   updated_at: Generated<Timestamp>;
+}
+
+export interface SavedSearches {
+  created_at: Generated<Timestamp>;
+  criteria: Json;
+  id: Generated<string>;
+  name: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
 }
 
 export interface Sessions {
@@ -892,6 +921,7 @@ export interface DB {
   alert_rules: AlertRules;
   alerts: Alerts;
   annotations: Annotations;
+  api_client_rate_windows: ApiClientRateWindows;
   api_clients: ApiClients;
   audit_checkpoints: AuditCheckpoints;
   audit_events: AuditEvents;
@@ -899,6 +929,7 @@ export interface DB {
   case_evidence: CaseEvidence;
   case_members: CaseMembers;
   case_notes: CaseNotes;
+  case_number_counters: CaseNumberCounters;
   cases: Cases;
   devices: Devices;
   disposal_requests: DisposalRequests;
@@ -924,6 +955,7 @@ export interface DB {
   report_runs: ReportRuns;
   retention_policies: RetentionPolicies;
   roles: Roles;
+  saved_searches: SavedSearches;
   sessions: Sessions;
   share_access_log: ShareAccessLog;
   share_items: ShareItems;
