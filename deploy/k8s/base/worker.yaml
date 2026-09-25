@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ksp-worker
+  labels: { app.kubernetes.io/name: ksp-worker, app.kubernetes.io/component: worker }
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels: { app.kubernetes.io/name: ksp-worker }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: ksp-worker, app.kubernetes.io/component: worker, ksp.police/db-client: "true", ksp.police/s3-client: "true" }
+    spec:
+      serviceAccountName: ksp-worker
+      automountServiceAccountToken: false
+      # pg-boss jobs are idempotent and retried; give running transcodes time to finish on scale-down.
+      terminationGracePeriodSeconds: 600
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: ksp-worker } }
+      containers:
+        - name: worker
+          image: ksp/worker
+          imagePullPolicy: IfNotPresent
+          command: ["node", "apps/worker/dist/main.js"]
+          ports:
+            - { name: metrics, containerPort: 9465 }
+          envFrom:
+            - configMapRef: { name: ksp-config }
+            - secretRef: { name: ksp-app }
+          env:
+            - { name: KSP_SERVICE, value: ksp-worker }
+          resources:
+            requests: { cpu: "1", memory: 1Gi }
+            limits: { cpu: "4", memory: 6Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          # The worker has no HTTP API; its metrics endpoint doubles as the liveness signal.
+          startupProbe:
+            httpGet: { path: /, port: metrics }
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet: { path: /, port: metrics }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 4
+          volumeMounts:
+            - { name: secrets, mountPath: /run/secrets/ksp, readOnly: true }
+            - { name: work, mountPath: /work }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: secrets
+          secret:
+            secretName: ksp-app
+            defaultMode: 0400
+            items:
+              - { key: jwt_private_key, path: jwt_private_key }
+              - { key: jwt_public_key, path: jwt_public_key }
+              - { key: signing_private_key, path: signing_private_key }
+              - { key: signing_certificate, path: signing_certificate }
+        # Transcoding scratch: size >= largest upload x WORKER_CONCURRENCY x 2. Use a generic ephemeral volume on
+        # fast local SSD in production (see overlays/production).
+        - name: work
+          emptyDir: { sizeLimit: 100Gi }
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ksp-worker-metrics
+  labels: { app.kubernetes.io/name: ksp-worker }
+spec:
+  selector: { app.kubernetes.io/name: ksp-worker }
+  clusterIP: None
+  ports:
+    - { name: metrics, port: 9465, targetPort: metrics }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: ksp-worker }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: ksp-worker }
+  minReplicas: 2
+  maxReplicas: 16
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+  behavior:
+    scaleDown: { stabilizationWindowSeconds: 900 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: ksp-worker }
+spec:
+  maxUnavailable: 1
+  selector: { matchLabels: { app.kubernetes.io/name: ksp-worker } }

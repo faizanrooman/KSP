@@ -1,0 +1,88 @@
+# Non-secret configuration shared by api/worker/migrate (packages/core/src/config.ts). Secrets come from the
+# ksp-app / ksp-migrate / ksp-ai / ksp-backup Secrets, materialised by ExternalSecrets or SealedSecrets
+# (docs/SECRETS.md). Overlays patch the environment-specific values.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: ksp-config }
+data:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  APP_BASE_URL: https://vms.ksp.example
+  CORS_ORIGINS: https://vms.ksp.example
+  COOKIE_SECURE: "true"
+  TRUST_PROXY: "true"
+  API_HOST: 0.0.0.0
+  API_PORT: "4000"
+  METRICS_HOST: 0.0.0.0
+  METRICS_PORT: "9464"
+  DATABASE_POOL_MAX: "20"
+  S3_ENDPOINT: https://s3.storage.ksp.internal
+  S3_REGION: us-east-1
+  S3_FORCE_PATH_STYLE: "true"
+  S3_BUCKET_STAGING: ksp-staging
+  S3_BUCKET_EVIDENCE: ksp-evidence
+  S3_BUCKET_ARCHIVE: ksp-evidence-archive
+  S3_BUCKET_LONG_TERM: ksp-evidence-longterm
+  S3_BUCKET_DERIVED: ksp-derived
+  S3_BUCKET_EXPORTS: ksp-exports
+  S3_BUCKET_REPORTS: ksp-reports
+  OBJECT_LOCK_MODE: GOVERNANCE
+  OBJECT_LOCK_DAYS: "3650"
+  JWT_ISSUER: ksp-vms
+  JWT_PRIVATE_KEY: file:/run/secrets/ksp/jwt_private_key
+  JWT_PUBLIC_KEY: file:/run/secrets/ksp/jwt_public_key
+  SIGNING_PRIVATE_KEY: file:/run/secrets/ksp/signing_private_key
+  SIGNING_CERTIFICATE: file:/run/secrets/ksp/signing_certificate
+  ACCESS_TOKEN_TTL_SECONDS: "900"
+  REFRESH_TOKEN_TTL_HOURS: "12"
+  MEDIA_TOKEN_TTL_SECONDS: "300"
+  WORK_DIR: /work
+  WORKER_CONCURRENCY: "2"
+  FFMPEG_PATH: /usr/local/bin/ffmpeg
+  FFPROBE_PATH: /usr/local/bin/ffprobe
+  AI_MODELS_DIR: /models
+---
+# The isolated AI worker gets its OWN, minimal config. App-only settings that config.ts requires are given inert
+# placeholders: the AI worker never issues tokens, decrypts MFA secrets or signs exports.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: ksp-ai-config }
+data:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  COOKIE_SECURE: "true"
+  S3_ENDPOINT: https://s3.storage.ksp.internal
+  S3_REGION: us-east-1
+  S3_FORCE_PATH_STYLE: "true"
+  S3_BUCKET_DERIVED: ksp-derived
+  OBJECT_LOCK_MODE: GOVERNANCE
+  AI_MODELS_DIR: /models
+  AI_WORKER_CONCURRENCY: "1"
+  WORK_DIR: /work
+  FFMPEG_PATH: /usr/local/bin/ffmpeg
+  FFPROBE_PATH: /usr/local/bin/ffprobe
+  JWT_PRIVATE_KEY: unused-by-ai-worker
+  JWT_PUBLIC_KEY: unused-by-ai-worker
+  SIGNING_PRIVATE_KEY: unused-by-ai-worker
+  SIGNING_CERTIFICATE: unused-by-ai-worker
+  DATA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  MEDIA_TOKEN_SECRET: unused-by-ai-worker-unused-by-ai-worker
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: ksp-backup-config }
+data:
+  PGHOST: ksp-db-r            # read replica (CloudNativePG "-r"/"-ro" service) keeps backup load off the primary
+  PGPORT: "5432"
+  PGDATABASE: ksp
+  PGUSER: ksp_backup
+  PGSSLMODE: require
+  BACKUP_S3_ENDPOINT: https://backup-s3.dr.ksp.internal
+  BACKUP_S3_REGION: us-east-1
+  BACKUP_S3_BUCKET: ksp-db-backups
+  BACKUP_RETENTION_DAYS: "35"
+  BACKUP_AGE_RECIPIENTS_FILE: /run/secrets/ksp-backup/backup_age_recipients
+  # s3-replicate.ts: primary (source) + DR (target) object stores.
+  DR_S3_ENDPOINT: https://s3.dr.ksp.internal
+  DR_S3_REGION: us-east-1
+  DR_BUCKET_PREFIX: dr-

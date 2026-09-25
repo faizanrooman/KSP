@@ -1,0 +1,33 @@
+# ingress-nginx. TLS certificate from cert-manager (ClusterIssuer patched per overlay) or a pre-created Secret.
+# /api goes straight to the API (uploads/streaming skip one proxy hop); everything else to the web tier.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ksp-vms
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Evidence chunk uploads: up to 128 MiB per request (API limit) — streamed, not buffered.
+    nginx.ingress.kubernetes.io/proxy-body-size: 130m
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    # Media streaming (Range / HLS / original downloads of multi-GB files).
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    cert-manager.io/cluster-issuer: ksp-internal-ca
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [vms.ksp.example]
+      secretName: ksp-vms-tls
+  rules:
+    - host: vms.ksp.example
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend: { service: { name: ksp-api, port: { name: http } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: ksp-web, port: { name: http } } }

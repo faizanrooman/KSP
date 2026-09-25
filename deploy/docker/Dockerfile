@@ -92,11 +92,13 @@ FROM runtime-base AS api
 COPY --from=prod-deps-api --chown=root:root /app/node_modules node_modules
 COPY --from=build --chown=root:root /src/apps/api/package.json apps/api/package.json
 COPY --from=build --chown=root:root /src/apps/api/dist apps/api/dist
+COPY --chown=root:root scripts/ops/ensure-buckets.mjs scripts/ops/ensure-buckets.mjs
 ENV KSP_SERVICE=ksp-api API_PORT=4000 METRICS_PORT=9464
 EXPOSE 4000 9464
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.API_PORT||4000)+'/health/live').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 # Alternative commands (same image):  migrate job -> node packages/core/dist/bin/migrate.js
+#                                     buckets     -> node scripts/ops/ensure-buckets.mjs
 #                                     first seed  -> env KSP_SEED_CLI=1 node packages/core/dist/bin/seed.js --production
 CMD ["node", "apps/api/dist/server.js"]
 

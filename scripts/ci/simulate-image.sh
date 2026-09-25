@@ -36,7 +36,11 @@ done
 for p in apps/web tools/station-client; do rm -rf "${OUT:?}/$p"; done
 for p in packages/shared packages/core "$DIR"; do cp -r "$ROOT/$p/dist" "$OUT/$p/dist"; done
 mkdir -p "$OUT/db"; cp -r "$ROOT/db/migrations" "$OUT/db/migrations"
-[ "$APP" = ai-worker ] && { mkdir -p "$OUT/scripts/ops"; cp "$ROOT/scripts/ops/fetch-models.mjs" "$OUT/scripts/ops/"; }
+mkdir -p "$OUT/scripts/ops"
+case "$APP" in
+  ai-worker) cp "$ROOT/scripts/ops/fetch-models.mjs" "$OUT/scripts/ops/" ;;
+  api|migrate) cp "$ROOT/scripts/ops/ensure-buckets.mjs" "$OUT/scripts/ops/" ;;
+esac
 rm -f "$OUT/package-lock.json" "$OUT/.npmrc"
 echo "image layout for $APP in $OUT ($(du -sh "$OUT" | cut -f1), node_modules $(du -sh "$OUT/node_modules" | cut -f1))"
 if [ -n "$(find "$OUT/node_modules" -maxdepth 2 -name 'typescript' -o -maxdepth 2 -name 'vitest' -o -maxdepth 2 -name 'tsx' | head -1)" ]; then

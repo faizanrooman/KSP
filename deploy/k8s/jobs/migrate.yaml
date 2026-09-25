@@ -1,0 +1,55 @@
+# Pre-deploy migration Job: schema migrations as the schema OWNER (ksp_owner), then bucket verification
+# (versioning + Object Lock on WORM buckets). CI applies deploy/k8s/overlays/<env>/jobs, waits for completion and
+# only then rolls out the Deployments (see .github/workflows/deploy.yml / scripts/ops/k8s-deploy.sh).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ksp-migrate
+  labels: { app.kubernetes.io/name: ksp-migrate }
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: ksp-migrate, ksp.police/db-client: "true", ksp.police/s3-client: "true" }
+    spec:
+      serviceAccountName: ksp-migrate
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: ksp/api
+          command: ["sh", "-c", "node packages/core/dist/bin/migrate.js && node scripts/ops/ensure-buckets.mjs"]
+          envFrom:
+            - configMapRef: { name: ksp-config }
+            - secretRef: { name: ksp-app }
+            - secretRef: { name: ksp-migrate }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: secrets, mountPath: /run/secrets/ksp, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: secrets
+          secret:
+            secretName: ksp-app
+            defaultMode: 0400
+            items:
+              - { key: jwt_private_key, path: jwt_private_key }
+              - { key: jwt_public_key, path: jwt_public_key }
+              - { key: signing_private_key, path: signing_private_key }
+              - { key: signing_certificate, path: signing_certificate }
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }
