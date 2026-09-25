@@ -20,3 +20,7 @@
 | API clients | argon2 verification on every Basic-auth request (no cache) — CPU cost under high integration load | open |
 | API clients | IPv6 allow-list entries must be exact addresses (no IPv6 CIDR matching) | open |
 | Web | Admin, cases/FIR, integrations and API-client UIs not yet exercised in a browser | UNVERIFIED (pending E2E) |
+| Search | Totals use `count(*) OVER ()` — slow for very large match sets (switch to keyset + approximate totals) | open |
+| Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | accepted |
+| Tests | Heavy FFmpeg/upload suites were intermittently slow/failing when several agents ran suites concurrently on one host; green on repeated sequential runs | monitor |
+| Tests | Test runs leaked fixtures in /tmp (~11 GB) and 10-year-locked S3 test objects; fixed: per-run temp dir removed on teardown; test env OBJECT_LOCK_DAYS=1 | fixed |

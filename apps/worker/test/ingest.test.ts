@@ -20,7 +20,7 @@ let storage: Storage;
 let ctx: Pick<WorkerContext, 'db' | 'storage' | 'cfg' | 'log'>;
 let uploader: string;
 let station: { id: string; path: string };
-const dir = join(tmpdir(), `ksp-worker-test-${process.pid}`);
+const dir = join(process.env.KSP_TEST_TMP ?? tmpdir(), `ksp-worker-test-${process.pid}`);
 
 async function fixture(name: string, seed: number): Promise<Buffer> {
   mkdirSync(dir, { recursive: true });

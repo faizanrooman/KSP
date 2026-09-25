@@ -36,7 +36,7 @@ S3_BUCKET_DERIVED=$5-derived
 S3_BUCKET_EXPORTS=$5-exports
 S3_BUCKET_REPORTS=$5-reports
 OBJECT_LOCK_MODE=GOVERNANCE
-OBJECT_LOCK_DAYS=3650
+OBJECT_LOCK_DAYS=$([ "$3" = test ] && echo 1 || echo 3650)
 JWT_PRIVATE_KEY=file:$S/jwt.key
 JWT_PUBLIC_KEY=file:$S/jwt.pub
 DATA_ENCRYPTION_KEY=$(cat "$S/data.key")
