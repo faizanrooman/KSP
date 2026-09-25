@@ -127,7 +127,9 @@ export interface AiTrainingExports {
 export interface AiWatchlistEntries {
   created_at: Generated<Timestamp>;
   created_by: string | null;
+  embedded_at: Timestamp | null;
   embedding: number[] | null;
+  embedding_error: string | null;
   id: Generated<string>;
   image_key: string | null;
   label: string;
