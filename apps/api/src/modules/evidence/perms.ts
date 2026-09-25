@@ -69,7 +69,3 @@ export async function evidencePermissions(
   };
 }
 
-/** True when `perm` is usable on this evidence (same rule as loadEvidenceFor, without auditing). */
-export function scopedCan(p: Principal, perm: Permission, orgPath: string): boolean {
-  return hasPermissionAt(p, perm, orgPath);
-}
