@@ -14,7 +14,7 @@ import type { RgbImage } from './image.js';
 export async function loadStill(path: string): Promise<RgbImage> {
   const info = await videoInfo(path);
   const size = analysisSize(info.width, info.height, 1600);
-  for await (const f of sampleFrames(path, { fps: 1, width: size.width, height: size.height })) return f.image;
+  for await (const f of sampleFrames(path, { fps: 0, width: size.width, height: size.height })) return f.image;
   throw new Error('image could not be decoded');
 }
 

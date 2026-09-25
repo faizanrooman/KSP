@@ -202,10 +202,10 @@ export async function runJob(ctx: AiContext, job: ClaimedJob, opts: { signal?: A
       stats.framesProcessed = frame.index + 1;
       if (Date.now() - lastBeat > 1500) {
         lastBeat = Date.now();
-        await flush();
         stats.msPerFrame = Math.round(inferMs / stats.framesProcessed);
         const alive = await heartbeat(ctx, job.id, Math.min(0.99, stats.framesProcessed / framesTotal), stats);
         if (!alive) throw new Cancelled();
+        await flush();
       }
       if (abort.signal.aborted) throw new Cancelled();
     }
@@ -252,7 +252,8 @@ export async function runJob(ctx: AiContext, job: ClaimedJob, opts: { signal?: A
     return done ? 'COMPLETED' : 'CANCELLED';
   } catch (err) {
     abort.abort();
-    if (err instanceof Cancelled) {
+    const now = await ctx.db.selectFrom('ai_jobs').select('status').where('id', '=', job.id).executeTakeFirst().catch(() => undefined);
+    if (err instanceof Cancelled || now?.status === 'CANCELLED') {
       log.info('ai job cancelled; stopped');
       return 'CANCELLED';
     }

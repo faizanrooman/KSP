@@ -46,7 +46,8 @@ export async function* sampleFrames(path: string, opts: { fps: number; width: nu
   const cfg = loadConfig();
   const args = [
     '-hide_banner', '-nostdin', '-v', 'error', '-i', path, '-an', '-sn', '-dn',
-    '-vf', `fps=${opts.fps},scale=${opts.width}:${opts.height}:flags=bilinear`,
+    // fps <= 0: still image / first frame only
+    ...(opts.fps > 0 ? ['-vf', `fps=${opts.fps},scale=${opts.width}:${opts.height}:flags=bilinear`] : ['-vf', `scale=${opts.width}:${opts.height}:flags=bilinear`, '-frames:v', '1']),
     '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1',
   ];
   const child = spawn(cfg.FFMPEG_PATH, args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -69,7 +70,7 @@ export async function* sampleFrames(path: string, opts: { fps: number; width: nu
       while (buf.length >= frameBytes) {
         const data = new Uint8Array(buf.subarray(0, frameBytes));
         buf = buf.subarray(frameBytes);
-        yield { index, timeMs: Math.round((index * 1000) / opts.fps), image: { width: opts.width, height: opts.height, data } };
+        yield { index, timeMs: opts.fps > 0 ? Math.round((index * 1000) / opts.fps) : 0, image: { width: opts.width, height: opts.height, data } };
         index++;
         if (opts.signal?.aborted) return;
       }
