@@ -1,0 +1,17 @@
+{
+  "_comment": "SYNTHETIC contract fixture for the ASSUMED contract ksp-cctns-json-v0 (apps/api/src/integrations/contract.ts). Not a real CCTNS payload.",
+  "fir": {
+    "firId": "STUB-CCTNS-CUB-2026-0501",
+    "psCode": "PS-CUB",
+    "firYear": 2026,
+    "firNo": "0501",
+    "regDateTime": "2026-05-01T10:15:00+05:30",
+    "actsSections": [{ "act": "BNS", "section": "309(4)" }],
+    "complainantName": "Stub Complainant",
+    "briefFacts": "[STUB FIXTURE] Robbery reported near the metro station.",
+    "placeOfOccurrence": "Cubbon Park metro (stub)",
+    "occurrenceFrom": "2026-05-01T09:00:00+05:30",
+    "occurrenceTo": "2026-05-01T09:20:00+05:30",
+    "firStatus": "UNDER_INVESTIGATION"
+  }
+}

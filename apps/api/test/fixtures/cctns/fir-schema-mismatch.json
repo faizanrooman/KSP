@@ -1,0 +1,4 @@
+{
+  "_comment": "SYNTHETIC: a payload that does NOT match ksp-cctns-json-v0 (used to test CONTRACT_MISMATCH handling).",
+  "fir": { "id": 501, "station": "PS-CUB", "year": "2026", "status": "Registered" }
+}
