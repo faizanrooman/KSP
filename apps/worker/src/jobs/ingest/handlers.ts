@@ -1,9 +1,8 @@
 /**
  * Ingestion job handlers (kept separate from the pg-boss registration so tests can run them in-process).
  */
-import { sql } from 'kysely';
 import { QUEUES, type IngestFinalizePayload } from '@ksp/shared';
-import { IngestError, appendAudit, enqueue, finalizeUpload, markIngestFailed, systemActor, type IngestDeps, type IngestOutcome } from '@ksp/core';
+import { IngestError, appendAudit, enqueue, finalizeUpload, markIngestFailed, raiseAlert as raiseSharedAlert, systemActor, type IngestDeps, type IngestOutcome } from '@ksp/core';
 import type { WorkerContext } from '../../lib/context.js';
 import { ProcessingTracker } from '../../lib/processing.js';
 
@@ -83,11 +82,8 @@ export async function raiseAlert(
   ctx: Pick<Ctx, 'db'>,
   a: { ruleCode: string; severity: 'INFO' | 'WARNING' | 'CRITICAL'; title: string; message: string; resourceType?: string; resourceId?: string; orgUnitId?: string | null; dedupeKey: string },
 ): Promise<void> {
-  await sql`
-    INSERT INTO alerts (rule_code, severity, title, message, resource_type, resource_id, org_unit_id, dedupe_key)
-    VALUES (${a.ruleCode}, ${a.severity}, ${a.title}, ${a.message}, ${a.resourceType ?? null}, ${a.resourceId ?? null}, ${a.orgUnitId ?? null}::uuid, ${a.dedupeKey})
-    ON CONFLICT (dedupe_key) WHERE status <> 'RESOLVED' AND dedupe_key IS NOT NULL
-    DO UPDATE SET occurrences = alerts.occurrences + 1, last_seen_at = now(), message = EXCLUDED.message`.execute(ctx.db);
+  // Delegates to the shared helper: respects alert_rules.enabled and de-duplicates on open alerts.
+  await raiseSharedAlert(ctx.db, a);
 }
 
 /**
