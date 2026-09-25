@@ -28,6 +28,7 @@ export const PUBLIC_ALLOW_LIST = new Set<string>([
   'GET /api/v1/media/download/:evidenceId',
   'GET /api/v1/ai/crops/:detectionId', // USER tokens only, ref = ai:<detectionId>
   'GET /api/v1/exports/:id/package', // USER tokens only, scope export, ref = export id
+  'GET /api/v1/reports/runs/:id/download', // USER token, scope download, ref 'report', eid = run id, own runs only
   // External share portal: link token + access code => X-Share-Session HMAC header (domain-separated key).
   'POST /api/v1/share-portal/open',
   'GET /api/v1/share-portal/session',

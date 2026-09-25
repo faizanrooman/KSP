@@ -179,7 +179,7 @@ export default async function reports(fastify: FastifyInstance) {
     const sess = await db.selectFrom('sessions as s').innerJoin('users as u', 'u.id', 's.user_id')
       .select(['u.id', 'u.full_name', 'u.status'])
       .where('s.id', '=', claims.sid ?? '00000000-0000-0000-0000-000000000000').where('s.user_id', '=', claims.sub)
-      .where('s.revoked_at', 'is', null).where('s.absolute_expires_at', '>', new Date()).executeTakeFirst();
+      .where('s.revoked_at', 'is', null).where('s.idle_expires_at', '>', new Date()).where('s.absolute_expires_at', '>', new Date()).executeTakeFirst();
     if (!sess || sess.status !== 'ACTIVE') throw unauthenticated('Session is no longer valid');
     const r = await db.selectFrom('report_runs').select(['id', 'status', 'bucket', 'object_key', 'format', 'report_type', 'created_by', 'sha256', 'size_bytes', 'created_at'])
       .where('id', '=', req.params.id).where('created_by', '=', claims.sub).executeTakeFirst();
