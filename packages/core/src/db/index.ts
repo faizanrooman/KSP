@@ -11,6 +11,9 @@ export { sql };
 // Return bigint/numeric as JS numbers where safe; timestamps stay Date.
 pg.types.setTypeParser(20, (v) => Number(v)); // int8
 pg.types.setTypeParser(1700, (v) => Number(v)); // numeric
+// cidr[] / inet[] (e.g. api_clients.allowed_ips) as string[] (pg has no default array parser for these OIDs).
+pg.types.setTypeParser(651 as never, pg.types.getTypeParser(1009));
+pg.types.setTypeParser(1041 as never, pg.types.getTypeParser(1009));
 
 export function createPool(connectionString: string, max?: number): pg.Pool {
   const cfg = loadConfig();

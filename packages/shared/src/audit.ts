@@ -138,6 +138,7 @@ export const AUDIT_ACTIONS = {
   INTEGRATION_VERIFIED: { category: 'INTEGRATION', custody: false },
   INTEGRATION_API_REQUEST: { category: 'INTEGRATION', custody: false },
   API_CLIENT_SECRET_ROTATED: { category: 'ADMIN', custody: false },
+  API_CLIENT_UPDATED: { category: 'ADMIN', custody: false },
   EVIDENCE_DOWNLOAD_LINK_ISSUED: { category: 'CUSTODY', custody: true },
   // Export & sharing
   EXPORT_REQUESTED: { category: 'EXPORT', custody: true },
