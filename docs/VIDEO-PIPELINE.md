@@ -69,7 +69,7 @@ UI. Timestamps (not frame numbers) are the authoritative link back to the origin
 | Portrait 360x640 | 3.0 s | 0.4–1.2 s |
 | 1080p (3 HLS rungs) | 2.0 s | 1.2–2.7 s |
 | VFR 30->15 fps | 6.0 s | 0.2–0.7 s |
-| 160x90 5 fps "huge duration" | 20 min | 18 s (proxy 8.5 s, HLS 9.1 s, sprite 0.4 s) |
+| 160x90 5 fps "huge duration" | 20 min | 18–30 s (e.g. proxy 8.5 s, HLS 9.1 s, sprite 0.4 s) |
 
 Ranges reflect host load. Real body-camera footage (1080p30, 20–60 min) is dominated by x264 time; plan
 roughly 3–6x faster than real time per worker at `WORKER_CONCURRENCY=2` on 4 cores — **UNVERIFIED** (no
