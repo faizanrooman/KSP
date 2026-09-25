@@ -215,6 +215,7 @@ export default async function exportsModule(fastify: FastifyInstance) {
       querystring: z.object({
         view: z.enum(['mine', 'pending', 'all']).default('mine'),
         status: z.enum(EXPORT_STATUSES).optional(),
+        caseId: z.string().uuid().optional(),
         q: z.string().trim().max(100).optional(),
         page: z.coerce.number().int().min(1).default(1),
         pageSize: z.coerce.number().int().min(1).max(200).default(25),
@@ -223,12 +224,13 @@ export default async function exportsModule(fastify: FastifyInstance) {
     },
   }, async (req) => {
     const p = req.requirePrincipal();
-    const { view, status, q, page, pageSize, sort } = req.query;
+    const { view, status, caseId, q, page, pageSize, sort } = req.query;
     let qb = baseSelect(app.db);
     if (view === 'mine') qb = qb.where('x.created_by', '=', p.userId!);
     else if (view === 'pending') qb = qb.where('x.status', '=', 'PENDING_APPROVAL').where('x.created_by', '<>', p.userId!).where(orgScopeSql(p, 'export:approve', 'o.path'));
     else qb = qb.where((eb) => eb.or([eb('x.created_by', '=', p.userId!), eb('x.approved_by', '=', p.userId!), orgScopeSql(p, 'export:approve', 'o.path')]));
     if (status) qb = qb.where('x.status', '=', status);
+    if (caseId) qb = qb.where('x.case_id', '=', caseId);
     if (q) qb = qb.where((eb) => eb.or([eb('x.export_number', 'ilike', `%${q}%`), eb('x.purpose', 'ilike', `%${q}%`), eb('x.court_case_number', 'ilike', `%${q}%`)]));
     const total = Number((await qb.clearSelect().select((eb) => eb.fn.countAll().as('n')).executeTakeFirstOrThrow()).n);
     const col = sort.replace('-', '') as 'created_at' | 'export_number' | 'status';
