@@ -11,7 +11,6 @@ import { pipeline } from 'node:stream/promises';
 import { appendAudit, loadConfig, sql, systemActor, type Database } from '@ksp/core';
 import type { AiTask } from '@ksp/shared';
 import { fileSha256 } from './runtime.js';
-import { COCO_LABELS } from './yolox.js';
 import type { ModelConfig } from './types.js';
 
 export interface Artifact {
