@@ -73,6 +73,8 @@ const schema = z.object({
   AI_MODELS_DIR: z.string().default('./models'),
   WORKER_CONCURRENCY: z.coerce.number().int().default(2),
   METRICS_PORT: z.coerce.number().int().default(9464),
+  /** Bind address of the internal Prometheus endpoint (0.0.0.0 inside containers; never exposed via ingress). */
+  METRICS_HOST: z.string().default('127.0.0.1'),
 });
 
 export type AppConfig = z.infer<typeof schema>;

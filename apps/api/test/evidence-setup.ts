@@ -1,5 +1,5 @@
 /** Shared setup for evidence/retention tests: MFA policy relaxed for MFA-mandatory roles, queue on the owner connection. */
-import { getQueue, loadConfig, stopQueue } from '@ksp/core';
+import { getQueue, stopQueue } from '@ksp/core';
 import { getApp } from './helpers.js';
 import { invalidateSettings } from '../src/lib/settings.js';
 

@@ -57,11 +57,6 @@ export const RATES = [0.1, 0.25, 0.5, 1, 1.5, 2] as const;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 8;
 
-const noop: EvidencePlayerHandle = {
-  seek: () => undefined, play: () => undefined, pause: () => undefined, setRate: () => undefined, getTime: () => 0,
-  stepFrame: () => undefined, getDuration: () => null, getFrameRate: () => null, isPaused: () => true,
-};
-
 export const EvidencePlayer = forwardRef<EvidencePlayerHandle, EvidencePlayerProps>(function EvidencePlayer(props, ref) {
   const q = usePlayback(props.evidenceId);
   const inner = useRef<EvidencePlayerHandle>(null);

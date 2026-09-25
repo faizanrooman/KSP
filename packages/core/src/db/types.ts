@@ -257,6 +257,18 @@ export interface AuditEvents {
   user_agent: string | null;
 }
 
+export interface BackupRuns {
+  error: string | null;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  kind: string;
+  location: string | null;
+  sha256: string | null;
+  size_bytes: Int8 | null;
+  started_at: Generated<Timestamp>;
+  status: Generated<string>;
+}
+
 export interface Bookmarks {
   created_at: Generated<Timestamp>;
   evidence_id: string;
@@ -925,6 +937,7 @@ export interface DB {
   api_clients: ApiClients;
   audit_checkpoints: AuditCheckpoints;
   audit_events: AuditEvents;
+  backup_runs: BackupRuns;
   bookmarks: Bookmarks;
   case_evidence: CaseEvidence;
   case_members: CaseMembers;
