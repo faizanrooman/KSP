@@ -1,0 +1,6 @@
+# Secrets from the enterprise secrets manager (HashiCorp Vault / AWS Secrets Manager / Azure Key Vault) via the
+# External Secrets Operator. The ClusterSecretStore "ksp-secrets" is created by the platform team (docs/SECRETS.md).
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - externalsecrets.yaml
