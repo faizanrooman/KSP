@@ -31,8 +31,10 @@ export interface RuleRow {
 export interface RuleContext {
   tx: Tx;
   rule: RuleRow;
-  from: Date; // watermark (exclusive)
-  to: Date; // evaluation time (inclusive)
+  /** Watermark (exclusive) and evaluation time (inclusive) as DB timestamptz text — microsecond precision is
+   *  preserved (a JS Date would truncate to ms and could exclude rows committed in the same millisecond). */
+  from: string;
+  to: string;
   cursor: { last_seq: number | null; state: Record<string, unknown> };
 }
 
@@ -53,7 +55,8 @@ export interface EvaluationSummary {
 }
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : d);
-const overlapFrom = (from: Date) => new Date(from.getTime() - OVERLAP_MINUTES * 60_000);
+const overlapFrom = (from: string) => sql<Date>`${from}::timestamptz - make_interval(mins => ${OVERLAP_MINUTES})`;
+const ts = (v: string) => sql<Date>`${v}::timestamptz`;
 
 type Evaluator = (c: RuleContext) => Promise<RuleOutcome>;
 
@@ -70,7 +73,7 @@ const uploadFailed: Evaluator = async ({ tx, from, to }) => {
     .select(['id', 'org_unit_id', 'original_filename', 'error'])
     .where('status', '=', 'FAILED')
     .where('updated_at', '>', overlapFrom(from))
-    .where('updated_at', '<=', to)
+    .where('updated_at', '<=', ts(to))
     .orderBy('updated_at')
     .limit(500)
     .execute();
@@ -86,7 +89,7 @@ const uploadFailed: Evaluator = async ({ tx, from, to }) => {
     .select(['id', 'org_unit_id', 'original_filename', 'status_reason'])
     .where('status', '=', 'QUARANTINED')
     .where('updated_at', '>', overlapFrom(from))
-    .where('updated_at', '<=', to)
+    .where('updated_at', '<=', ts(to))
     .orderBy('updated_at')
     .limit(500)
     .execute();
@@ -109,7 +112,7 @@ const processingFailed: Evaluator = async ({ tx, from, to }) => {
     .select(['pj.id', 'pj.kind', 'pj.error', 'pj.evidence_id', 'pj.upload_session_id', 'e.evidence_number', 'e.org_unit_id as ev_org', 'us.org_unit_id as us_org'])
     .where('pj.status', '=', 'FAILED')
     .where('pj.finished_at', '>', overlapFrom(from))
-    .where('pj.finished_at', '<=', to)
+    .where('pj.finished_at', '<=', ts(to))
     .orderBy('pj.finished_at')
     .limit(500)
     .execute();
@@ -139,7 +142,7 @@ const aiFailure: Evaluator = async ({ tx, from, to }) => {
     .select(['j.id', 'j.tasks', 'j.error', 'j.evidence_id', 'e.evidence_number', 'e.org_unit_id'])
     .where('j.status', '=', 'FAILED')
     .where('j.finished_at', '>', overlapFrom(from))
-    .where('j.finished_at', '<=', to)
+    .where('j.finished_at', '<=', ts(to))
     .orderBy('j.finished_at')
     .limit(500)
     .execute();
@@ -161,7 +164,7 @@ const integrityFailure: Evaluator = async ({ tx, from, to }) => {
     .select(['ic.id', 'ic.trigger', 'ic.error', 'ic.evidence_id', 'e.evidence_number', 'e.org_unit_id'])
     .where('ic.ok', '=', false)
     .where('ic.checked_at', '>', overlapFrom(from))
-    .where('ic.checked_at', '<=', to)
+    .where('ic.checked_at', '<=', ts(to))
     .orderBy('ic.checked_at')
     .limit(500)
     .execute();
@@ -183,12 +186,12 @@ const storageThreshold: Evaluator = async ({ tx, rule, from }) => {
   const warn = num(rule.config.warnPercent, settings.storagePolicy.warnThresholdPercent);
   const crit = num(rule.config.criticalPercent, settings.storagePolicy.criticalThresholdPercent);
   const capacity = num(rule.config.capacityBytes, settings.storagePolicy.capacityBytes);
-  const { rows } = await sql<{ bucket: string; total_bytes: string; capacity_bytes: string | null; captured_at: Date }>`
-    SELECT DISTINCT ON (bucket) bucket, total_bytes, capacity_bytes, captured_at FROM storage_snapshots
+  const { rows } = await sql<{ bucket: string; total_bytes: string; capacity_bytes: string | null; fresh: boolean }>`
+    SELECT DISTINCT ON (bucket) bucket, total_bytes, capacity_bytes, captured_at > ${from}::timestamptz AS fresh FROM storage_snapshots
      WHERE captured_at > now() - interval '1 day' ORDER BY bucket, captured_at DESC`.execute(tx);
   let raised = 0;
   let resolved = 0;
-  const fresh = rows.some((r) => new Date(r.captured_at) > from);
+  const fresh = rows.some((r) => r.fresh);
   const check = async (key: string, label: string, used: number, cap: number) => {
     const pct = (used / cap) * 100;
     if (pct >= warn) {
@@ -346,16 +349,16 @@ export async function evaluateRule(db: Database, code: AlertRuleCode): Promise<E
       : { code, enabled: true, severity: 'WARNING', config: {} };
     await sql`INSERT INTO alert_cursors (rule_code, watermark) VALUES (${code}, now() - make_interval(mins => ${INITIAL_LOOKBACK_MINUTES})) ON CONFLICT (rule_code) DO NOTHING`.execute(tx);
     const cur = await tx.selectFrom('alert_cursors').select(['watermark', 'last_seq', 'state']).where('rule_code', '=', code).forUpdate().executeTakeFirstOrThrow();
-    const { rows } = await sql<{ now: Date }>`SELECT now() AS now`.execute(tx);
-    const to = new Date(rows[0]!.now);
+    const { rows } = await sql<{ now: string; wm: string }>`SELECT now()::text AS now, watermark::text AS wm FROM alert_cursors WHERE rule_code = ${code}`.execute(tx);
+    const to = rows[0]!.now;
     let out: RuleOutcome = { raised: 0, resolved: 0 };
     if (rule.enabled) {
-      out = await EVALUATORS[code]({ tx, rule, from: new Date(cur.watermark), to, cursor: { last_seq: cur.last_seq === null ? null : Number(cur.last_seq), state: (cur.state ?? {}) as Record<string, unknown> } });
+      out = await EVALUATORS[code]({ tx, rule, from: rows[0]!.wm, to, cursor: { last_seq: cur.last_seq === null ? null : Number(cur.last_seq), state: (cur.state ?? {}) as Record<string, unknown> } });
     }
     await tx
       .updateTable('alert_cursors')
       .set({
-        watermark: to,
+        watermark: ts(to),
         updated_at: new Date(),
         ...(out.lastSeq !== undefined ? { last_seq: out.lastSeq } : {}),
         ...(out.state ? { state: JSON.stringify(out.state) } : {}),
