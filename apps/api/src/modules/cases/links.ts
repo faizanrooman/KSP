@@ -44,7 +44,7 @@ export default async function linkRoutes(fastify: FastifyInstance) {
 
   app.delete('/:id/members/:userId', {
     preHandler: app.authorize('cases:manage'),
-    schema: { tags: ['cases'], summary: 'Remove a case team member (revokes case-based visibility)', params: z.object({ id: z.string().uuid(), userId: z.string().uuid() }), body: z.object({ reason: z.string().trim().max(2000).optional() }).strict().optional() },
+    schema: { tags: ['cases'], summary: 'Remove a case team member (revokes case-based visibility)', params: z.object({ id: z.string().uuid(), userId: z.string().uuid() }), body: z.object({ reason: z.string().trim().max(2000).optional() }).strict().nullish() },
   }, async (req) => {
     const p = req.requirePrincipal();
     const acc = await loadCaseFor(app.db, p, req.params.id);

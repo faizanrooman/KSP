@@ -177,7 +177,7 @@ export default async function integrations(fastify: FastifyInstance) {
           z.object({ caseRef: z.string().trim().min(1).max(200) }).strict(),
           z.object({ evidenceRef: z.string().trim().min(1).max(200) }).strict(),
         ]).optional(),
-      }).strict().optional(),
+      }).strict().nullish(),
     },
   }, async (req) => {
     const p = req.requirePrincipal();
