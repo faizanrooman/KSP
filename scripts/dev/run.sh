@@ -9,7 +9,14 @@ declare -A DIR=([api]=apps/api [worker]=apps/worker [ai]=apps/ai-worker [web]=ap
 declare -A CMD=([api]="npx tsx --conditions=ksp-src src/server.ts" [worker]="npx tsx --conditions=ksp-src src/main.ts" [ai]="npx tsx --conditions=ksp-src src/main.ts" [web]="npx vite --host 127.0.0.1")
 start() { local n=$1; [ -d "$KSP_ROOT/${DIR[$n]}" ] || return 0
   if [ -f "$RUN/$n.pid" ] && kill -0 "$(cat "$RUN/$n.pid")" 2>/dev/null; then echo "$n: running"; return; fi
-  (cd "$KSP_ROOT/${DIR[$n]}" && setsid nohup ${CMD[$n]} > "$KSP_ROOT/.local/logs/$n.log" 2>&1 & echo $! > "$RUN/$n.pid"); echo "$n: started (log .local/logs/$n.log)"; }
-stop() { local n=$1; [ -f "$RUN/$n.pid" ] || return 0; local p; p=$(cat "$RUN/$n.pid"); kill -- -"$p" 2>/dev/null || kill "$p" 2>/dev/null || true; rm -f "$RUN/$n.pid"; echo "$n: stopped"; }
+  # The child writes its OWN pid after setsid, so the pid file holds the session/process-group leader.
+  (cd "$KSP_ROOT/${DIR[$n]}" && setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$RUN/$n.pid" ${CMD[$n]} > "$KSP_ROOT/.local/logs/$n.log" 2>&1 < /dev/null &)
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$RUN/$n.pid" ] && break; sleep 0.2; done
+  echo "$n: started pid $(cat "$RUN/$n.pid" 2>/dev/null) (log .local/logs/$n.log)"; }
+stop() { local n=$1; [ -f "$RUN/$n.pid" ] || return 0; local p; p=$(cat "$RUN/$n.pid")
+  kill -TERM -- -"$p" 2>/dev/null || kill -TERM "$p" 2>/dev/null || true
+  for _ in $(seq 1 25); do kill -0 -- -"$p" 2>/dev/null || break; sleep 0.2; done
+  kill -0 -- -"$p" 2>/dev/null && kill -KILL -- -"$p" 2>/dev/null || true
+  rm -f "$RUN/$n.pid"; echo "$n: stopped"; }
 names=("$WHAT"); [ "$WHAT" = all ] && names=(api worker ai web)
 for n in "${names[@]}"; do case "$ACTION" in start) start "$n";; stop) stop "$n";; restart) stop "$n"; sleep 1; start "$n";; esac; done
