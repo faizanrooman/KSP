@@ -112,8 +112,12 @@ export const AUDIT_ACTIONS = {
   AI_WATCHLIST_CHANGED: { category: 'AI', custody: false },
   // Search & investigation
   SEARCH_PERFORMED: { category: 'SEARCH', custody: false },
+  SAVED_SEARCH_CHANGED: { category: 'SEARCH', custody: false },
   WORKSPACE_CREATED: { category: 'INVESTIGATION', custody: false },
   WORKSPACE_UPDATED: { category: 'INVESTIGATION', custody: false },
+  WORKSPACE_MEMBER_CHANGED: { category: 'INVESTIGATION', custody: false },
+  /** sync offset / order / notes of an evidence item inside a workspace changed */
+  WORKSPACE_ITEM_UPDATED: { category: 'INVESTIGATION', custody: false },
   WORKSPACE_EVIDENCE_ADDED: { category: 'INVESTIGATION', custody: true },
   WORKSPACE_EVIDENCE_REMOVED: { category: 'INVESTIGATION', custody: true },
   BOOKMARK_CREATED: { category: 'INVESTIGATION', custody: true },
