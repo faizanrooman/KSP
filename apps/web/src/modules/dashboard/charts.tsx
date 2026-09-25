@@ -62,14 +62,14 @@ export function TimeBars<T extends Record<string, unknown>>({ title, rows, x, se
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barGap={2} barCategoryGap="20%">
             <CartesianGrid vertical={false} stroke={GRID} />
-            <XAxis dataKey={x} tick={AXIS} tickLine={false} axisLine={{ stroke: GRID }} tickFormatter={(v: string) => String(v).slice(5)} minTickGap={16} />
+            <XAxis dataKey={x as never} tick={AXIS} tickLine={false} axisLine={{ stroke: GRID }} tickFormatter={(v: string) => String(v).slice(5)} minTickGap={16} />
             <YAxis tick={AXIS} tickLine={false} axisLine={false} width={48} allowDecimals={false} tickFormatter={yFormat} />
-            <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} formatter={(v: number, name: string) => {
+            <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} formatter={(v: unknown, name: unknown) => {
               const s = series.find((d) => d.label === name);
-              return [(s?.format ?? String)(Number(v)), name];
+              return [(s?.format ?? String)(Number(v)), String(name)];
             }} />
             {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} iconType="square" />}
-            {series.map((s, i) => <Bar key={s.key} dataKey={s.key} name={s.label} fill={SERIES[i % SERIES.length]} radius={[4, 4, 0, 0]} maxBarSize={18} isAnimationActive={false} />)}
+            {series.map((s, i) => <Bar key={s.key} dataKey={s.key as never} name={s.label} fill={SERIES[i % SERIES.length]} radius={[4, 4, 0, 0]} maxBarSize={18} isAnimationActive={false} />)}
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -90,10 +90,10 @@ export function CategoryBars<T extends Record<string, unknown>>({ title, rows, l
           <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 48, bottom: 0, left: 0 }}>
             <CartesianGrid horizontal={false} stroke={GRID} />
             <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} tickFormatter={format} />
-            <YAxis type="category" dataKey={label} tick={AXIS} tickLine={false} axisLine={false} width={120} />
-            <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} formatter={(v: number) => [(format ?? String)(Number(v)), title]} />
-            <Bar dataKey={value} fill={SERIES[0]} radius={[0, 4, 4, 0]} maxBarSize={18} isAnimationActive={false}
-              label={{ position: 'right', fontSize: 11, fill: '#0b0b0b', formatter: (v: number) => (format ?? String)(Number(v)) }}>
+            <YAxis type="category" dataKey={label as never} tick={AXIS} tickLine={false} axisLine={false} width={120} />
+            <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} formatter={(v: unknown) => [(format ?? String)(Number(v)), title]} />
+            <Bar dataKey={value as never} fill={SERIES[0]} radius={[0, 4, 4, 0]} maxBarSize={18} isAnimationActive={false}
+              label={{ position: 'right', fontSize: 11, fill: '#0b0b0b', formatter: (v: unknown) => (format ?? String)(Number(v)) }}>
               {colorOf && rows.map((r, i) => <Cell key={i} fill={colorOf(r)} />)}
             </Bar>
           </BarChart>
