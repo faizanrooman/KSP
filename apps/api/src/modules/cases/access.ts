@@ -19,7 +19,7 @@ import { notFound } from '../../lib/errors.js';
 
 /** SQL predicate: case row (alias) visible to principal. */
 export function caseVisibleSql(p: Principal, alias = 'c'): RawBuilder<boolean> {
-  const a = alias.replace(/[^a-z_]/gi, '');
+  const a = alias.replace(/[^a-z0-9_]/gi, '');
   const scope = orgScopeSql(p, 'cases:read', `${a}.org_path`);
   if (!p.userId || !hasPermission(p, 'cases:read')) return scope;
   const c = sql.raw(a);
@@ -73,7 +73,7 @@ export async function caseAccess(db: Database | Tx, p: Principal, row: CaseAcces
 }
 
 export function firVisibleSql(p: Principal, alias = 'f'): RawBuilder<boolean> {
-  const a = alias.replace(/[^a-z_]/gi, '');
+  const a = alias.replace(/[^a-z0-9_]/gi, '');
   const scope = orgScopeSql(p, 'cases:read', `${a}.org_path`);
   if (!p.userId || !hasPermission(p, 'cases:read')) return scope;
   // FIRs of cases where the user is on the team are readable too.
