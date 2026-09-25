@@ -18,12 +18,13 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 | Identity & administration (users, role assignments with privilege-escalation guard, custom roles with SoD checks, org units, devices, settings; admin UI) | 51 admin/security API tests |
 | Cases/FIR, evidence linking (case-based visibility), append-only case diary, timeline; integration adapters (fixture + http-json skeleton, SSRF-guarded); API clients; external REST API (search/metadata/tokenised download) | 47 API tests; external systems UNVERIFIED |
 | Advanced permission-aware search (text, jurisdiction, officer/device, time, radius/bbox, tags, case/FIR, tiers, approved-AI label/colour/plate/watchlist; facets; saved searches; related evidence) + investigation workspaces (members, items, sync offsets, bookmarks, annotations/regions, incident timeline with overlap detection, relations) | 33 API tests; search ≈25–30 ms/API call on ~6k rows |
+| Isolated AI platform (separate worker, ksp_ai DB role with column grants + DB trigger guard; real ONNX models: YOLOX-S objects/persons, YuNet faces, SFace recognition vs watchlists, ANPR detector+OCR, colour, rule-based tagging) + human review (queue, keyboard review, two-person rule for face matches, approved tags, history, training exports) | 13 API + 17 ai-worker tests with real inference; dev E2E ≈295 ms/frame for all 6 tasks on CPU |
 | End-to-end integration (orchestrator): station CLI upload → REGISTERED → media READY → HLS playable via token; other-jurisdiction IO gets 404; audit chain intact | manual run 2026-09-25 |
 
-Test totals on `main` at last merge: API 200 · worker 22 · web 3 · station client 3 — all passing; root typecheck and web build green.
+Test totals on `main` at last merge: API 213 · worker 22 · ai-worker 17 · web 9 · station client 3 — all passing; root typecheck and web build green.
 
 ## In Progress
-AI analysis & human review · Chain of custody, audit viewer, court export, secure sharing.
+Chain of custody, audit viewer, court export, secure sharing.
 
 ## Queued
 Dashboards, reports, alerts, monitoring · DevOps (containers, CI/CD, k8s), backup & DR · Security testing, E2E, performance, accessibility · Final documentation & production audit.
@@ -32,7 +33,7 @@ Dashboards, reports, alerts, monitoring · DevOps (containers, CI/CD, k8s), back
 CCTNS/FIR/case-diary API contracts (not in spec) · CERT-In VAPT · HSM/DSC signing key · production S3 IAM separation.
 
 ## Unverified
-Docker/compose/k8s (no Docker access on host) · behaviour on AWS S3/MinIO/Ceph (only versitygw tested) · uploads > 5 GiB · Safari native HLS · real 1080p30 long-footage throughput · 99.5% availability and 2-hour restoration targets (not yet tested).
+AI model accuracy on real KSP body-worn footage and Indian plates · GPU inference · Docker/compose/k8s (no Docker access on host) · behaviour on AWS S3/MinIO/Ceph (only versitygw tested) · uploads > 5 GiB · Safari native HLS · real 1080p30 long-footage throughput · 99.5% availability and 2-hour restoration targets (not yet tested).
 
 ## Tests
 See totals above. Commands: `npm run typecheck`; `(cd apps/api && npx vitest run)`; `(cd apps/worker && npx vitest run)`; `(cd apps/web && npx vitest run && npx vite build)`; `(cd tools/station-client && npx vitest run)`.

@@ -24,3 +24,8 @@
 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | accepted |
 | Tests | Heavy FFmpeg/upload suites were intermittently slow/failing when several agents ran suites concurrently on one host; green on repeated sequential runs | monitor |
 | Tests | Test runs leaked fixtures in /tmp (~11 GB) and 10-year-locked S3 test objects; fixed: per-run temp dir removed on teardown; test env OBJECT_LOCK_DAYS=1 | fixed |
+| AI (licence) | ANPR plate detector is a YOLOv9 derivative published as MIT while upstream YOLOv9 is GPL-3.0 — legal review required before production | open (legal) |
+| AI (legal) | Face recognition is biometric processing — requires legal basis / DPIA before production use | open (legal) |
+| AI | Model accuracy metrics are upstream figures; no evaluation on KSP footage; plate OCR not validated on Indian plates | UNVERIFIED |
+| AI | Track fragmentation for very small faces during camera pans (more duplicate detections to review) | open |
+| Dev | Editing migration 0600 after a worktree applied it causes checksum errors in that worktree's private DB (rebuild the private DB) | note |
