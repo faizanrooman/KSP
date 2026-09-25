@@ -35,7 +35,11 @@ export async function handleFinalize(ctx: Ctx, job: FinalizeJob, extra: Partial<
     return null;
   }
   const session = await ctx.db.selectFrom('upload_sessions').select(['evidence_id']).where('id', '=', sessionId).executeTakeFirst();
-  const tracker = await ProcessingTracker.start(ctx.db, { kind: 'VALIDATE_REGISTER', uploadSessionId: sessionId, evidenceId: session?.evidence_id ?? null, queueJobId: job.id });
+  if (!session) {
+    ctx.log.error({ jobId: job.id, uploadSessionId: sessionId }, 'ingest.finalize: unknown upload session (not retried)');
+    return null;
+  }
+  const tracker = await ProcessingTracker.start(ctx.db, { kind: 'VALIDATE_REGISTER', uploadSessionId: sessionId, evidenceId: session.evidence_id, queueJobId: job.id });
   try {
     const out = await finalizeUpload(deps(ctx, { onProgress: (f) => tracker.progress(f), ...extra }), sessionId);
     await tracker.complete(out);
