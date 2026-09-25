@@ -79,7 +79,8 @@ export interface CreateCheckpointResult {
  * signed: a CRITICAL AUDIT_CHAIN_BROKEN alert is raised instead.
  */
 export async function createCheckpoint(db: Database, actor: AuditActor, signer: Signer = evidenceSigner()): Promise<CreateCheckpointResult> {
-  const last = await db.selectFrom('audit_checkpoints').select(['head_seq']).orderBy('head_seq', 'desc').limit(1).executeTakeFirst();
+  // Only checkpoints cut by this system after a successful verification anchor the incremental check.
+  const last = await db.selectFrom('audit_checkpoints').select(['head_seq']).where('chain_ok', '=', true).orderBy('head_seq', 'desc').limit(1).executeTakeFirst();
   const from = last ? Number(last.head_seq) + 1 : 1;
   const verification = await verifyLedger(db, from, null);
   if (!verification.ok) {
