@@ -4,15 +4,20 @@
  */
 import { writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { appendAudit, sql, systemActor } from '@ksp/core';
+import { appendAudit, IMAGE_FORMAT_WHITELIST, sql, systemActor } from '@ksp/core';
 import type { AiContext } from './context.js';
 import { analysisSize, sampleFrames, videoInfo } from './frames.js';
 import { baseDetector, type ModelRow } from './models/index.js';
 import { SfaceEmbedder } from './models/sface.js';
 import type { RgbImage } from './image.js';
 
+/** Tool output quotes the local temp path; never store/return server filesystem paths (shown in the admin UI). */
+export function imageErrorMessage(err: Error, file: string, dir: string): string {
+  return `IMAGE_UNREADABLE: ${err.message.split(file).join('<reference-image>').split(dir).join('<work-dir>').slice(0, 300)}`;
+}
+
 export async function loadStill(path: string): Promise<RgbImage> {
-  const info = await videoInfo(path);
+  const info = await videoInfo(path, IMAGE_FORMAT_WHITELIST);
   const size = analysisSize(info.width, info.height, 1600);
   for await (const f of sampleFrames(path, { fps: 0, width: size.width, height: size.height })) return f.image;
   throw new Error('image could not be decoded');
@@ -57,7 +62,7 @@ export async function embedPendingWatchlistEntries(ctx: AiContext, limit = 25): 
       if (!largest?.landmarks) error = 'NO_FACE_FOUND: no face detected in the reference image';
       else embedding = Array.from(await embedder.embed(img, largest.landmarks));
     } catch (err) {
-      error = `IMAGE_UNREADABLE: ${(err as Error).message.slice(0, 300)}`;
+      error = imageErrorMessage(err as Error, file, dir);
     } finally {
       await rm(file, { force: true });
     }

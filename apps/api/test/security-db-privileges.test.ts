@@ -6,6 +6,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import pg from 'pg';
 import { loadConfig } from '@ksp/core';
+import { createRegisteredEvidence } from './fixtures/evidence.js';
+import { userId } from './evidence-setup.js';
+import { closeApp } from './helpers.js';
 
 let appPool: pg.Pool;
 let aiPool: pg.Pool;
@@ -18,6 +21,7 @@ beforeAll(() => {
 afterAll(async () => {
   await appPool.end();
   await aiPool.end();
+  await closeApp();
 });
 
 /** Run `stmt` in a transaction that is always rolled back; resolve to the SQLSTATE of the failure (or null). */
@@ -61,15 +65,18 @@ describe('ksp_app cannot rewrite history', () => {
   });
 
   it('registered evidence immutable columns are guarded by trigger', async () => {
+    const ev = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: await userId('io.meera'), durationSeconds: 1 });
+    const id = ev.id;
     const c = await appPool.connect();
     try {
-      const r = await c.query("SELECT id FROM evidence WHERE status = 'REGISTERED' LIMIT 1");
-      if (!r.rowCount) return; // no registered evidence in this DB yet; covered by evidence.test.ts
-      const id = r.rows[0].id as string;
-      for (const col of ['sha256', 'storage_key', 'uploaded_by', 'org_path']) {
-        const code = await sqlstate(appPool, `UPDATE evidence SET ${col} = ${col === 'org_path' ? "'ksp'::ltree" : "'tampered'"} WHERE id = '${id}'`);
+      for (const col of ['sha256', 'storage_key', 'uploaded_by']) {
+        const code = await sqlstate(appPool, `UPDATE evidence SET ${col} = 'tampered' WHERE id = '${id}'`);
         expect(code, col).not.toBeNull();
       }
+      // SEC-06: jurisdiction cannot be moved after registration (migration 0990).
+      expect(await sqlstate(appPool, `UPDATE evidence SET org_path = 'ksp'::ltree WHERE id = '${id}'`)).toBe('42501');
+      const other = await c.query("SELECT id FROM org_units WHERE code = 'ps_indiranagar'");
+      expect(await sqlstate(appPool, `UPDATE evidence SET org_unit_id = '${other.rows[0].id}' WHERE id = '${id}'`)).toBe('42501');
     } finally {
       c.release();
     }

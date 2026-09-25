@@ -20,8 +20,8 @@ export interface VideoInfo {
   frameRate: number | null;
 }
 
-export async function videoInfo(path: string): Promise<VideoInfo> {
-  const p = await probe(path);
+export async function videoInfo(path: string, formats?: string): Promise<VideoInfo> {
+  const p = await probe(path, undefined, formats);
   const v = p.streams.find((s) => s.codec_type === 'video');
   if (!v?.width || !v.height) throw new Error('proxy has no video stream');
   const rate = v.avg_frame_rate ?? v.r_frame_rate;

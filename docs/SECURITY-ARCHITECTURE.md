@@ -14,6 +14,19 @@ See also `docs/AUTHENTICATION.md`, `docs/AUTHORIZATION.md`, `docs/CONTRACTS.md` 
 | Database | App connects as `ksp_app` (DML only); append-only hash-chained `audit_events`; triggers: evidence immutability, org unit path immutability & no delete, system-role no delete, role code immutability (0100); unique serials (case-insensitive) |
 | Audit | Every auth event, admin change and refusal is written to the tamper-evident ledger (`audit_verify()`); secrets, passwords and one-time passwords are never written |
 
+## Media & ingestion hardening (security testing workstream)
+
+| Control | Where |
+|---|---|
+| FFmpeg/ffprobe open untrusted media only with `-protocol_whitelist` **and** `-format_whitelist` (`MEDIA_FORMAT_WHITELIST`: mov, matroska, avi, mpegts, asf, flv, mpeg) — HLS/concat/image-sequence demuxers are never selected for an uploaded file | `packages/core/src/media.ts`, `ingest/inspect.ts`, `apps/worker/src/jobs/media/process.ts` |
+| Egress guard also denies IPv4-compatible IPv6 (`::/96`) | `apps/api/src/integrations/egress.ts` |
+| `/media/download` refuses non-share tokens that carry a `ref` (tokens minted for other download routes) | `apps/api/src/modules/media/index.ts` |
+| Report downloads re-check the session idle timeout | `apps/api/src/modules/reports/index.ts` |
+| AES-256-GCM secrets at rest require the full 16-byte tag | `packages/core/src/crypto.ts` |
+| Every registered route is enumerated in tests (`app.routeRegistry`): public allow-list, 401, CSRF, API-client confinement | `apps/api/test/security-routes.test.ts` |
+
+Threat model: `docs/THREAT-MODEL.md`. Test results: `docs/SECURITY-TEST-REPORT.md`.
+
 ## Data minimisation in responses
 
 User endpoints never return `password_hash`, `mfa_secret_enc`, `mfa_pending_secret_enc`, `mfa_recovery_codes` or
