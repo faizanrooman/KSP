@@ -15,12 +15,13 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 | Evidence ingestion (resumable chunked uploads, validation, SHA-256/512, dedupe, quarantine, WORM registration, metadata/GPS extraction, station CLI, web uploader) | API/worker/CLI tests incl. 217 MiB upload; headless-browser run by the agent |
 | Evidence registry, legal hold, fixity, tiering, retention, dual-control disposal | API + worker tests |
 | Video pipeline (proxy, HLS ladder, poster/thumbnail/sprites), tokenised streaming with Range, original download, exact-frame snapshots, player + synchronised multi-player | API + worker tests; exact-frame pixel comparison; agent headless-browser smoke |
+| Identity & administration (users, role assignments with privilege-escalation guard, custom roles with SoD checks, org units, devices, settings; admin UI) | 51 admin/security API tests |
 | End-to-end integration (orchestrator): station CLI upload → REGISTERED → media READY → HLS playable via token; other-jurisdiction IO gets 404; audit chain intact | manual run 2026-09-25 |
 
-Test totals on `main` at last merge: API 69 · worker 22 · web 3 · station client 3 — all passing; root typecheck and web build green.
+Test totals on `main` at last merge: API 120 · worker 22 · web 3 · station client 3 — all passing; root typecheck and web build green.
 
 ## In Progress
-Identity & administration · AI analysis & human review · Cases/FIR & integration REST API.
+AI analysis & human review · Cases/FIR & integration REST API.
 
 ## Queued
 Search & investigation workspace · Chain-of-custody viewer, audit viewer, court export, secure sharing · Dashboards, reports, alerts, monitoring · DevOps (containers, CI/CD, k8s), backup & DR · Security testing, E2E, performance, accessibility · Final documentation & production audit.
