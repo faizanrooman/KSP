@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   plugins: [react()],
-  resolve: { conditions: ['ksp-src'], alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+  resolve: { conditions: ['ksp-src'], dedupe: ['react', 'react-dom'], alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     port: 5173,
     strictPort: true,

@@ -32,6 +32,10 @@ export interface TokenContext {
   actor: AuditActor;
   /** For SHARE tokens: whether the share allows downloads. */
   shareAllowsDownload: boolean;
+  /** For SHARE tokens: whether the share allows downloading the ORIGINAL (otherwise only the watermarked copy). */
+  shareAllowsOriginal: boolean;
+  /** For SHARE tokens: the (still ACTIVE, unexpired) share the token is bound to. */
+  share?: { id: string; watermark: boolean; allowDownload: boolean; allowOriginal: boolean; allowPrint: boolean; recipientName: string | null };
 }
 
 /**
@@ -65,20 +69,27 @@ export async function authenticateMediaToken(
       .where('s.absolute_expires_at', '>', now)
       .executeTakeFirst();
     if (!s || s.status !== 'ACTIVE') throw unauthenticated('Session no longer active');
-    return { claims, actor: { type: 'USER', id: claims.sub, name: s.username, sessionId: claims.sid, ...base }, shareAllowsDownload: false };
+    return { claims, actor: { type: 'USER', id: claims.sub, name: s.username, sessionId: claims.sid, ...base }, shareAllowsDownload: false, shareAllowsOriginal: false };
   }
   if (claims.typ === 'SHARE') {
     const share = await db
       .selectFrom('shares as sh')
       .innerJoin('share_items as si', 'si.share_id', 'sh.id')
-      .select(['sh.id', 'sh.allow_download', 'sh.recipient_name'])
+      .select(['sh.id', 'sh.allow_download', 'sh.allow_original', 'sh.allow_print', 'sh.watermark', 'sh.recipient_name', 'sh.recipient_type'])
       .where('sh.id', '=', claims.sub)
       .where('si.evidence_id', '=', claims.eid)
       .where('sh.status', '=', 'ACTIVE')
       .where('sh.expires_at', '>', now)
       .executeTakeFirst();
-    if (!share) throw unauthenticated('Share no longer active');
-    return { claims, actor: { type: 'EXTERNAL_RECIPIENT', id: share.id, name: share.recipient_name ?? null, ...base }, shareAllowsDownload: share.allow_download };
+    // SHARE media tokens are only issued by the external share portal; internal recipients use USER tokens.
+    if (!share || share.recipient_type !== 'EXTERNAL') throw unauthenticated('Share no longer active');
+    return {
+      claims,
+      actor: { type: 'EXTERNAL_RECIPIENT', id: share.id, name: share.recipient_name ?? null, ...base },
+      shareAllowsDownload: share.allow_download,
+      shareAllowsOriginal: share.allow_download && share.allow_original,
+      share: { id: share.id, watermark: share.watermark, allowDownload: share.allow_download, allowOriginal: share.allow_download && share.allow_original, allowPrint: share.allow_print, recipientName: share.recipient_name },
+    };
   }
   if (claims.typ === 'API_CLIENT') {
     // Integration API clients may only hold download tokens (issued by GET /integration/evidence/:id/download).
@@ -90,7 +101,7 @@ export async function authenticateMediaToken(
       .executeTakeFirst();
     if (!c || c.revoked_at || (c.expires_at && c.expires_at <= now)) throw unauthenticated('API client no longer active');
     if (c.allowed_ips.length && !c.allowed_ips.some((cidr) => ipInCidr(req.ip, cidr))) throw unauthenticated('API client not allowed from this address');
-    return { claims, actor: { type: 'API_CLIENT', id: c.id, name: c.client_id, ...base }, shareAllowsDownload: false };
+    return { claims, actor: { type: 'API_CLIENT', id: c.id, name: c.client_id, ...base }, shareAllowsDownload: false, shareAllowsOriginal: false };
   }
   throw unauthenticated('Media token invalid or expired');
 }

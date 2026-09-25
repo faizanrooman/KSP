@@ -167,6 +167,14 @@ export const AUDIT_ACTIONS = {
   SHARE_DOWNLOADED: { category: 'SHARE', custody: true },
   SHARE_PRINTED: { category: 'SHARE', custody: true },
   SHARE_ACCESS_DENIED: { category: 'SHARE', custody: true },
+  /** Share passed its expiry (cron). */
+  SHARE_EXPIRED: { category: 'SHARE', custody: true },
+  /** Share locked after too many wrong access codes. */
+  SHARE_LOCKED: { category: 'SHARE', custody: true },
+  /** Watermarked playback variant generated for an external share. */
+  SHARE_WATERMARK_GENERATED: { category: 'SHARE', custody: true },
+  /** Export package deleted after its retention period (cron). */
+  EXPORT_EXPIRED: { category: 'EXPORT', custody: true },
   // Audit / reports / system
   AUDIT_VIEWED: { category: 'SYSTEM', custody: false },
   AUDIT_EXPORTED: { category: 'SYSTEM', custody: false },

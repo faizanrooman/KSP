@@ -129,12 +129,24 @@ export default async function media(fastify: FastifyInstance) {
     schema: { tags: ['media'], summary: 'Stream a derived media object (media token)', params: z.object({ evidenceId: z.string().uuid(), '*': z.string().max(300) }), querystring: tokenQuery },
   }, async (req, reply) => {
     const { evidenceId } = req.params;
-    const { claims } = await authenticateMediaToken(app.db, req, req.query.t, { evidenceId, scope: 'stream' });
+    const auth = await authenticateMediaToken(app.db, req, req.query.t, { evidenceId, scope: 'stream' });
+    const { claims } = auth;
     const relPath = req.params['*'];
     if (!REL_PATH.test(relPath) || relPath.split('/').some((s) => s === '..' || s === '.')) throw notFound('Media');
     const key = `evidence/${evidenceId}/${relPath}`;
-    const ds = await derivativesOf(evidenceId, STREAMABLE_KINDS);
-    const d = ds.find((x) => (x.kind === 'HLS' ? key.startsWith(x.object_key) && /(?:^|\/)(?:master|index)\.m3u8$|\/seg_\d{5}\.ts$/.test(key) : x.object_key === key));
+    let d;
+    if (claims.typ === 'SHARE') {
+      // External share recipients: ONLY the watermarked variant generated for THIS share (or, when the sharer
+      // disabled watermarking, the plain proxy MP4). Never HLS/posters/sprites/other shares' variants.
+      if (auth.share?.watermark) {
+        d = (await derivativesOf(evidenceId, ['WATERMARKED'])).find((x) => x.object_key === key && (x.meta as { shareId?: string }).shareId === claims.sub);
+      } else {
+        d = (await derivativesOf(evidenceId, ['PROXY_MP4'])).find((x) => x.object_key === key);
+      }
+    } else {
+      const ds = await derivativesOf(evidenceId, STREAMABLE_KINDS);
+      d = ds.find((x) => (x.kind === 'HLS' ? key.startsWith(x.object_key) && /(?:^|\/)(?:master|index)\.m3u8$|\/seg_\d{5}\.ts$/.test(key) : x.object_key === key));
+    }
     if (!d) throw notFound('Media');
     const ev = await app.db.selectFrom('evidence').select(['status']).where('id', '=', evidenceId).executeTakeFirst();
     if (!ev || !PLAYABLE_STATUSES.includes(ev.status)) throw notFound('Media');
@@ -156,6 +168,8 @@ export default async function media(fastify: FastifyInstance) {
   }, async (req, reply) => {
     const { derivativeId } = req.params;
     const { claims } = await authenticateMediaToken(app.db, req, req.query.t, { scope: 'image', ref: derivativeId });
+    // Derived images are not watermarked: never served to external share recipients.
+    if (claims.typ === 'SHARE') throw new AppError(403, 'TOKEN_SCOPE', 'Media token not valid for this resource');
     const d = await app.db
       .selectFrom('evidence_derivatives as d')
       .innerJoin('evidence as e', 'e.id', 'd.evidence_id')
@@ -197,7 +211,9 @@ export default async function media(fastify: FastifyInstance) {
   }, async (req, reply) => {
     const { evidenceId } = req.params;
     const auth = await authenticateMediaToken(app.db, req, req.query.t, { evidenceId, scope: 'download' });
-    if (auth.claims.typ === 'SHARE' && !auth.shareAllowsDownload) throw forbidden('This share does not allow downloads');
+    // External shares: the ORIGINAL only when the share explicitly allows it (allow_download AND allow_original);
+    // otherwise recipients get the watermarked copy via /share-portal/download.
+    if (auth.claims.typ === 'SHARE' && (!auth.shareAllowsOriginal || auth.claims.ref !== 'original')) throw forbidden('This share does not allow downloading the original');
     const ev = await app.db
       .selectFrom('evidence')
       .select(['id', 'status', 'org_unit_id', 'evidence_number', 'original_filename', 'storage_bucket', 'storage_key', 'storage_version_id', 'sha256', 'size_bytes', 'storage_tier'])
