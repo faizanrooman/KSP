@@ -43,6 +43,11 @@ describe('tier migration', () => {
     expect(row).toMatchObject({ storage_tier: 'ARCHIVE', storage_bucket: st.bucket('archive'), storage_key: ev.key });
     expect(row.archived_at).toBeTruthy();
     expect(row.object_lock_until).toBeTruthy();
+    // Ask the store itself: the new tier copy must carry a real Object Lock retention.
+    const { GetObjectRetentionCommand } = await import('@aws-sdk/client-s3');
+    const ret = await storage().s3.send(new GetObjectRetentionCommand({ Bucket: row.storage_bucket!, Key: row.storage_key!, VersionId: row.storage_version_id ?? undefined }));
+    expect(ret.Retention?.Mode).toBe(storage().cfg.OBJECT_LOCK_MODE);
+    expect(ret.Retention?.RetainUntilDate && ret.Retention.RetainUntilDate > new Date()).toBe(true);
     const head = await st.s3.send(new HeadObjectCommand({ Bucket: row.storage_bucket!, Key: row.storage_key!, VersionId: row.storage_version_id ?? undefined }));
     expect(head.ObjectLockMode).toBe('GOVERNANCE');
     expect(await listVersions(st, ev.bucket, ev.key)).toEqual([]);

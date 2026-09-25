@@ -95,6 +95,7 @@ export const AUDIT_ACTIONS = {
   MEDIA_PROCESSING_STARTED: { category: 'MEDIA', custody: true },
   MEDIA_PROCESSING_COMPLETED: { category: 'MEDIA', custody: true },
   MEDIA_PROCESSING_FAILED: { category: 'MEDIA', custody: true },
+  MEDIA_REPROCESS_REQUESTED: { category: 'MEDIA', custody: true },
   // AI & review
   AI_ANALYSIS_REQUESTED: { category: 'AI', custody: true },
   AI_ANALYSIS_STARTED: { category: 'AI', custody: true },

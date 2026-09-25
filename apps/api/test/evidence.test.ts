@@ -142,7 +142,9 @@ describe('evidence detail & list', () => {
     expect(gps.body.items.every((i: { id: string }) => i.id !== C.id)).toBe(true);
     expect(gps.body.items.map((i: { id: string }) => i.id)).toContain(A.id);
     const officer = await kavya.get(`/api/v1/evidence?officerId=${U['fo.ravi']}`);
-    expect(officer.body.items.map((i: { id: string }) => i.id)).toEqual([A.id]);
+    // Other suites may also record evidence for this officer: assert the filter's guarantee, not a global count.
+    expect(officer.body.items.map((i: { id: string }) => i.id)).toContain(A.id);
+    expect(officer.body.items.every((i: { officer: { id: string } | null }) => i.officer?.id === U['fo.ravi'])).toBe(true);
     const page = await kavya.get('/api/v1/evidence?pageSize=1&page=2&sort=size_bytes');
     expect(page.body.items).toHaveLength(1);
     expect(page.body.total).toBeGreaterThanOrEqual(3);
