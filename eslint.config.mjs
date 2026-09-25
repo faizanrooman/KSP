@@ -8,6 +8,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 export default tseslint.config(
   {
     ignores: [
+      '.claude/**',
       '**/dist/**', '**/node_modules/**', '**/coverage/**', '.local/**', '**/.local/**',
       'packages/core/src/db/types.ts', '**/*.d.ts', 'playwright-report/**', 'test-results/**',
     ],

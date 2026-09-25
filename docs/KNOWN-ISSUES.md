@@ -51,3 +51,11 @@
 | npm audit | 4 moderate advisories (react-router 6.x, @vitest/mocker dev-only); 0 high/critical (`npm audit --audit-level=high --omit=dev` passes) | open |
 | Dev host | Intermittent node/tsc/eslint segfaults (exit 139) under concurrent load; single-threaded `eslint .` crashes reliably → lint uses `--concurrency=auto` | environment |
 | Storage | Staging-bucket lifecycle (abort incomplete multipart uploads) is applied by `ensure-buckets.mjs` where supported; versitygw returns NotImplemented | open (deployment) |
+| Security | SEC-08: npm advisories — react-router 6.x (moderate), vitest/@vitest/mocker (dev only); 0 high/critical | open |
+| Security | SEC-09: `system:monitor` holders can trigger reprocess for any evidence id and learn whether it exists outside their jurisdiction | open (decide) |
+| Security | Not yet tested: full data-driven IDOR matrix across all `:id` routes, mass-assignment/`.strict()`, approval race conditions, JWT alg-confusion tests, login timing, rate limits in production config, media-token tampering/path-traversal/Range tests, upload chunk abuse, CRLF/filename header injection, zip-slip/zip-bomb on `/exports/verify`, PDF/log injection, production HSTS/Secure cookies, browser XSS, containers (Trivy) | UNVERIFIED |
+| Security | Residual: FFmpeg demuxer/decoder memory-safety bugs; media tokens are bearer secrets for their TTL; DB superuser can bypass triggers (detected by hash chain, not prevented); Object Lock GOVERNANCE is bypassable by privileged credentials (use COMPLIANCE in production); keys not in HSM | accepted / external |
+| DR | Replicated copies have different S3 version ids → `s3-replicate.ts --repoint` needed after failover; native store replication is the primary DR path | by design |
+| DR | Disposed evidence persists in the DR store until its own lock expires (no DR disposal sweep yet) | open |
+| Capacity | CPU transcoding of the full HLS ladder at state-wide volume needs ~1,100 worker instances — hardware/GPU transcoding decision required (see INFRASTRUCTURE.md) | open (decision) |
+| Environment | Dev host shows intermittent node/tsc/eslint segfaults and one in-memory data corruption → possible RAM/hardware fault; run memtest; re-verify results on another machine | open |

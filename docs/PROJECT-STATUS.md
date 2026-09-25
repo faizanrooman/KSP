@@ -21,12 +21,14 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 | Isolated AI platform (separate worker, ksp_ai DB role with column grants + DB trigger guard; real ONNX models: YOLOX-S objects/persons, YuNet faces, SFace recognition vs watchlists, ANPR detector+OCR, colour, rule-based tagging) + human review (queue, keyboard review, two-person rule for face matches, approved tags, history, training exports) | 13 API + 17 ai-worker tests with real inference; dev E2E ≈295 ms/frame for all 6 tasks on CPU |
 | Chain of custody (per-item ledger verification, signed custody PDF), audit viewer/export/verify with signed hourly checkpoints, court export (dual approval, re-hash, signed manifest, Fact Sheet with BSA s.63 template, watermarked copies, offline VERIFY.txt), secure sharing (internal/external, access codes with lockout, expiry, max views, watermarked per-share media, access log) | 43 API + 6 worker tests; agent headless-browser run |
 | Dashboards (role/jurisdiction-scoped KPIs, charts with text summaries), alerts (10 rules, cursor-based idempotent evaluator, dedupe, auto-resolve, notifications, webhook channel), 9 report types (CSV/JSON/PDF, hashed, jurisdiction-scoped), storage snapshots, Prometheus metrics, worker heartbeats, `/system/health` | 22 API + 27 worker tests; dashboard 75–82 ms on 50k rows |
+| Internal security assessment (route-level authz/CSRF sweep of every route, SSRF, malicious media inputs, DB privilege tests, headers, crypto; semgrep, gitleaks, npm audit; STRIDE threat model) — 7 findings fixed incl. HIGH: FFmpeg followed references inside uploaded HLS playlists | 7 security suites; `docs/SECURITY-TEST-REPORT.md` (NOT a CERT-In VAPT) |
+| DevOps & DR: multi-target Dockerfile, compose, kustomize k8s (staging/prod), CI + release workflows, encrypted backups (age) + verification, S3 replication/repoint, local DR drill | production entrypoints run from simulated image layouts; validators green; backup verify 8/8; DR drill restore→ready 3.9 s on ~44 MB (small-data only) |
 | End-to-end integration (orchestrator): station CLI upload → REGISTERED → media READY → HLS playable via token; other-jurisdiction IO gets 404; audit chain intact | manual run 2026-09-25 |
 
-Test totals on `main` at last merge: API 278 · worker 55 · ai-worker 17 · web 15 · station client 3 (368 total) — all passing; root typecheck and web build green.
+Test totals on `main` at last merge: API 364 · worker 55 · ai-worker 19 · web 15 · station client 3 (456 total) — all passing; root build, typecheck, lint (0 errors) and web build green.
 
 ## In Progress
-Security testing & threat model. (DevOps, CI/CD, backup & DR: delivered on the devops branch — see Deployment.)
+Nothing running. Next: E2E browser tests, performance, accessibility, final audit.
 
 ## Queued
 E2E, performance, accessibility · Final documentation & production audit.
