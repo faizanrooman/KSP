@@ -81,6 +81,7 @@ restore_dump "$WORK/restore.dump" "$(dburl "${DB}_restoring")" "$JOBS"
 log "pg_restore finished in $(( $(date +%s) - T1 )) s"
 post_checks "$(dburl "${DB}_restoring")"
 aq "ALTER DATABASE \"${DB}_restoring\" RENAME TO \"$DB\"" >/dev/null
+apply_db_settings "$ADMIN" "$DB"
 aq "REVOKE ALL ON DATABASE \"$DB\" FROM PUBLIC" >/dev/null
 aq "GRANT CONNECT ON DATABASE \"$DB\" TO ksp_app, ksp_ai, ksp_backup" >/dev/null
 

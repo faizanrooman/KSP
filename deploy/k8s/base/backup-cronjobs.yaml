@@ -26,7 +26,7 @@ spec:
           serviceAccountName: ksp-backup
           automountServiceAccountToken: false
           restartPolicy: OnFailure
-          securityContext: &sc
+          securityContext:
             runAsNonRoot: true
             runAsUser: 999
             runAsGroup: 999
@@ -44,7 +44,7 @@ spec:
               resources:
                 requests: { cpu: 500m, memory: 512Mi }
                 limits: { cpu: "2", memory: 2Gi }
-              securityContext: &csc
+              securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities: { drop: [ALL] }
@@ -90,7 +90,12 @@ spec:
           serviceAccountName: ksp-backup
           automountServiceAccountToken: false
           restartPolicy: Never
-          securityContext: *sc
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile: { type: RuntimeDefault }
           containers:
             - name: verify
               image: ksp/backup
@@ -107,7 +112,10 @@ spec:
               resources:
                 requests: { cpu: "1", memory: 1Gi }
                 limits: { cpu: "4", memory: 4Gi }
-              securityContext: *csc
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
               volumeMounts:
                 - { name: work, mountPath: /work }
                 - { name: tmp, mountPath: /tmp }
@@ -150,7 +158,12 @@ spec:
           serviceAccountName: ksp-backup
           automountServiceAccountToken: false
           restartPolicy: OnFailure
-          securityContext: *sc
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile: { type: RuntimeDefault }
           containers:
             - name: replicate
               image: ksp/backup
@@ -162,7 +175,10 @@ spec:
               resources:
                 requests: { cpu: 500m, memory: 512Mi }
                 limits: { cpu: "2", memory: 2Gi }
-              securityContext: *csc
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
               volumeMounts:
                 - { name: tmp, mountPath: /tmp }
           volumes:

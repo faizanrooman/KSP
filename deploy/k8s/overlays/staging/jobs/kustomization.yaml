@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ksp-vms-staging
+resources:
+  - ../../../jobs
+images:
+  - { name: ksp/api, newName: ghcr.io/ksp/api, newTag: staging }
+  - { name: ksp/ai-worker, newName: ghcr.io/ksp/ai-worker, newTag: staging }

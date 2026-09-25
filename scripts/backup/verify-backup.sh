@@ -39,7 +39,7 @@ finish() {
     psql "$BACKUP_RECORD_URL" -qtAX -v id="$RUN_ID" -v st="$st" -v err="$err" -v loc="${BACKUP_SOURCE:-$SRC}" \
       <<<"UPDATE backup_runs SET status = :'st', finished_at = now(), error = NULLIF(:'err',''), location = :'loc' WHERE id = :'id'::uuid" >/dev/null 2>&1 || true
   fi
-  [ "$rc" = 0 ] && log "VERIFY_OK ${BACKUP_SOURCE:-$SRC}" || log "VERIFY_FAILED ${BACKUP_SOURCE:-$SRC}"
+  if [ "$rc" = 0 ]; then log "VERIFY_OK ${BACKUP_SOURCE:-$SRC}"; else log "VERIFY_FAILED ${BACKUP_SOURCE:-$SRC}"; fi
   exit "$rc"
 }
 trap finish EXIT

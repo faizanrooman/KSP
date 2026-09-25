@@ -22,7 +22,7 @@ has "$encoders" ' mjpeg ' "encoder mjpeg (thumbnails/snapshots/AI frames)"
 has "$encoders" ' png ' "encoder png (exact-frame snapshots)"
 # Body-worn camera inputs.
 for d in h264 hevc mjpeg mpeg4 aac pcm_s16le; do has "$decoders" " $d " "decoder $d"; done
-for d in mov mp4 matroska avi mpegts; do has "$demuxers" "[ ,]$d[ ,]" "demuxer $d"; done
+for d in mov mp4 matroska avi mpegts; do has "$demuxers" "[ ,]${d}[ ,]" "demuxer $d"; done
 [ -x "$FP" ] || command -v "$FP" >/dev/null 2>&1 || missing+=("ffprobe next to ffmpeg ($FP)")
 "$FF" -hide_banner -version | head -1
 if [ ${#missing[@]} -gt 0 ]; then

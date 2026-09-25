@@ -1,0 +1,41 @@
+# Staging: single-zone, smaller footprint, SealedSecrets/plain Secrets created out of band (docs/SECRETS.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ksp-vms-staging
+resources:
+  - ../../base
+images:
+  - { name: ksp/api, newName: ghcr.io/ksp/api, newTag: staging }
+  - { name: ksp/worker, newName: ghcr.io/ksp/worker, newTag: staging }
+  - { name: ksp/ai-worker, newName: ghcr.io/ksp/ai-worker, newTag: staging }
+  - { name: ksp/web, newName: ghcr.io/ksp/web, newTag: staging }
+  - { name: ksp/backup, newName: ghcr.io/ksp/backup, newTag: staging }
+patches:
+  - target: { kind: Namespace, name: ksp-vms }
+    patch: |-
+      - { op: replace, path: /metadata/name, value: ksp-vms-staging }
+  - target: { kind: ConfigMap, name: ksp-config }
+    patch: |-
+      - { op: replace, path: /data/APP_BASE_URL, value: "https://vms-staging.ksp.example" }
+      - { op: replace, path: /data/CORS_ORIGINS, value: "https://vms-staging.ksp.example" }
+      - { op: replace, path: /data/S3_ENDPOINT, value: "https://s3-staging.storage.ksp.internal" }
+      - { op: replace, path: /data/LOG_LEVEL, value: debug }
+      - { op: replace, path: /data/OBJECT_LOCK_DAYS, value: "30" }
+  - target: { kind: Ingress, name: ksp-vms }
+    patch: |-
+      - { op: replace, path: /spec/tls/0/hosts/0, value: vms-staging.ksp.example }
+      - { op: replace, path: /spec/rules/0/host, value: vms-staging.ksp.example }
+  - target: { kind: HorizontalPodAutoscaler, name: ksp-api }
+    patch: |-
+      - { op: replace, path: /spec/minReplicas, value: 2 }
+      - { op: replace, path: /spec/maxReplicas, value: 4 }
+  - target: { kind: HorizontalPodAutoscaler, name: ksp-worker }
+    patch: |-
+      - { op: replace, path: /spec/minReplicas, value: 1 }
+      - { op: replace, path: /spec/maxReplicas, value: 3 }
+  - target: { kind: Deployment, name: ksp-worker }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 1 }
+  - target: { kind: Deployment, name: ksp-web }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 1 }

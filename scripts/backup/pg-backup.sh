@@ -67,6 +67,9 @@ AUDIT_HEAD=$(q "SELECT coalesce(max(seq),0) FROM audit_events")
 AUDIT_HASH=$(q "SELECT coalesce((SELECT hash FROM audit_events ORDER BY seq DESC LIMIT 1),'')")
 EVIDENCE_ROWS=$(q "SELECT count(*) FROM evidence")
 USER_ROWS=$(q "SELECT count(*) FROM users")
+# Database-level settings (ALTER DATABASE ... SET, e.g. jit=off from migration 0901) are NOT in a -Fc dump of one
+# database; record them so restore.sh re-applies them.
+DB_SETTINGS=$(q "SELECT coalesce(json_agg(c), '[]') FROM pg_db_role_setting s, unnest(s.setconfig) c WHERE s.setrole = 0 AND s.setdatabase = (SELECT oid FROM pg_database WHERE datname = current_database())")
 
 # 2. Dump (custom format, compressed). Snapshot-consistent by construction (single transaction).
 pg_dump --format=custom --compress=6 --no-password --file="$DUMP" || fail "pg_dump exited $?"
@@ -97,7 +100,8 @@ cat > "$WORK/manifest.json" <<JSON
   "encryptedSizeBytes": $ENC_SIZE,
   "schemaMigrations": { "count": $MIG_COUNT, "head": "$MIG_HEAD" },
   "audit": { "headSeq": $AUDIT_HEAD, "headHash": "$AUDIT_HASH" },
-  "rowCounts": { "evidence": $EVIDENCE_ROWS, "users": $USER_ROWS }
+  "rowCounts": { "evidence": $EVIDENCE_ROWS, "users": $USER_ROWS },
+  "databaseSettings": $DB_SETTINGS
 }
 JSON
 

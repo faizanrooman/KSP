@@ -24,7 +24,7 @@ fetch_backup() {
     src="s3://$bucket/$key"
   fi
   if [[ "$src" == s3://* ]]; then
-    bucket="${src#s3://}"; bucket="${bucket%%/*}"; key="${src#s3://$bucket/}"
+    bucket="${src#s3://}"; bucket="${bucket%%/*}"; key="${src#s3://"$bucket"/}"
     log "fetching s3://$bucket/$key"
     node "$BACKUP_LIB_DIR/s3.ts" get "$bucket" "$key" "$work/manifest.json" || die "cannot download manifest"
     MANIFEST="$work/manifest.json"
@@ -58,6 +58,18 @@ decrypt_verify() {
 restore_dump() {
   local jobs="${3:-4}"
   pg_restore --exit-on-error --no-password --jobs="$jobs" --dbname="$2" "$1" || die "pg_restore failed"
+}
+
+# apply_db_settings <admin-url> <db>: re-apply ALTER DATABASE ... SET values recorded in the manifest.
+apply_db_settings() {
+  local kv name val
+  while IFS= read -r kv; do
+    [ -n "$kv" ] || continue
+    name="${kv%%=*}"; val="${kv#*=}"
+    [[ "$name" =~ ^[a-z_.]+$ ]] || die "unexpected database setting name $name in manifest"
+    psql "$1" -qX -v ON_ERROR_STOP=1 -v v="$val" <<<"ALTER DATABASE \"$2\" SET $name = :'v'" >/dev/null || die "cannot apply setting $name"
+    log "database setting re-applied: $name=$val"
+  done < <(json "$MANIFEST" '(m.databaseSettings ?? []).join("\n")')
 }
 
 # post_checks <db-url> [--strict]   (uses MANIFEST when set)
