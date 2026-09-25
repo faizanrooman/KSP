@@ -21,7 +21,7 @@
     "dev:web": "npm run -w @ksp/web dev",
     "build": "npm run build -w @ksp/shared && npm run build -w @ksp/core && npm run build -w @ksp/api -w @ksp/worker -w @ksp/ai-worker -w @ksp/web -w @ksp/station-client",
     "typecheck": "npm run build -w @ksp/shared -w @ksp/core && npm run typecheck --workspaces --if-present",
-    "lint": "eslint --concurrency=auto .",
+    "lint": "eslint --concurrency=4 .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run test --workspaces --if-present",
