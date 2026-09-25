@@ -1,0 +1,152 @@
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { SettingKey, SystemSettings } from '@ksp/shared';
+import { api, ApiError, errorMessage } from '@/lib/api';
+import { formatDateTime } from '@/lib/format';
+import { Alert, Badge, Button, Card, Checkbox, ConfirmDialog, ErrorState, Field, Input, PageHeader, Spinner, useToast } from '@/components/ui';
+import { useRoles } from './shared';
+
+interface SettingsResponse {
+  settings: SystemSettings;
+  defaults: SystemSettings;
+  keys: Array<{ key: SettingKey; overridden: boolean; updatedAt: string | null; updatedBy: { id: string; fullName: string } | null }>;
+}
+
+type FieldDef = { name: string; label: string; kind: 'int' | 'bool' | 'bytes' | 'roles'; min?: number; max?: number; hint?: string };
+const MiB = 1024 ** 2;
+const GROUPS: Array<{ key: SettingKey; title: string; description: string; fields: FieldDef[] }> = [
+  {
+    key: 'passwordPolicy', title: 'Password policy', description: 'Applies to new passwords (changes and resets).',
+    fields: [
+      { name: 'minLength', label: 'Minimum length', kind: 'int', min: 10, max: 128 },
+      { name: 'requireUpper', label: 'Require an upper-case letter', kind: 'bool' },
+      { name: 'requireLower', label: 'Require a lower-case letter', kind: 'bool' },
+      { name: 'requireDigit', label: 'Require a digit', kind: 'bool' },
+      { name: 'requireSymbol', label: 'Require a symbol', kind: 'bool' },
+      { name: 'historyCount', label: 'Reject reuse of last N passwords', kind: 'int', min: 0, max: 24 },
+      { name: 'maxAgeDays', label: 'Maximum password age (days)', kind: 'int', min: 0, max: 365, hint: '0 = never expires' },
+    ],
+  },
+  {
+    key: 'lockoutPolicy', title: 'Account lockout', description: 'Brute-force protection for sign-in.',
+    fields: [
+      { name: 'maxFailedAttempts', label: 'Failed attempts before lockout', kind: 'int', min: 3, max: 20 },
+      { name: 'lockoutMinutes', label: 'Lockout duration (minutes)', kind: 'int', min: 1, max: 1440 },
+      { name: 'ipMaxFailedPerWindow', label: 'Failed attempts per IP per window', kind: 'int', min: 5, max: 1000 },
+      { name: 'windowMinutes', label: 'IP window (minutes)', kind: 'int', min: 1, max: 1440 },
+    ],
+  },
+  {
+    key: 'sessionPolicy', title: 'Sessions & MFA', description: 'Session lifetime and roles for which MFA enrolment is mandatory.',
+    fields: [
+      { name: 'idleTimeoutMinutes', label: 'Idle timeout (minutes)', kind: 'int', min: 5, max: 480 },
+      { name: 'absoluteTimeoutHours', label: 'Absolute session lifetime (hours)', kind: 'int', min: 1, max: 72 },
+      { name: 'maxConcurrentSessions', label: 'Maximum concurrent sessions per user', kind: 'int', min: 1, max: 20 },
+      { name: 'requireMfaForRoles', label: 'MFA mandatory for roles', kind: 'roles' },
+    ],
+  },
+  {
+    key: 'uploadPolicy', title: 'Uploads', description: 'Resumable chunked upload limits.',
+    fields: [
+      { name: 'maxFileSizeBytes', label: 'Maximum file size (MiB)', kind: 'bytes', min: 10, max: 1024 * 1024 },
+      { name: 'chunkSizeBytes', label: 'Chunk size (MiB)', kind: 'bytes', min: 5, max: 128 },
+      { name: 'sessionTtlHours', label: 'Upload session lifetime (hours)', kind: 'int', min: 1, max: 720 },
+      { name: 'maxConcurrentSessionsPerUser', label: 'Concurrent upload sessions per user', kind: 'int', min: 1, max: 200 },
+    ],
+  },
+  {
+    key: 'storagePolicy', title: 'Storage alerts', description: 'Utilisation thresholds for dashboards and alerts.',
+    fields: [
+      { name: 'warnThresholdPercent', label: 'Warning threshold (%)', kind: 'int', min: 1, max: 99 },
+      { name: 'criticalThresholdPercent', label: 'Critical threshold (%)', kind: 'int', min: 2, max: 100 },
+      { name: 'capacityBytes', label: 'Declared capacity (MiB)', kind: 'bytes', min: 0, hint: '0 = unknown' },
+    ],
+  },
+  {
+    key: 'shareExportPolicy', title: 'Sharing & export', description: 'Limits for shares and court exports.',
+    fields: [
+      { name: 'maxShareDays', label: 'Maximum share validity (days)', kind: 'int', min: 1, max: 365 },
+      { name: 'exportRetentionDays', label: 'Keep generated exports (days)', kind: 'int', min: 1, max: 3650 },
+      { name: 'excessiveDownloadsPerHour', label: 'Excessive downloads alert (per hour)', kind: 'int', min: 1, max: 10000 },
+    ],
+  },
+];
+
+function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: SettingsResponse }) {
+  const initial = data.settings[group.key] as unknown as Record<string, unknown>;
+  const [v, setV] = useState<Record<string, unknown>>(initial);
+  const [confirmReset, setConfirmReset] = useState(false);
+  useEffect(() => setV(initial), [initial]);
+  const roles = useRoles(group.key === 'sessionPolicy');
+  const qc = useQueryClient();
+  const toast = useToast();
+  const meta = data.keys.find((k) => k.key === group.key);
+  const save = useMutation({
+    mutationFn: () => api.put<SettingsResponse>(`/settings/${group.key}`, v),
+    onSuccess: (r) => { qc.setQueryData(['admin', 'settings'], r); toast.success(`${group.title} saved`); },
+  });
+  const reset = useMutation({
+    mutationFn: () => api.delete<SettingsResponse>(`/settings/${group.key}`),
+    onSuccess: (r) => { qc.setQueryData(['admin', 'settings'], r); setConfirmReset(false); toast.success(`${group.title} restored to defaults`); },
+  });
+  const dirty = JSON.stringify(v) !== JSON.stringify(initial);
+  const details = save.error instanceof ApiError && Array.isArray(save.error.details) ? (save.error.details as Array<{ path?: string; message: string }>) : [];
+  return (
+    <Card
+      title={<div><h2>{group.title} {meta?.overridden ? <Badge tone="blue">Customised</Badge> : <Badge>Default</Badge>}</h2><p className="text-xs font-normal text-ink-500">{group.description}{meta?.updatedAt ? ` Last changed ${formatDateTime(meta.updatedAt)}${meta.updatedBy ? ` by ${meta.updatedBy.fullName}` : ''}.` : ''}</p></div>}
+      actions={meta?.overridden ? <Button size="sm" variant="ghost" onClick={() => { reset.reset(); setConfirmReset(true); }}>Restore defaults</Button> : undefined}
+    >
+      <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {group.fields.map((fd) => {
+            const id = `set-${group.key}-${fd.name}`;
+            const val = v[fd.name];
+            if (fd.kind === 'bool') return <div key={fd.name} className="self-end"><Checkbox label={fd.label} checked={!!val} onChange={(c) => setV({ ...v, [fd.name]: c })} /></div>;
+            if (fd.kind === 'roles') {
+              const sel = new Set((val as string[]) ?? []);
+              return (
+                <fieldset key={fd.name} className="sm:col-span-2">
+                  <legend className="label">{fd.label}</legend>
+                  {roles.isLoading ? <Spinner /> : (
+                    <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                      {roles.data?.items.map((r) => (
+                        <Checkbox key={r.code} label={r.name} description={r.code} checked={sel.has(r.code)} onChange={(c) => { const n = new Set(sel); if (c) n.add(r.code); else n.delete(r.code); setV({ ...v, [fd.name]: [...n] }); }} />
+                      ))}
+                    </div>
+                  )}
+                </fieldset>
+              );
+            }
+            const shown = fd.kind === 'bytes' ? Math.round(Number(val) / MiB) : Number(val);
+            return (
+              <Field key={fd.name} label={fd.label} htmlFor={id} hint={[fd.hint, fd.min !== undefined && fd.max !== undefined ? `${fd.min}–${fd.max.toLocaleString('en-IN')}` : undefined].filter(Boolean).join(' · ')}>
+                <Input id={id} type="number" inputMode="numeric" min={fd.min} max={fd.max} value={Number.isFinite(shown) ? shown : ''} onChange={(e) => { const n = e.target.value === '' ? NaN : Number(e.target.value); setV({ ...v, [fd.name]: fd.kind === 'bytes' ? Math.round(n * MiB) : n }); }} />
+              </Field>
+            );
+          })}
+        </div>
+        {save.error ? (
+          <Alert tone="red" title="Not saved">
+            {errorMessage(save.error)}
+            {details.length > 0 && <ul className="mt-1 list-disc pl-5">{details.map((d, i) => <li key={i}>{d.path ? `${d.path}: ` : ''}{d.message}</li>)}</ul>}
+          </Alert>
+        ) : null}
+        <div className="flex justify-end gap-2">
+          {dirty && <Button variant="secondary" onClick={() => { setV(initial); save.reset(); }}>Discard</Button>}
+          <Button type="submit" disabled={!dirty} loading={save.isPending}>Save</Button>
+        </div>
+      </form>
+      <ConfirmDialog open={confirmReset} title={`Restore ${group.title}`} message="Replace the customised values with the built-in defaults? The change is audited." confirmLabel="Restore defaults" loading={reset.isPending} error={reset.error} onConfirm={() => reset.mutate()} onCancel={() => setConfirmReset(false)} />
+    </Card>
+  );
+}
+
+export function SettingsPage() {
+  const q = useQuery({ queryKey: ['admin', 'settings'], queryFn: () => api.get<SettingsResponse>('/settings') });
+  return (
+    <div className="space-y-4">
+      <PageHeader title="System settings" subtitle="Security and operational policies. Every change is recorded in the audit trail with old and new values." />
+      {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : GROUPS.map((g) => <GroupForm key={g.key} group={g} data={q.data!} />)}
+    </div>
+  );
+}
