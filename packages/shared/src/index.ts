@@ -5,3 +5,4 @@ export * from './settings.js';
 export * from './queues.js';
 export * from './api.js';
 export * from './ingest.js';
+export * from './ai.js';
