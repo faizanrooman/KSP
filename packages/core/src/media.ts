@@ -70,12 +70,24 @@ export function runProcess(
   });
 }
 
+/**
+ * Demuxers allowed to open evidence media (short names of the containers in SUPPORTED_CONTAINERS). Passed as
+ * `-format_whitelist` so reference-following demuxers (hls, concat, image2 sequences, …) are never selected for
+ * an uploaded file, whatever its extension or HTTP content type (SSRF / local file read via crafted playlists).
+ */
+export const MEDIA_FORMAT_WHITELIST = 'mov,matroska,avi,mpegts,asf,flv,mpeg';
+/**
+ * Demuxers for single still images (watchlist reference photos, JPEG/PNG sniffed by the API). image2 only expands
+ * sequences/globs when the FILENAME contains a pattern; callers must pass server-generated paths (e.g. <uuid>.img).
+ */
+export const IMAGE_FORMAT_WHITELIST = 'image2,jpeg_pipe,png_pipe';
+
 /** ffprobe a local path or an internal (presigned, never client-visible) URL. */
-export async function probe(input: string, timeoutMs = 120_000): Promise<ProbeResult> {
+export async function probe(input: string, timeoutMs = 120_000, formats: string = MEDIA_FORMAT_WHITELIST): Promise<ProbeResult> {
   const cfg = loadConfig();
   const res = await runProcess(
     cfg.FFPROBE_PATH,
-    ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', '-protocol_whitelist', 'file,http,https,tcp,tls', input],
+    ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', '-protocol_whitelist', 'file,http,https,tcp,tls', '-format_whitelist', formats, input],
     { timeoutMs },
   );
   if (res.code !== 0) throw new MediaError('PROBE_FAILED', res.stderr.trim().slice(0, 2000) || `ffprobe exited ${res.code}`);

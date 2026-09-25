@@ -214,6 +214,8 @@ export default async function media(fastify: FastifyInstance) {
     // External shares: the ORIGINAL only when the share explicitly allows it (allow_download AND allow_original);
     // otherwise recipients get the watermarked copy via /share-portal/download.
     if (auth.claims.typ === 'SHARE' && (!auth.shareAllowsOriginal || auth.claims.ref !== 'original')) throw forbidden('This share does not allow downloading the original');
+    // Evidence download tokens carry no ref; tokens minted for other download routes (e.g. ref 'report') are refused.
+    if (auth.claims.typ !== 'SHARE' && auth.claims.ref !== undefined) throw new AppError(403, 'TOKEN_SCOPE', 'Media token not valid for this resource');
     const ev = await app.db
       .selectFrom('evidence')
       .select(['id', 'status', 'org_unit_id', 'evidence_number', 'original_filename', 'storage_bucket', 'storage_key', 'storage_version_id', 'sha256', 'size_bytes', 'storage_tier'])

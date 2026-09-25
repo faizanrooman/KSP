@@ -23,6 +23,8 @@ declare module 'fastify' {
     pool: pg.Pool;
     storage: Storage;
     cfg: AppConfig;
+    /** Every registered route (method, url, config) — used by the security route sweep test. */
+    routeRegistry: Array<{ method: string; url: string; public: boolean }>;
   }
 }
 
@@ -55,6 +57,11 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   app.decorate('pool', pool);
   app.decorate('storage', new Storage());
   app.decorate('cfg', cfg);
+  const routeRegistry: Array<{ method: string; url: string; public: boolean }> = [];
+  app.decorate('routeRegistry', routeRegistry);
+  app.addHook('onRoute', (r) => {
+    for (const m of [r.method].flat()) routeRegistry.push({ method: String(m), url: r.url, public: !!(r.config as { public?: boolean } | undefined)?.public });
+  });
   app.addHook('onClose', async () => {
     await db.destroy();
   });

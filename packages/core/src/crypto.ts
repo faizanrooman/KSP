@@ -37,7 +37,7 @@ export const dummySecretHash = (): Promise<string> => (dummyHash ??= hashSecret(
 export function encryptSecret(plain: string, keyB64 = loadConfig().DATA_ENCRYPTION_KEY): string {
   const key = Buffer.from(keyB64, 'base64');
   const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const cipher = createCipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
   const ct = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
   return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), ct.toString('base64url')].join('.');
 }
@@ -45,8 +45,11 @@ export function encryptSecret(plain: string, keyB64 = loadConfig().DATA_ENCRYPTI
 export function decryptSecret(token: string, keyB64 = loadConfig().DATA_ENCRYPTION_KEY): string {
   const [v, iv, tag, ct] = token.split('.');
   if (v !== 'v1' || !iv || !tag || !ct) throw new Error('unsupported ciphertext');
-  const decipher = createDecipheriv('aes-256-gcm', Buffer.from(keyB64, 'base64'), Buffer.from(iv, 'base64url'));
-  decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+  const tagBuf = Buffer.from(tag, 'base64url');
+  // Pin the full 128-bit tag: without authTagLength, truncated tags would be accepted (weaker forgery bound).
+  if (tagBuf.length !== 16) throw new Error('invalid authentication tag');
+  const decipher = createDecipheriv('aes-256-gcm', Buffer.from(keyB64, 'base64'), Buffer.from(iv, 'base64url'), { authTagLength: 16 });
+  decipher.setAuthTag(tagBuf);
   return Buffer.concat([decipher.update(Buffer.from(ct, 'base64url')), decipher.final()]).toString('utf8');
 }
 

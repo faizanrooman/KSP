@@ -56,6 +56,7 @@ export function isRestrictedIp(ip: string): boolean {
     const mapped = ip.toLowerCase().match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
     if (mapped) return isRestrictedIp(mapped[1]!);
     if (x.startsWith('0000:0000:0000:0000:0000:ffff:')) return true; // hex-form mapped v4: deny
+    if (x.startsWith('0000:0000:0000:0000:0000:0000:')) return true; // ::/96 IPv4-compatible (deprecated): deny
     const first = parseInt(x.slice(0, 4), 16);
     if ((first & 0xfe00) === 0xfc00) return true; // fc00::/7 unique local
     if ((first & 0xffc0) === 0xfe80) return true; // fe80::/10 link local
