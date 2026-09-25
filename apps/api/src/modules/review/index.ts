@@ -39,7 +39,7 @@ const actionBody = z.object({
   action: z.enum(REVIEW_ACTIONS),
   comment: z.string().trim().max(2000).optional(),
   correctedLabel: z.string().trim().min(1).max(100).optional(),
-});
+}).strict();
 type ActionBody = z.infer<typeof actionBody>;
 
 const AUDIT_FOR: Record<ReviewAction, AuditAction> = {
@@ -206,7 +206,7 @@ export default async function review(fastify: FastifyInstance) {
     preHandler: guard,
     schema: {
       tags: ['review'], summary: 'Apply review actions to several detections (per-item results)',
-      body: z.object({ items: z.array(actionBody.extend({ id: z.string().uuid() })).min(1).max(100) }),
+      body: z.object({ items: z.array(actionBody.extend({ id: z.string().uuid() })).min(1).max(100) }).strict(),
     },
   }, async (req) => {
     const p = req.requirePrincipal();

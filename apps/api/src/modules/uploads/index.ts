@@ -192,7 +192,7 @@ export default async function uploads(fastify: FastifyInstance) {
     schema: {
       tags: ['uploads'],
       summary: 'Create an upload batch for a station',
-      body: z.object({ orgUnitId: uuid, label: z.string().trim().max(200).optional(), clientInfo: z.record(z.union([z.string().max(500), z.number(), z.boolean()])).optional() }),
+      body: z.object({ orgUnitId: uuid, label: z.string().trim().max(200).optional(), clientInfo: z.record(z.union([z.string().max(500), z.number(), z.boolean()])).optional() }).strict(),
     },
   }, async (req, reply) => {
     const p = req.requirePrincipal();
@@ -320,7 +320,7 @@ export default async function uploads(fastify: FastifyInstance) {
     return ev;
   }
 
-  const decisionSchema = { params: z.object({ evidenceId: uuid }), body: z.object({ reason: z.string().trim().min(5).max(2000) }) };
+  const decisionSchema = { params: z.object({ evidenceId: uuid }), body: z.object({ reason: z.string().trim().min(5).max(2000) }).strict() };
 
   app.post('/quarantine/:evidenceId/release', {
     preHandler: app.authorize('evidence:quarantine_manage'),
@@ -369,7 +369,7 @@ export default async function uploads(fastify: FastifyInstance) {
         sha256: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
         chunkSize: z.number().int().positive().optional(),
         metadata: metadataSchema.optional(),
-      }),
+      }).strict(),
     },
   }, async (req, reply) => {
     const p = req.requirePrincipal();
