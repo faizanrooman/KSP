@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { sql } from 'kysely';
 import { raiseAlert } from '@ksp/core';
 import { Agent, closeApp, login } from './helpers.js';
 import { evidenceTestSetup, evidenceTestTeardown, userId } from './evidence-setup.js';
@@ -66,7 +67,9 @@ describe('alerts API authz & scoping', () => {
     expect((await admin.get('/api/v1/alerts?severity=BOGUS')).status).toBe(400);
     const s = await meera.get('/api/v1/alerts/summary');
     expect(s.status).toBe(200);
-    expect(s.body.bySeverity.CRITICAL).toBe(0); // the system-wide CRITICAL alert is not in meera's scope
+    const cubbonCritical = await app.db.selectFrom('alerts as a').innerJoin('org_units as o', 'o.id', 'a.org_unit_id').select(sql<number>`count(*)::int`.as('n'))
+      .where('a.status', '<>', 'RESOLVED').where('a.severity', '=', 'CRITICAL').where(sql<boolean>`o.path <@ 'ksp.blr_city.blr_central.ps_cubbonpark'::ltree`).executeTakeFirstOrThrow();
+    expect(s.body.bySeverity.CRITICAL).toBe(cubbonCritical.n); // the system-wide CRITICAL alert is not in meera's scope
     const sa = await admin.get('/api/v1/alerts/summary');
     expect(sa.body.bySeverity.CRITICAL).toBeGreaterThanOrEqual(1);
   });

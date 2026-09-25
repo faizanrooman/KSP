@@ -13,11 +13,24 @@ const timings: Record<string, unknown> = {};
 
 const orgOf = async (code: string) => app.db.selectFrom('org_units').select(['id', 'path']).where('code', '=', code).executeTakeFirstOrThrow();
 
-/** Ground truth computed independently: live evidence under an org path. */
-async function expectedTotal(path: string | null): Promise<number> {
-  const q = app.db.selectFrom('evidence').select(sql<number>`count(*)::int`.as('n')).where('status', 'not in', ['DISPOSED', 'REJECTED']);
-  const r = await (path ? q.where(sql<boolean>`org_path <@ ${path}::ltree`) : q).executeTakeFirstOrThrow();
-  return r.n;
+/**
+ * Ground truth computed independently: live evidence under an org path, plus (for a user) items visible only
+ * through a relationship — linked to a case they investigate/supervise/belong to, or shared with them.
+ */
+async function expectedTotal(path: string | null, username?: string): Promise<number> {
+  const uid = username ? await userId(username) : null;
+  const r = await sql<{ n: number }>`
+    SELECT count(*)::int AS n FROM evidence e
+     WHERE e.status NOT IN ('DISPOSED','REJECTED')
+       AND (${path}::ltree IS NULL OR e.org_path <@ ${path}::ltree
+            OR (${uid}::uuid IS NOT NULL AND (
+                 e.id IN (SELECT ce.evidence_id FROM case_evidence ce JOIN cases c ON c.id = ce.case_id
+                           WHERE ce.unlinked_at IS NULL AND c.status <> 'ARCHIVED'
+                             AND (c.investigating_officer_id = ${uid}::uuid OR c.supervisor_id = ${uid}::uuid
+                                  OR c.id IN (SELECT case_id FROM case_members WHERE user_id = ${uid}::uuid)))
+              OR e.id IN (SELECT si.evidence_id FROM share_items si JOIN shares sh ON sh.id = si.share_id
+                           WHERE sh.recipient_user_id = ${uid}::uuid AND sh.status = 'ACTIVE' AND sh.expires_at > now()))))`.execute(app.db);
+  return r.rows[0]!.n;
 }
 
 async function failedSession(org: string, by: string) {
@@ -69,12 +82,14 @@ describe('dashboard scoping', () => {
     const m = await summary(meera, '', 'io.meera');
     const a = await summary(arjun, '', 'io.arjun');
     const s = await summary(auditor, '', 'aud.suresh');
-    expect(m.evidence.total).toBe(await expectedTotal(cubbon.path));
-    expect(a.evidence.total).toBe(await expectedTotal(indira.path));
+    expect(m.evidence.total).toBe(await expectedTotal(cubbon.path, 'io.meera'));
+    expect(a.evidence.total).toBe(await expectedTotal(indira.path, 'io.arjun'));
     expect(s.evidence.total).toBe(await expectedTotal(null));
     expect(s.evidence.total).toBeGreaterThan(m.evidence.total);
-    expect(m.evidence.byStation.map((x: { code: string }) => x.code)).toEqual(['ps_cubbonpark']);
-    expect(a.evidence.byStation.map((x: { code: string }) => x.code)).toEqual(['ps_indiranagar']);
+    // jurisdiction stations only (other stations may appear solely via case/share relationships)
+    expect(m.evidence.byStation.map((x: { code: string }) => x.code)).toContain('ps_cubbonpark');
+    expect(m.evidence.byStation.map((x: { code: string }) => x.code)).not.toContain('ps_nazarbad');
+    expect(a.evidence.byStation.map((x: { code: string }) => x.code)).toContain('ps_indiranagar');
     expect(s.evidence.byStation.map((x: { code: string }) => x.code)).toEqual(expect.arrayContaining(['ps_cubbonpark', 'ps_indiranagar', 'ps_nazarbad']));
     expect(m.evidence.byCategory.map((x: { category: string }) => x.category)).toEqual(expect.arrayContaining(['Traffic', 'Protest']));
     // uploads: meera sees Cubbon failures only
@@ -112,7 +127,7 @@ describe('dashboard scoping', () => {
   it('supervisor sees the district; station filter narrows it', async () => {
     const central = await orgOf('blr_central');
     const k = await summary(kavya, '', 'sup.kavya');
-    expect(k.evidence.total).toBe(await expectedTotal(central.path));
+    expect(k.evidence.total).toBe(await expectedTotal(central.path, 'sup.kavya'));
     const hg = await orgOf('ps_highgrounds');
     const f = await summary(kavya, `?orgUnitId=${hg.id}`);
     expect(f.evidence.total).toBe(await expectedTotal(hg.path));
