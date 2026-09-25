@@ -137,7 +137,7 @@ function JobsCard({ evidenceId, canCancel }: { evidenceId: string; canCancel: bo
               <span className="font-medium text-ink-800">{j.tasks.map(taskLabel).join(', ')}</span>
               <span className="text-xs text-ink-500">{formatDateTime(j.createdAt)} · {j.requestedBy.fullName} · {j.params.sampleFps} fps · {j.models.map((m) => `${m.code}@${m.version}`).join(', ')}</span>
               {(j.status === 'RUNNING' || j.status === 'QUEUED') && (
-                <div className="w-48"><ProgressBar value={Math.round(j.progress * 100)} label={`${Math.round(j.progress * 100)}%`} /></div>
+                <div className="flex w-56 items-center gap-2"><ProgressBar value={j.progress} label="Analysis progress" /><span className="text-xs tabular-nums text-ink-600">{Math.round(j.progress * 100)}%</span></div>
               )}
               {j.status === 'COMPLETED' && (
                 <span className="text-xs text-ink-600">

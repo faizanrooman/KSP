@@ -3,7 +3,9 @@
  * focus handling and keyboard behaviour are consistent (see docs/UI-GUIDELINES.md).
  */
 import {
+  cloneElement,
   createContext,
+  isValidElement,
   forwardRef,
   useCallback,
   useContext,
@@ -66,16 +68,40 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 });
 
 // ---------------------------------------------------------------------------------------------
+/**
+ * Label + control + hint/error. The label is always programmatically associated: with `htmlFor`, or — when the
+ * single child control has no id — with a generated id. Hint/error are linked via aria-describedby and errors set
+ * aria-invalid (E2E/axe pass: several dialogs rendered unlabeled controls).
+ */
+const FORM_CONTROLS = new Set<unknown>(['input', 'select', 'textarea']);
+
 export function Field({ label, hint, error, children, required, htmlFor }: { label: string; hint?: string; error?: string | null; children: ReactNode; required?: boolean; htmlFor?: string }) {
+  const autoId = useId();
+  const el = isValidElement<Record<string, unknown>>(children) ? children : null;
+  // Only real form controls get a generated id; any element already carrying the htmlFor id is enhanced as well.
+  const child = el && (FORM_CONTROLS.has(el.type) || (htmlFor !== undefined && el.props.id === htmlFor)) ? el : null;
+  const controlId = htmlFor ?? (child?.props.id as string | undefined) ?? (child ? `${autoId}-control` : undefined);
+  const hintId = `${autoId}-hint`;
+  const errorId = `${autoId}-error`;
+  const describedBy = [child?.props['aria-describedby'] as string | undefined, error ? errorId : hint ? hintId : undefined].filter(Boolean).join(' ') || undefined;
+  const control =
+    child && (!htmlFor || child.props.id === htmlFor)
+      ? cloneElement(child, {
+          id: controlId,
+          'aria-describedby': describedBy,
+          ...(error ? { 'aria-invalid': true } : {}),
+          ...(required && child.props.required === undefined ? { 'aria-required': true } : {}),
+        })
+      : children;
   return (
     <div>
-      <label className="label" htmlFor={htmlFor}>
+      <label className="label" htmlFor={controlId}>
         {label}
         {required && <span className="ml-0.5 text-red-600" aria-hidden>*</span>}
       </label>
-      {children}
-      {hint && !error && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
-      {error && <p className="mt-1 text-xs text-red-600" role="alert">{error}</p>}
+      {control}
+      {hint && !error && <p id={hintId} className="mt-1 text-xs text-ink-500">{hint}</p>}
+      {error && <p id={errorId} className="mt-1 text-xs text-red-700" role="alert">{error}</p>}
     </div>
   );
 }
@@ -88,6 +114,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   return <textarea ref={ref} className={clsx('input min-h-[80px]', className)} {...rest} />;
 });
 
+FORM_CONTROLS.add(Input).add(Textarea);
+
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
   return (
     <select ref={ref} className={clsx('input pr-8', className)} {...rest}>
@@ -95,6 +123,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
     </select>
   );
 });
+FORM_CONTROLS.add(Select);
 
 export function Checkbox({ label, checked, onChange, disabled, description }: { label: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; description?: string }) {
   const id = useId();
@@ -111,11 +140,13 @@ export function Checkbox({ label, checked, onChange, disabled, description }: { 
 
 // ---------------------------------------------------------------------------------------------
 export function Card({ title, actions, children, className, bodyClassName }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; bodyClassName?: string }) {
+  const titleId = useId();
+  const named = typeof title === 'string';
   return (
-    <section className={clsx('card', className)}>
+    <section className={clsx('card', className)} aria-labelledby={named ? titleId : undefined}>
       {(title || actions) && (
         <header className="flex items-center justify-between gap-3 border-b border-ink-100 px-4 py-3">
-          {typeof title === 'string' ? <h2>{title}</h2> : title}
+          {named ? <h2 id={titleId}>{title}</h2> : title}
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>
       )}
@@ -329,7 +360,12 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: {
     const prev = document.activeElement as HTMLElement | null;
     const el = ref.current;
     const focusables = () => Array.from(el?.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? []).filter((x) => !x.hasAttribute('disabled'));
-    (focusables()[0] ?? el)?.focus();
+    // Respect a child's autoFocus (e.g. the reason textarea). Moving focus to the first focusable (the Close
+    // button) meant typed text hit Close on Space and then the page's single-key shortcuts (E2E finding BUG-05).
+    if (!el?.contains(document.activeElement)) {
+      const field = el?.querySelector<HTMLElement>('input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])');
+      (field ?? focusables()[0] ?? el)?.focus();
+    }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       if (e.key === 'Tab') {
