@@ -41,7 +41,8 @@ The API never runs inference; the worker never sees the evidence table, original
 | `audit_append()` | EXECUTE (0002) | STARTED / COMPLETED / FAILED / WATCHLIST_EMBEDDED events, actor `SYSTEM ai-worker@<host>` |
 | everything else (`evidence`, `evidence_derivatives`, `users`, `sessions`, `cases`, `audit_events`, `evidence_tags`, `ai_review_events`, …) | none | |
 
-`ai_detection_guard` (0500, BEFORE INSERT, SECURITY DEFINER) additionally enforces: the job exists, is `RUNNING`, belongs to
+`ai_detection_guard` (0500, BEFORE INSERT, SECURITY DEFINER; scoped by 0501 to sessions of role `ksp_ai` — the trusted
+application role may insert historical/reviewed detections, e.g. imports and test fixtures) additionally enforces: the job exists, is `RUNNING`, belongs to
 the same evidence id, and the detection's model is one of the job's `model_ids`; `model_code/model_version/task` are
 **copied from the registry** (a worker cannot forge provenance) and review columns are forced to `PENDING`/NULL.
 Consequence: once the API sets a job `CANCELLED`, further inserts fail — cancellation is enforced by the database.
