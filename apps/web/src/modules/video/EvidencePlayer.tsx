@@ -196,7 +196,9 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
       video.addEventListener('loadedmetadata', applyStart, { once: true });
     }
     return () => {
-      initialRef.current = video.currentTime * 1000;
+      // Keep the position across source switches (only once media has loaded; StrictMode re-mounts must
+      // not overwrite the requested initial time).
+      if (video.readyState > 0) initialRef.current = video.currentTime * 1000;
       video.removeEventListener('loadedmetadata', applyStart);
       hls?.destroy();
       video.removeAttribute('src');
@@ -346,9 +348,10 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
     const h = el?.clientHeight ?? 0;
     return { z, x: Math.min(0, Math.max(w - w * z, x)), y: Math.min(0, Math.max(h - h * z, y)) };
   }, []);
-  const zoomAt = useCallback((nz: number, cx?: number, cy?: number) => {
+  /** Multiply the zoom by `factor` around (cx, cy) in stage pixels (default: centre). */
+  const zoomBy = useCallback((factor: number, cx?: number, cy?: number) => {
     setZoom((cur) => {
-      const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nz));
+      const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, cur.z * factor));
       const el = stageRef.current;
       const px = cx ?? (el?.clientWidth ?? 0) / 2;
       const py = cy ?? (el?.clientHeight ?? 0) / 2;
@@ -448,8 +451,8 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
       else stepFrame(1);
     } else if (k === '[') rateStep(-1);
     else if (k === ']') rateStep(1);
-    else if (k === '+' || k === '=') zoomAt(zoom.z * 1.25);
-    else if (k === '-' || k === '_') zoomAt(zoom.z / 1.25);
+    else if (k === '+' || k === '=') zoomBy(1.25);
+    else if (k === '-' || k === '_') zoomBy(1 / 1.25);
     else if (k === '0') resetZoom();
     else if (k === 's' || k === 'S') takeSnapshot();
     else if (k === 'f' || k === 'F') toggleFullscreen();
@@ -585,9 +588,9 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
             <select id={`rate-${evidenceId}`} value={rate} onChange={(e) => setRate(Number(e.target.value))} className="h-8 rounded bg-white/10 px-1 text-xs text-ink-100" title="Playback rate ([ / ])">
               {RATES.map((r) => <option key={r} value={r} className="text-ink-900">{r}×</option>)}
             </select>
-            <button type="button" className={btn} onClick={() => zoomAt(zoom.z / 1.25)} disabled={zoom.z <= MIN_ZOOM} aria-label="Zoom out" title="Zoom out (−)"><ZoomOut className="h-4 w-4" /></button>
+            <button type="button" className={btn} onClick={() => zoomBy(1 / 1.25)} disabled={zoom.z <= MIN_ZOOM} aria-label="Zoom out" title="Zoom out (−)"><ZoomOut className="h-4 w-4" /></button>
             <span className="w-10 text-center text-xs tabular-nums">{Math.round(zoom.z * 100)}%</span>
-            <button type="button" className={btn} onClick={() => zoomAt(zoom.z * 1.25)} disabled={zoom.z >= MAX_ZOOM} aria-label="Zoom in" title="Zoom in (+)"><ZoomIn className="h-4 w-4" /></button>
+            <button type="button" className={btn} onClick={() => zoomBy(1.25)} disabled={zoom.z >= MAX_ZOOM} aria-label="Zoom in" title="Zoom in (+)"><ZoomIn className="h-4 w-4" /></button>
             <button type="button" className={btn} onClick={resetZoom} disabled={zoom.z === 1} aria-label="Reset zoom" title="Reset zoom (0)"><RotateCcw className="h-4 w-4" /></button>
             {info.hlsUrl && (
               <>
