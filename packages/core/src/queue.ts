@@ -24,7 +24,8 @@ export async function getQueue(connectionString?: string): Promise<PgBoss> {
   if (boss) return boss;
   if (starting) return starting;
   starting = (async () => {
-    const b = new PgBoss({ connectionString: connectionString ?? loadConfig().DATABASE_URL, schema: 'pgboss', application_name: 'ksp-queue' });
+    // The schema is created by migration 0200 (ksp_app cannot CREATE schemas); pg-boss creates its tables inside it.
+    const b = new PgBoss({ connectionString: connectionString ?? loadConfig().DATABASE_URL, schema: 'pgboss', application_name: 'ksp-queue', createSchema: false });
     b.on('error', (err: Error) => console.error('[queue] error', err.message));
     await b.start();
     for (const [name, opts] of Object.entries(QUEUE_DEFAULTS)) {
