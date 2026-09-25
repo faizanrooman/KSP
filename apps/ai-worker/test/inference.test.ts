@@ -150,4 +150,19 @@ describe('IoU tracker dedupe', () => {
     expect(new Set(cars.map((c) => c.trackId)).size).toBe(2);
     expect(tr.tracksStarted).toBe(3);
   });
+
+  it('follows narrow objects during a camera pan (IoU alone would fragment the track)', () => {
+    const out: string[] = [];
+    const tr = new IouTracker<null>({ minIou: 0.3, maxGapFrames: 2, keepEveryMs: 60_000 }, (e) => out.push(e.trackId));
+    for (let f = 0; f < 12; f++) {
+      // two pedestrians 40 px wide, moving 30 px per sample (IoU between samples ~0.14)
+      tr.update(f, [
+        { trackClass: 'person', box: { x1: 100 + 30 * f, y1: 100, x2: 140 + 30 * f, y2: 220 }, confidence: 0.8, frameIndex: f, timeMs: f * 500, payload: null },
+        { trackClass: 'person', box: { x1: 400 + 30 * f, y1: 110, x2: 440 + 30 * f, y2: 230 }, confidence: 0.7, frameIndex: f, timeMs: f * 500, payload: null },
+      ]);
+    }
+    tr.finish();
+    expect(tr.tracksStarted).toBe(2);
+    expect(out).toHaveLength(2);
+  });
 });
