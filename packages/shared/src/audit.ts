@@ -134,7 +134,6 @@ export const AUDIT_ACTIONS = {
   EVIDENCE_UNLINKED_FROM_CASE: { category: 'CUSTODY', custody: true },
   INTEGRATION_SYNC: { category: 'INTEGRATION', custody: false },
   CASE_STATUS_CHANGED: { category: 'CASE', custody: false },
-  FIR_IMPORTED: { category: 'INTEGRATION', custody: false },
   INTEGRATION_TESTED: { category: 'INTEGRATION', custody: false },
   INTEGRATION_VERIFIED: { category: 'INTEGRATION', custody: false },
   INTEGRATION_API_REQUEST: { category: 'INTEGRATION', custody: false },
