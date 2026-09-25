@@ -30,7 +30,7 @@ const variants: Record<Variant, string> = {
   primary: 'bg-brand-700 text-white hover:bg-brand-800 disabled:bg-brand-300',
   secondary: 'bg-white text-ink-800 border border-ink-300 hover:bg-ink-50 disabled:text-ink-400',
   danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300',
-  success: 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-emerald-300',
+  success: 'bg-emerald-700 text-white hover:bg-emerald-800 disabled:bg-emerald-300',
   ghost: 'text-ink-700 hover:bg-ink-100 disabled:text-ink-400',
 };
 
@@ -175,11 +175,12 @@ export function Spinner({ label = 'Loading…', className }: { label?: string; c
   );
 }
 
-export function EmptyState({ title, description, action, icon }: { title: string; description?: ReactNode; action?: ReactNode; icon?: ReactNode }) {
+export function EmptyState({ title, description, action, icon, heading }: { title: string; description?: ReactNode; action?: ReactNode; icon?: ReactNode; heading?: 'h1' | 'h2' }) {
+  const Title = heading ?? 'p';
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-      <div className="text-ink-300">{icon ?? <Inbox className="h-10 w-10" aria-hidden />}</div>
-      <p className="font-medium text-ink-700">{title}</p>
+      <div className="text-ink-300" aria-hidden>{icon ?? <Inbox className="h-10 w-10" aria-hidden />}</div>
+      <Title className={clsx('font-medium text-ink-700', heading && 'text-base')}>{title}</Title>
       {description && <p className="max-w-md text-sm text-ink-500">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>

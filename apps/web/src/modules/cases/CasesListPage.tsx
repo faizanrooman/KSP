@@ -46,7 +46,7 @@ export function CasesListPage() {
     },
     { key: 'fir', header: 'FIR', render: (r) => (r.fir ? <Link className="mono text-sm text-brand-700 hover:underline" to={`/firs/${r.fir.id}`} onClick={(e) => e.stopPropagation()}>{r.fir.displayNumber}</Link> : <span className="text-ink-400">—</span>) },
     { key: 'station', header: 'Station', render: (r) => r.orgUnit.name },
-    { key: 'io', header: 'Investigating officer', render: (r) => r.investigatingOfficer?.fullName ?? <span className="text-ink-400">Unassigned</span> },
+    { key: 'io', header: 'Investigating officer', render: (r) => r.investigatingOfficer?.fullName ?? <span className="text-ink-500">Unassigned</span> },
     { key: 'priority', header: 'Priority', sortKey: 'priority', render: (r) => <PriorityBadge priority={r.priority} /> },
     { key: 'status', header: 'Status', sortKey: 'status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'ev', header: 'Evidence', render: (r) => <span className="tabular-nums">{r.evidenceCount}</span> },

@@ -269,7 +269,7 @@ function Timeline({ items, durationMs, onPick }: { items: AiDetectionDto[]; dura
           </div>
         </div>
       ))}
-      <div className="ml-[10.5rem] flex justify-between text-[10px] text-ink-400"><span>0:00</span><span>{formatTimecode(durationMs)}</span></div>
+      <div className="ml-[10.5rem] flex justify-between text-[10px] text-ink-500"><span>0:00</span><span>{formatTimecode(durationMs)}</span></div>
     </div>
   );
 }

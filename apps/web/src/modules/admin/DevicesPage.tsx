@@ -87,7 +87,7 @@ export function DevicesPage() {
     { key: 'serial', header: 'Serial', sortKey: 'serialNumber', render: (r) => (<div><Link to={`/admin/devices/${r.id}`} className="mono font-medium text-brand-800 hover:underline" onClick={(e) => e.stopPropagation()}>{r.serialNumber}</Link><p className="text-xs text-ink-500">{[r.make, r.model].filter(Boolean).join(' ') || '—'}</p></div>) },
     { key: 'type', header: 'Type', sortKey: 'deviceType', render: (r) => titleCase(r.deviceType) },
     { key: 'unit', header: 'Unit', render: (r) => r.orgUnit.name },
-    { key: 'officer', header: 'Assigned officer', render: (r) => (r.assignedOfficer ? `${r.assignedOfficer.fullName}${r.assignedOfficer.badgeNumber ? ` (${r.assignedOfficer.badgeNumber})` : ''}` : <span className="text-ink-400">Unassigned</span>) },
+    { key: 'officer', header: 'Assigned officer', render: (r) => (r.assignedOfficer ? `${r.assignedOfficer.fullName}${r.assignedOfficer.badgeNumber ? ` (${r.assignedOfficer.badgeNumber})` : ''}` : <span className="text-ink-500">Unassigned</span>) },
     { key: 'status', header: 'Status', sortKey: 'status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'updated', header: 'Updated', sortKey: 'updatedAt', render: (r) => <span className="whitespace-nowrap text-sm">{formatDateTime(r.updatedAt)}</span> },
   ];

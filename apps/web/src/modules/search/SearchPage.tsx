@@ -244,9 +244,9 @@ function ResultCard({ item }: { item: SearchItem }) {
           <StatusBadge status={item.status} />
           {item.storageTier !== 'ACTIVE' && <Badge tone="blue">{titleCase(item.storageTier)}</Badge>}
           {item.legalHold && <Badge tone="amber"><Lock className="mr-1 inline h-3 w-3" aria-hidden />Legal hold</Badge>}
-          {m.score !== null && <span className="text-xs text-ink-400">score {m.score}</span>}
+          {m.score !== null && <span className="text-xs text-ink-500">score {m.score}</span>}
         </div>
-        <p className="font-medium text-ink-900">{item.title ?? <span className="text-ink-400">Untitled</span>}</p>
+        <p className="font-medium text-ink-900">{item.title ?? <span className="text-ink-500">Untitled</span>}</p>
         {m.snippet && <Snippet parts={m.snippet} />}
         <p className="text-xs text-ink-500">
           {item.orgUnit.name} · recorded {formatDateTime(item.recordedAt)} · {formatDuration(item.durationMs)}
@@ -413,8 +413,8 @@ export function SearchPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-ink-600" aria-live="polite">
               {data ? `${data.total.toLocaleString('en-IN')} result${data.total === 1 ? '' : 's'}` : ' '}
-              {data && <span className="text-ink-400"> · {data.tookMs} ms</span>}
-              {q.isFetching && !q.isLoading && <span className="ml-2 text-ink-400">Updating…</span>}
+              {data && <span className="text-ink-500"> · {data.tookMs} ms</span>}
+              {q.isFetching && !q.isLoading && <span className="ml-2 text-ink-500">Updating…</span>}
             </p>
             <label className="flex items-center gap-2 text-sm">
               <span className="text-ink-600">Sort</span>

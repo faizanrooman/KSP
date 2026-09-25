@@ -150,10 +150,10 @@ export function SystemHealthPage() {
             <Card title="Storage">
               <ThresholdMeter percent={h.storage.percentUsed} warn={h.storage.warnThresholdPercent} critical={h.storage.criticalThresholdPercent} label={`${formatBytes(h.storage.usedBytes)}${h.storage.capacityBytes ? ` of ${formatBytes(h.storage.capacityBytes)}` : ''} used`} />
               <table className="mt-4 min-w-full text-sm">
-                <caption className="sr-only">Storage by bucket</caption>
-                <thead><tr className="text-left text-ink-600"><th scope="col">Bucket</th><th scope="col">Tier</th><th scope="col" className="text-right">Objects</th><th scope="col" className="text-right">Size</th><th scope="col">Method</th><th scope="col" className="text-right">DB catalogue</th></tr></thead>
+                <caption className="sr-only">Storage by store</caption>
+                <thead><tr className="text-left text-ink-600"><th scope="col">Store</th><th scope="col">Tier</th><th scope="col" className="text-right">Objects</th><th scope="col" className="text-right">Size</th><th scope="col">Method</th><th scope="col" className="text-right">DB catalogue</th></tr></thead>
                 <tbody>{h.storage.byBucket.map((b) => (
-                  <tr key={b.bucket} className="border-t border-ink-100"><td className="font-mono text-xs">{b.bucket}</td><td>{b.tier}</td><td className="text-right tabular-nums">{b.objects}</td><td className="text-right">{formatBytes(b.bytes)}</td><td className="text-xs">{b.source === 'S3_LIST' ? 'S3 listing' : 'DB sum'}</td><td className="text-right">{formatBytes(b.dbBytes)}</td></tr>
+                  <tr key={b.role} className="border-t border-ink-100"><td className="font-mono text-xs">{b.role}</td><td>{b.tier}</td><td className="text-right tabular-nums">{b.objects}</td><td className="text-right">{formatBytes(b.bytes)}</td><td className="text-xs">{b.source === 'S3_LIST' ? 'S3 listing' : 'DB sum'}</td><td className="text-right">{formatBytes(b.dbBytes)}</td></tr>
                 ))}</tbody>
               </table>
               {!h.storage.byBucket.length && <p className="text-sm text-ink-600">No snapshot captured yet.</p>}

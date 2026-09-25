@@ -146,6 +146,9 @@ describe('dashboard scoping', () => {
     expect(r.system.objectStorage.ok).toBe(true);
     expect(r.system.queues.items.length).toBeGreaterThan(0);
     expect(r.storage).toHaveProperty('byTier');
+    // Physical bucket names never reach a client (E2E finding: they were listed in storage.byBucket).
+    const body = JSON.stringify(r);
+    for (const role of ['staging', 'evidence', 'archive', 'longterm', 'derived', 'exports', 'reports'] as const) expect(body).not.toContain(`"${app.storage.bucket(role)}"`);
     expect(r.alerts.bySeverity.CRITICAL).toBeGreaterThanOrEqual(1);
     expect(r.meta.timingsMs.total).toEqual(expect.any(Number));
   });

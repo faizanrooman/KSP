@@ -34,7 +34,7 @@ export function UsersListPage() {
     },
     { key: 'rank', header: 'Rank / designation', render: (r) => <span className="text-sm">{[r.rank, r.designation].filter(Boolean).join(' · ') || '—'}</span> },
     { key: 'unit', header: 'Home unit', render: (r) => r.homeOrgUnit.name },
-    { key: 'roles', header: 'Roles', render: (r) => (<div className="flex flex-wrap gap-1">{r.roleCodes.length ? r.roleCodes.map((c) => <Badge key={c}>{titleCase(c)}</Badge>) : <span className="text-xs text-ink-400">None</span>}</div>) },
+    { key: 'roles', header: 'Roles', render: (r) => (<div className="flex flex-wrap gap-1">{r.roleCodes.length ? r.roleCodes.map((c) => <Badge key={c}>{titleCase(c)}</Badge>) : <span className="text-xs text-ink-500">None</span>}</div>) },
     {
       key: 'status', header: 'Status', sortKey: 'status',
       render: (r) => (
