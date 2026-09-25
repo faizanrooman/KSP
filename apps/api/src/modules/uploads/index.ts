@@ -355,6 +355,8 @@ export default async function uploads(fastify: FastifyInstance) {
   // ---- sessions ---------------------------------------------------------------------------------
   app.post('/', {
     preHandler: app.authorize('evidence:upload'),
+    // Per client IP (a station client initiates one session per file; 120/min is far above real ingest rates).
+    config: { rateLimit: { max: app.cfg.NODE_ENV === 'test' ? 10_000 : 120, timeWindow: '1 minute' } },
     schema: {
       tags: ['uploads'],
       summary: 'Initiate a resumable upload session',
@@ -404,15 +406,23 @@ export default async function uploads(fastify: FastifyInstance) {
     const md = b.metadata ?? {};
     let officerId: string | null = null;
     let deviceId: string | null = null;
+    // SEC-13: the declared officer / device must belong to the uploader's upload jurisdiction (or, for officers, to a
+    // unit above the target station). Otherwise any uploader could attribute footage to — and, via evidence:read_own,
+    // make it visible to — any officer statewide, and probe badge numbers/serials across districts. Out-of-scope is
+    // indistinguishable from unknown.
+    const uploadScope = scopePaths(p, 'evidence:upload');
+    const inScope = (col: string) => sql<boolean>`(${sql.ref(col)} <@ ${sql.val(uploadScope)}::ltree[])`;
     if (md.officerId || md.officerBadge) {
-      let oq = app.db.selectFrom('users').select(['id']).where('status', '=', 'ACTIVE');
-      oq = md.officerId ? oq.where('id', '=', md.officerId) : oq.where(sql<boolean>`lower(badge_number) = lower(${md.officerBadge!})`);
+      let oq = app.db.selectFrom('users as u').innerJoin('org_units as ho', 'ho.id', 'u.home_org_unit_id').select(['u.id']).where('u.status', '=', 'ACTIVE')
+        .where((eb) => eb.or([inScope('ho.path'), eb(sql<string>`${org.path}::ltree`, '<@', eb.ref('ho.path'))]));
+      oq = md.officerId ? oq.where('u.id', '=', md.officerId) : oq.where(sql<boolean>`lower(u.badge_number) = lower(${md.officerBadge!})`);
       const officer = await oq.executeTakeFirst();
       if (!officer) throw new AppError(400, 'UNKNOWN_OFFICER', `No active officer found for ${md.officerId ? 'id' : 'badge'} "${md.officerId ?? md.officerBadge}"`);
       officerId = officer.id;
     }
     if (md.deviceSerial) {
-      const device = await app.db.selectFrom('devices').select(['id', 'assigned_officer_id', 'status']).where(sql<boolean>`lower(serial_number) = lower(${md.deviceSerial})`).executeTakeFirst();
+      const device = await app.db.selectFrom('devices as d').innerJoin('org_units as dorg', 'dorg.id', 'd.org_unit_id').select(['d.id', 'd.assigned_officer_id', 'd.status'])
+        .where(sql<boolean>`lower(d.serial_number) = lower(${md.deviceSerial})`).where(inScope('dorg.path')).executeTakeFirst();
       if (!device) throw new AppError(400, 'UNKNOWN_DEVICE', `No registered device with serial "${md.deviceSerial}"`);
       deviceId = device.id;
       officerId ??= device.assigned_officer_id;
