@@ -17,6 +17,10 @@ export async function evidenceTestSetup() {
 }
 
 export async function evidenceTestTeardown() {
+  // Restore the default session policy for other test files sharing the test database.
+  const app = await getApp();
+  await app.db.deleteFrom('system_settings').where('key', '=', 'sessionPolicy').execute();
+  invalidateSettings();
   await stopQueue();
 }
 
