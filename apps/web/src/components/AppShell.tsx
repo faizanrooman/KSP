@@ -4,6 +4,7 @@ import { LogOut, Menu, ShieldCheck, UserCircle2, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { MODULES, NAV_SECTIONS, type NavItem } from '@/lib/modules';
 import { clsx } from '@/components/ui';
+import { NotificationBell } from '@/modules/alerts/NotificationBell';
 
 function visibleNav(canAny: (...p: never[]) => boolean): Map<string, NavItem[]> {
   const items = MODULES.flatMap((m) => m.nav ?? []).filter((n) => !n.anyOf || canAny(...(n.anyOf as never[])));
@@ -76,6 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <div className="flex-1 truncate text-sm text-ink-600">{me?.user.homeOrgUnit.name}</div>
+          <NotificationBell />
           <Link to="/profile" className="flex items-center gap-2 rounded px-2 py-1 text-sm text-ink-700 hover:bg-ink-100">
             <UserCircle2 className="h-5 w-5" aria-hidden />
             <span className="hidden sm:inline">

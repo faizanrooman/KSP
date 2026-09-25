@@ -96,6 +96,7 @@ export async function ffmpeg(
   opts: { timeoutMs?: number; durationMs?: number; onProgress?: (fraction: number) => void; signal?: AbortSignal } = {},
 ): Promise<RunResult> {
   const cfg = loadConfig();
+  const started = performance.now();
   const res = await runProcess(cfg.FFMPEG_PATH, ['-hide_banner', '-nostdin', '-y', ...args], {
     timeoutMs: opts.timeoutMs,
     signal: opts.signal,
@@ -108,9 +109,13 @@ export async function ffmpeg(
       }
     },
   });
+  mediaObservers.onFfmpeg?.((performance.now() - started) / 1000, res.code === 0);
   if (res.code !== 0) throw new MediaError('FFMPEG_FAILED', res.stderr.trim().split('\n').slice(-8).join('\n'));
   return res;
 }
+
+/** Optional instrumentation hook (worker Prometheus metrics): called after every ffmpeg run. */
+export const mediaObservers: { onFfmpeg?: (seconds: number, ok: boolean) => void } = {};
 
 export class MediaError extends Error {
   constructor(

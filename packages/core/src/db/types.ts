@@ -149,6 +149,24 @@ export interface AiWatchlists {
   org_unit_id: string;
 }
 
+export interface AlertCursors {
+  last_seq: Int8 | null;
+  rule_code: string;
+  state: Generated<Json>;
+  updated_at: Generated<Timestamp>;
+  watermark: Timestamp;
+}
+
+export interface AlertDeliveries {
+  alert_id: string;
+  channel: string;
+  created_at: Generated<Timestamp>;
+  detail: string | null;
+  id: Generated<Int8>;
+  recipients: number | null;
+  status: string;
+}
+
 export interface AlertRules {
   code: string;
   config: Generated<Json>;
@@ -163,11 +181,13 @@ export interface AlertRules {
 export interface Alerts {
   acknowledged_at: Timestamp | null;
   acknowledged_by: string | null;
+  auto_resolved: Generated<boolean>;
   dedupe_key: string | null;
   first_seen_at: Generated<Timestamp>;
   id: Generated<string>;
   last_seen_at: Generated<Timestamp>;
   message: string;
+  notified_at: Timestamp | null;
   occurrences: Generated<number>;
   org_unit_id: string | null;
   resolution_note: string | null;
@@ -258,6 +278,18 @@ export interface AuditEvents {
   seq: Int8;
   session_id: string | null;
   user_agent: string | null;
+}
+
+export interface BackupRuns {
+  error: string | null;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  kind: string;
+  location: string | null;
+  sha256: string | null;
+  size_bytes: Int8 | null;
+  started_at: Generated<Timestamp>;
+  status: Generated<string>;
 }
 
 export interface Bookmarks {
@@ -678,17 +710,22 @@ export interface RefreshTokens {
 
 export interface ReportRuns {
   bucket: string | null;
+  content_sha256: string | null;
   created_at: Generated<Timestamp>;
   created_by: string;
+  download_count: Generated<number>;
   error: string | null;
   finished_at: Timestamp | null;
   format: string;
   id: Generated<string>;
   object_key: string | null;
+  org_unit_id: string | null;
   params: Generated<Json>;
   report_type: string;
   row_count: number | null;
   sha256: string | null;
+  size_bytes: Int8 | null;
+  started_at: Timestamp | null;
   status: Generated<string>;
 }
 
@@ -790,8 +827,11 @@ export interface StorageSnapshots {
   bucket: string;
   capacity_bytes: Int8 | null;
   captured_at: Generated<Timestamp>;
+  db_object_count: Int8 | null;
+  db_total_bytes: Int8 | null;
   id: Generated<Int8>;
   object_count: Int8;
+  source: Generated<string>;
   tier: string;
   total_bytes: Int8;
 }
@@ -897,6 +937,17 @@ export interface Users {
   username: string;
 }
 
+export interface WorkerHeartbeats {
+  hostname: string;
+  id: string;
+  info: Generated<Json>;
+  last_seen_at: Generated<Timestamp>;
+  pid: number;
+  service: string;
+  started_at: Timestamp;
+  version: string | null;
+}
+
 export interface WorkspaceItems {
   added_at: Generated<Timestamp>;
   added_by: string;
@@ -935,6 +986,8 @@ export interface DB {
   ai_training_exports: AiTrainingExports;
   ai_watchlist_entries: AiWatchlistEntries;
   ai_watchlists: AiWatchlists;
+  alert_cursors: AlertCursors;
+  alert_deliveries: AlertDeliveries;
   alert_rules: AlertRules;
   alerts: Alerts;
   annotations: Annotations;
@@ -942,6 +995,7 @@ export interface DB {
   api_clients: ApiClients;
   audit_checkpoints: AuditCheckpoints;
   audit_events: AuditEvents;
+  backup_runs: BackupRuns;
   bookmarks: Bookmarks;
   case_evidence: CaseEvidence;
   case_members: CaseMembers;
@@ -985,6 +1039,7 @@ export interface DB {
   upload_sessions: UploadSessions;
   user_roles: UserRoles;
   users: Users;
+  worker_heartbeats: WorkerHeartbeats;
   workspace_items: WorkspaceItems;
   workspace_members: WorkspaceMembers;
   workspaces: Workspaces;
