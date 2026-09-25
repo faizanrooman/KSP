@@ -7,7 +7,7 @@ import { statSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { GetObjectRetentionCommand } from '@aws-sdk/client-s3';
 import { sql } from 'kysely';
-import { stopQueue } from '@ksp/core';
+import { loadConfig, stopQueue } from '@ksp/core';
 import type { FastifyInstance } from 'fastify';
 import { Agent, closeApp, createUser, getApp, login } from './helpers.js';
 import { invalidateSettings } from '../src/lib/settings.js';
@@ -214,7 +214,8 @@ describe('finalize pipeline', () => {
     expect(ev.storage_bucket).toBe(app.storage.bucket('evidence'));
     expect(ev.storage_key).toMatch(new RegExp(`^originals/\\d{4}/\\d{2}/${validEvidenceId}/${ev.sha256}$`));
     expect(ev.storage_version_id).toBeTruthy();
-    expect(ev.object_lock_until!.getTime()).toBeGreaterThan(Date.now() + 365 * 86_400_000);
+    // Retention follows OBJECT_LOCK_DAYS (10 years in dev/prod, 1 day in the test env to avoid pinning test data).
+    expect(ev.object_lock_until!.getTime()).toBeGreaterThan(Date.now() + (loadConfig().OBJECT_LOCK_DAYS - 0.01) * 86_400_000);
     expect(ev.retention_policy_id).toBeTruthy();
     expect(ev.retain_until).toBeTruthy();
     expect(ev.registered_at).toBeTruthy();

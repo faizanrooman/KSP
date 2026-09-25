@@ -45,7 +45,7 @@ const aac = ['-c:a', 'aac', '-b:a', '64k'];
 let dirPromise: Promise<string> | undefined;
 export function mediaDir(): Promise<string> {
   return (dirPromise ??= (async () => {
-    const d = join(tmpdir(), `ksp-test-media-${process.pid}`);
+    const d = join(process.env.KSP_TEST_TMP ?? tmpdir(), `ksp-test-media-${process.pid}`);
     await mkdir(d, { recursive: true });
     return d;
   })());

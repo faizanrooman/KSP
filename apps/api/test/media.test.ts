@@ -41,7 +41,7 @@ beforeAll(async () => {
     .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify({ requireMfaForRoles: [] }) }))
     .execute();
   invalidateSettings();
-  tmp = await mkdtemp(join(tmpdir(), 'ksp-media-api-'));
+  tmp = await mkdtemp(join(process.env.KSP_TEST_TMP ?? tmpdir(), 'ksp-media-api-'));
   [clip, frames, audio] = await Promise.all([processed('h264'), processed('frames'), processed('audio_only')]);
   meera = await login('io.meera');
   arjun = await login('io.arjun');

@@ -43,9 +43,9 @@ CREATE INDEX ai_detections_watchlist ON ai_detections ((attributes->>'watchlistE
 CREATE INDEX ai_detections_evidence_review ON ai_detections (evidence_id, review_status, frame_time_ms);
 
 -- Case / FIR filters
-CREATE INDEX cases_fir ON cases (fir_id) WHERE fir_id IS NOT NULL;
+-- cases_fir (cases.fir_id) is created by 0700_cases_integrations.sql (merged in parallel).
 CREATE INDEX firs_number ON firs (upper(fir_number), fir_year);
-CREATE INDEX case_members_user ON case_members (user_id);
+-- case_members_user (case_members.user_id) is created by 0700_cases_integrations.sql.
 
 -- ---------------------------------------------------------------------------------------------
 -- Investigation workspace

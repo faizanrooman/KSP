@@ -53,10 +53,10 @@ describe('integration evidence search', () => {
   });
 
   it('limits results to the client jurisdiction and supports FIR / case / station / officer / number / date filters', async () => {
-    const all = (await call(client, '/evidence?pageSize=100')).json();
-    const ids = all.items.map((i: { id: string }) => i.id);
-    expect(ids).toContain(A.id);
-    expect(ids).not.toContain(B.id);
+    // Other suites share the test DB (e.g. thousands of synthetic search rows): look items up by number.
+    const byNumber = async (n: string) => (await call(client, `/evidence?evidenceNumber=${encodeURIComponent(n)}`)).json().items.map((i: { id: string }) => i.id);
+    expect(await byNumber(A.evidenceNumber)).toContain(A.id);
+    expect(await byNumber(B.evidenceNumber)).not.toContain(B.id);
     const ids1 = async (q: string) => (await call(client, `/evidence?${q}`)).json().items.map((i: { id: string }) => i.id);
     expect(await ids1(`firStation=ps_cubbonpark&firYear=${FIR_YEAR}&firNumber=321`)).toEqual([A.id]);
     expect(await ids1(`caseNumber=${caseNumber}`)).toEqual([A.id]);
@@ -64,6 +64,7 @@ describe('integration evidence search', () => {
     expect(await ids1('officerBadge=KSP-FO-1001&recordedFrom=2026-03-31T00:00:00Z&recordedTo=2026-04-02T00:00:00Z')).toContain(A.id);
     expect(await ids1(`evidenceNumber=${B.evidenceNumber}`)).toEqual([]);
     expect(await ids1('station=ps_indiranagar')).toEqual([]);
+    const all = (await call(client, `/evidence?evidenceNumber=${encodeURIComponent(A.evidenceNumber)}`)).json();
     const item = all.items.find((i: { id: string }) => i.id === A.id);
     expect(item.hashes.sha256).toBe(A.sha256);
     expect(item.cases.map((c: { caseNumber: string }) => c.caseNumber)).toContain(caseNumber);

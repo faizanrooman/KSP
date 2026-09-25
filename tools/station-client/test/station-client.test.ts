@@ -17,7 +17,7 @@ import { KspClient } from '../src/client.js';
 import { collectFiles, uploadFiles } from '../src/uploader.js';
 
 const PASSWORD = 'Ksp@Dev-Passw0rd!';
-const dir = join(tmpdir(), `ksp-station-client-${process.pid}`);
+const dir = join(process.env.KSP_TEST_TMP ?? tmpdir(), `ksp-station-client-${process.pid}`);
 let app: FastifyInstance;
 let worker: WorkerContext;
 let server: string;

@@ -22,7 +22,7 @@ beforeAll(async () => {
   db = createDb(cfg.DATABASE_URL, 8).db;
   storage = new Storage();
   deps = { db, storage, cfg, log: logger().child({ test: 'media' }) };
-  tmp = await mkdtemp(join(tmpdir(), 'ksp-media-test-'));
+  tmp = await mkdtemp(join(process.env.KSP_TEST_TMP ?? tmpdir(), 'ksp-media-test-'));
 });
 afterAll(async () => {
   // eslint-disable-next-line no-console

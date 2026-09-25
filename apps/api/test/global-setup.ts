@@ -16,4 +16,11 @@ export default async function setup() {
   await new core.Storage().ensureBuckets();
   await seedDev(db);
   await db.destroy();
+  // One temp directory per test run (fixtures write under KSP_TEST_TMP); removed on teardown so runs don't leak disk.
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'ksp-testrun-'));
+  process.env.KSP_TEST_TMP = dir;
+  return () => rmSync(dir, { recursive: true, force: true });
 }

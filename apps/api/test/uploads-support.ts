@@ -10,7 +10,7 @@ import type { FastifyInstance } from 'fastify';
 import { handleFinalize } from '../../worker/src/jobs/ingest/handlers.js';
 import type { Agent, Res } from './helpers.js';
 
-export const FIXTURES = join(tmpdir(), `ksp-upload-fixtures-${process.pid}`);
+export const FIXTURES = join(process.env.KSP_TEST_TMP ?? tmpdir(), `ksp-upload-fixtures-${process.pid}`);
 mkdirSync(FIXTURES, { recursive: true });
 
 export async function ffmpegFixture(name: string, args: string[]): Promise<string> {

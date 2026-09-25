@@ -17,15 +17,16 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 | Video pipeline (proxy, HLS ladder, poster/thumbnail/sprites), tokenised streaming with Range, original download, exact-frame snapshots, player + synchronised multi-player | API + worker tests; exact-frame pixel comparison; agent headless-browser smoke |
 | Identity & administration (users, role assignments with privilege-escalation guard, custom roles with SoD checks, org units, devices, settings; admin UI) | 51 admin/security API tests |
 | Cases/FIR, evidence linking (case-based visibility), append-only case diary, timeline; integration adapters (fixture + http-json skeleton, SSRF-guarded); API clients; external REST API (search/metadata/tokenised download) | 47 API tests; external systems UNVERIFIED |
+| Advanced permission-aware search (text, jurisdiction, officer/device, time, radius/bbox, tags, case/FIR, tiers, approved-AI label/colour/plate/watchlist; facets; saved searches; related evidence) + investigation workspaces (members, items, sync offsets, bookmarks, annotations/regions, incident timeline with overlap detection, relations) | 33 API tests; search ≈25–30 ms/API call on ~6k rows |
 | End-to-end integration (orchestrator): station CLI upload → REGISTERED → media READY → HLS playable via token; other-jurisdiction IO gets 404; audit chain intact | manual run 2026-09-25 |
 
-Test totals on `main` at last merge: API 167 · worker 22 · web 3 · station client 3 — all passing; root typecheck and web build green.
+Test totals on `main` at last merge: API 200 · worker 22 · web 3 · station client 3 — all passing; root typecheck and web build green.
 
 ## In Progress
-AI analysis & human review · Search & investigation workspace.
+AI analysis & human review · Chain of custody, audit viewer, court export, secure sharing.
 
 ## Queued
-Chain-of-custody viewer, audit viewer, court export, secure sharing · Dashboards, reports, alerts, monitoring · DevOps (containers, CI/CD, k8s), backup & DR · Security testing, E2E, performance, accessibility · Final documentation & production audit.
+Dashboards, reports, alerts, monitoring · DevOps (containers, CI/CD, k8s), backup & DR · Security testing, E2E, performance, accessibility · Final documentation & production audit.
 
 ## Blocked / external
 CCTNS/FIR/case-diary API contracts (not in spec) · CERT-In VAPT · HSM/DSC signing key · production S3 IAM separation.
