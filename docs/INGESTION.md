@@ -85,7 +85,7 @@ the destination key is content-addressed, the counter/registration update runs u
    evidence number `KSP-<STATIONCODE>-<YYYY>-<NNNNNN>` (station code upper-cased, non-alphanumerics removed;
    per station per IST year via `evidence_number_counters` row lock), default retention policy +
    `retain_until`, `storage_bucket/key/version_id`, tier `ACTIVE`, `object_lock_until`, `registered_at`,
-   `last_verified_at`, status `REGISTERED`, `integrity_checks` row (trigger `REGISTRATION`),
+   `last_verified_at`, status `REGISTERED`, `evidence_storage_copies` CURRENT row, `integrity_checks` row (trigger `REGISTRATION`),
    `EVIDENCE_STORED` + `EVIDENCE_REGISTERED`. After commit: staging object deleted, `media.process
    {evidenceId}` enqueued with a deterministic job id (sent at most once per evidence item).
 6. Final failure (last pg-boss retry, or a permanent error): the item is quarantined as

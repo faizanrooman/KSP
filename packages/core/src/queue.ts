@@ -1,5 +1,6 @@
 import { PgBoss } from 'pg-boss';
-import { QUEUES, type QueueName } from '@ksp/shared';
+import { QUEUES, SCHEDULES, type QueueName } from '@ksp/shared';
+import pg from 'pg';
 import { loadConfig } from './config.js';
 
 /**
@@ -24,10 +25,31 @@ export async function getQueue(connectionString?: string): Promise<PgBoss> {
   if (boss) return boss;
   if (starting) return starting;
   starting = (async () => {
-    // The schema is created by migration 0200 (ksp_app cannot CREATE schemas); pg-boss creates its tables inside it.
-    const b = new PgBoss({ connectionString: connectionString ?? loadConfig().DATABASE_URL, schema: 'pgboss', application_name: 'ksp-queue', createSchema: false });
+    // Runtime connections use the least-privilege app role: no schema migration / DDL. The schema and all
+    // queues are installed by `installQueueSchema` during `npm run db:migrate` (schema owner).
+    const b = new PgBoss({ connectionString: connectionString ?? loadConfig().DATABASE_URL, schema: 'pgboss', application_name: 'ksp-queue', migrate: false, createSchema: false });
     b.on('error', (err: Error) => console.error('[queue] error', err.message));
     await b.start();
+    boss = b;
+    return b;
+  })();
+  return starting;
+}
+
+/** Every queue the system uses: work queues, their dead-letter queues, and cron (schedule) queues. */
+export function allQueueNames(): string[] {
+  return [...Object.keys(QUEUE_DEFAULTS), ...Object.keys(QUEUE_DEFAULTS).map((n) => `${n}.dead`), ...Object.keys(SCHEDULES)];
+}
+
+/**
+ * Install/upgrade the pg-boss schema and create all queues as the SCHEMA OWNER (called from migrate()),
+ * then grant the app role DML-only access. New queue names must be added to @ksp/shared QUEUES/SCHEDULES.
+ */
+export async function installQueueSchema(ownerUrl: string, appRole = 'ksp_app'): Promise<void> {
+  const b = new PgBoss({ connectionString: ownerUrl, schema: 'pgboss', application_name: 'ksp-queue-install', supervise: false, schedule: false });
+  b.on('error', (err: Error) => console.error('[queue-install] error', err.message));
+  await b.start();
+  try {
     for (const [name, opts] of Object.entries(QUEUE_DEFAULTS)) {
       const dead = `${name}.dead`;
       if (!(await b.getQueue(dead))) await b.createQueue(dead);
@@ -35,10 +57,22 @@ export async function getQueue(connectionString?: string): Promise<PgBoss> {
         await b.createQueue(name, { retryLimit: opts.retryLimit, retryBackoff: true, retryDelay: 10, expireInSeconds: opts.expireInSeconds, deadLetter: dead });
       }
     }
-    boss = b;
-    return b;
-  })();
-  return starting;
+    for (const name of Object.keys(SCHEDULES)) if (!(await b.getQueue(name))) await b.createQueue(name, { retryLimit: 1, expireInSeconds: 3600 });
+  } finally {
+    await b.stop({ graceful: false, wait: true } as never);
+  }
+  const c = new pg.Client({ connectionString: ownerUrl });
+  await c.connect();
+  try {
+    await c.query(`GRANT USAGE ON SCHEMA pgboss TO ${appRole};
+      GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA pgboss TO ${appRole};
+      GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA pgboss TO ${appRole};
+      GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA pgboss TO ${appRole};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA pgboss GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${appRole};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA pgboss GRANT USAGE, SELECT ON SEQUENCES TO ${appRole};`);
+  } finally {
+    await c.end();
+  }
 }
 
 export async function enqueue<T extends object>(name: QueueName, data: T, opts: { singletonKey?: string; startAfter?: number } = {}): Promise<string | null> {

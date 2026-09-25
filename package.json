@@ -20,7 +20,7 @@
     "dev:ai": "npm run -w @ksp/ai-worker dev",
     "dev:web": "npm run -w @ksp/web dev",
     "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build -w @ksp/shared -w @ksp/core && npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

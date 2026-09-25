@@ -16,7 +16,7 @@ export default async function register(ctx: WorkerContext): Promise<void> {
     },
   );
 
-  if (!(await ctx.boss.getQueue(EXPIRE_SCHEDULE))) await ctx.boss.createQueue(EXPIRE_SCHEDULE);
+  // The uploads.expire queue is created at migrate time (SCHEDULES in @ksp/shared); no runtime DDL.
   await ctx.boss.schedule(EXPIRE_SCHEDULE, SCHEDULES[EXPIRE_SCHEDULE]);
   await ctx.boss.work(EXPIRE_SCHEDULE, async () => {
     await expireUploads(ctx);

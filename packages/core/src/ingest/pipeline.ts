@@ -404,6 +404,12 @@ export async function registerEvidence(deps: IngestDeps, evidenceId: string, act
       })
       .where('id', '=', evidenceId)
       .execute();
+    // Storage copy registry (migration 0300, owned by the lifecycle module): the original is the CURRENT copy.
+    await tx
+      .insertInto('evidence_storage_copies')
+      .values({ evidence_id: evidenceId, tier: 'ACTIVE', bucket, object_key: key, version_id: copy.versionId, sha256, status: 'CURRENT', object_lock_until: copy.lockUntil })
+      .onConflict((oc) => oc.columns(['bucket', 'object_key', 'version_id']).doUpdateSet({ status: 'CURRENT' }))
+      .execute();
     await tx.insertInto('integrity_checks').values({ evidence_id: evidenceId, trigger: 'REGISTRATION', expected_sha256: sha256, actual_sha256: stored.sha256, ok: true }).execute();
     await appendAudit(tx, actor, {
       action: 'EVIDENCE_STORED',

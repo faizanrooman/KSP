@@ -262,6 +262,9 @@ describe('finalize pipeline', () => {
     const ic = await app.db.selectFrom('integrity_checks').selectAll().where('evidence_id', '=', validEvidenceId).execute();
     expect(ic).toHaveLength(1);
     expect(ic[0]).toMatchObject({ trigger: 'REGISTRATION', ok: true, expected_sha256: ev.sha256, actual_sha256: ev.sha256 });
+    const copies = await app.db.selectFrom('evidence_storage_copies').selectAll().where('evidence_id', '=', validEvidenceId).execute();
+    expect(copies).toHaveLength(1);
+    expect(copies[0]).toMatchObject({ status: 'CURRENT', tier: 'ACTIVE', bucket: ev.storage_bucket, object_key: ev.storage_key, version_id: ev.storage_version_id, sha256: ev.sha256 });
 
     // re-running the job is a no-op
     expect((await runFinalize(app, init.body.id))?.outcome).toBe('NOOP');
