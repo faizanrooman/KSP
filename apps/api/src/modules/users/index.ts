@@ -158,7 +158,7 @@ export default async function users(fastify: FastifyInstance) {
       ])
       .select(sql<string[]>`ARRAY(SELECT DISTINCT r.code FROM user_roles ur JOIN roles r ON r.id = ur.role_id
         WHERE ur.user_id = u.id AND (ur.expires_at IS NULL OR ur.expires_at > now()) ORDER BY r.code)`.as('role_codes'))
-      .orderBy(sql.ref(col), sql.raw(desc ? 'desc nulls last' : 'asc nulls last'))
+      .orderBy(sql`${sql.ref(col)} ${sql.raw(desc ? 'desc nulls last' : 'asc nulls last')}`)
       .orderBy('u.id')
       .limit(pageSize)
       .offset((page - 1) * pageSize)
@@ -301,7 +301,7 @@ export default async function users(fastify: FastifyInstance) {
   });
 
   app.post('/:id/unlock', {
-    schema: { tags: ['users'], summary: 'Clear a failed-login lockout (and an administrative LOCKED status)', params: uuidParam, body: z.object({ reason: reasonField.optional() }).strict().optional() },
+    schema: { tags: ['users'], summary: 'Clear a failed-login lockout (and an administrative LOCKED status)', params: uuidParam, body: z.object({ reason: reasonField.optional() }).strict().nullish() },
   }, async (req) => {
     const p = req.requirePrincipal();
     const target = await loadScopedUser(db, p, req.params.id, 'users:manage');
@@ -385,7 +385,7 @@ export default async function users(fastify: FastifyInstance) {
   });
 
   app.post('/:id/sessions/revoke-all', {
-    schema: { tags: ['users'], summary: "Revoke all of a user's sessions (forces sign-out everywhere)", params: uuidParam, body: z.object({ reason: reasonField.optional() }).strict().optional() },
+    schema: { tags: ['users'], summary: "Revoke all of a user's sessions (forces sign-out everywhere)", params: uuidParam, body: z.object({ reason: reasonField.optional() }).strict().nullish() },
   }, async (req) => {
     const p = req.requirePrincipal();
     const target = await loadScopedUser(db, p, req.params.id, 'users:manage');
@@ -433,7 +433,7 @@ export default async function users(fastify: FastifyInstance) {
 
   app.delete('/:id/roles/:assignmentId', {
     preHandler: app.authorize('roles:manage'),
-    schema: { tags: ['users'], summary: 'Revoke a role assignment', params: z.object({ id: z.string().uuid(), assignmentId: z.string().uuid() }), body: z.object({ reason: reasonField.optional() }).strict().optional() },
+    schema: { tags: ['users'], summary: 'Revoke a role assignment', params: z.object({ id: z.string().uuid(), assignmentId: z.string().uuid() }), body: z.object({ reason: reasonField.optional() }).strict().nullish() },
   }, async (req) => {
     const p = req.requirePrincipal();
     const target = await loadScopedUser(db, p, req.params.id, null);
