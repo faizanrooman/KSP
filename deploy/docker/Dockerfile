@@ -106,8 +106,19 @@ CMD ["node", "apps/api/dist/server.js"]
 FROM ${FFMPEG_IMAGE} AS ffmpeg
 
 FROM runtime-base AS worker
+USER root
+# Fonts + fontconfig for libass (watermark burn-in of shared media renders an ASS overlay).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/* && fc-cache -f
 COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
+COPY --chown=root:root scripts/ops/check-ffmpeg.sh /usr/local/bin/ksp-check-ffmpeg
+# Fail the image build if this FFmpeg lacks libass / libx264 / the camera decoders the pipeline relies on.
+RUN /usr/local/bin/ksp-check-ffmpeg /usr/local/bin/ffmpeg
+USER 1000:1000
+# fontconfig writes its cache under XDG_CACHE_HOME; keep it on the writable tmpfs (read-only root FS).
+ENV XDG_CACHE_HOME=/tmp
 COPY --from=prod-deps-worker --chown=root:root /app/node_modules node_modules
 COPY --from=build --chown=root:root /src/apps/worker/package.json apps/worker/package.json
 COPY --from=build --chown=root:root /src/apps/worker/dist apps/worker/dist
