@@ -4,7 +4,7 @@
  */
 import { SUPPORTED_CONTAINERS, SUPPORTED_VIDEO_CODECS, type QuarantineReason } from '@ksp/shared';
 import { loadConfig } from '../config.js';
-import { MediaError, parseIso6709, parseRate, probe, runProcess, type ProbeResult, type ProbeStream } from '../media.js';
+import { MEDIA_FORMAT_WHITELIST, MediaError, parseIso6709, parseRate, probe, runProcess, type ProbeResult, type ProbeStream } from '../media.js';
 
 /** Protocols ffprobe/ffmpeg may open while inspecting untrusted uploads (no concat/data/pipe/subfile…). */
 export const INSPECT_PROTOCOLS = 'file,http,https,tcp,tls';
@@ -110,6 +110,7 @@ async function decodeWindow(input: string, window: 'head' | 'tail' | 'all', time
   const args = [
     '-hide_banner', '-nostdin', '-v', 'error', '-xerror',
     '-protocol_whitelist', INSPECT_PROTOCOLS,
+    '-format_whitelist', MEDIA_FORMAT_WHITELIST,
     ...pos,
     '-i', input,
     '-map', '0:v:0', '-map', '0:a:0?',

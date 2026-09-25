@@ -19,7 +19,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { sql } from 'kysely';
 import type { Logger } from 'pino';
-import { appendAudit, ffmpeg, MediaError, probe, systemActor, type AppConfig, type Database, type ProbeResult, type Storage } from '@ksp/core';
+import { appendAudit, ffmpeg, MEDIA_FORMAT_WHITELIST, MediaError, probe, systemActor, type AppConfig, type Database, type ProbeResult, type Storage } from '@ksp/core';
 import type { MediaProcessPayload } from '@ksp/shared';
 import { ProcessingTracker } from '../../lib/processing.js';
 import {
@@ -242,7 +242,7 @@ function firstLine(s: string): string {
 
 // ---------------------------------------------------------------------------------------------
 const HTTP_IN = ['-reconnect', '1', '-reconnect_on_network_error', '1', '-reconnect_delay_max', '10'];
-const inputArgs = (url: string) => (/^https?:/.test(url) ? [...HTTP_IN, '-i', url] : ['-i', url]);
+const inputArgs = (url: string) => [...(/^https?:/.test(url) ? HTTP_IN : []), '-format_whitelist', MEDIA_FORMAT_WHITELIST, '-i', url];
 
 function audioArgs(src: SourceInfo): string[] {
   if (!src.audio) return [];
