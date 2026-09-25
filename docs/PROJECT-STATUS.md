@@ -20,15 +20,16 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 | Advanced permission-aware search (text, jurisdiction, officer/device, time, radius/bbox, tags, case/FIR, tiers, approved-AI label/colour/plate/watchlist; facets; saved searches; related evidence) + investigation workspaces (members, items, sync offsets, bookmarks, annotations/regions, incident timeline with overlap detection, relations) | 33 API tests; search ≈25–30 ms/API call on ~6k rows |
 | Isolated AI platform (separate worker, ksp_ai DB role with column grants + DB trigger guard; real ONNX models: YOLOX-S objects/persons, YuNet faces, SFace recognition vs watchlists, ANPR detector+OCR, colour, rule-based tagging) + human review (queue, keyboard review, two-person rule for face matches, approved tags, history, training exports) | 13 API + 17 ai-worker tests with real inference; dev E2E ≈295 ms/frame for all 6 tasks on CPU |
 | Chain of custody (per-item ledger verification, signed custody PDF), audit viewer/export/verify with signed hourly checkpoints, court export (dual approval, re-hash, signed manifest, Fact Sheet with BSA s.63 template, watermarked copies, offline VERIFY.txt), secure sharing (internal/external, access codes with lockout, expiry, max views, watermarked per-share media, access log) | 43 API + 6 worker tests; agent headless-browser run |
+| Dashboards (role/jurisdiction-scoped KPIs, charts with text summaries), alerts (10 rules, cursor-based idempotent evaluator, dedupe, auto-resolve, notifications, webhook channel), 9 report types (CSV/JSON/PDF, hashed, jurisdiction-scoped), storage snapshots, Prometheus metrics, worker heartbeats, `/system/health` | 22 API + 27 worker tests; dashboard 75–82 ms on 50k rows |
 | End-to-end integration (orchestrator): station CLI upload → REGISTERED → media READY → HLS playable via token; other-jurisdiction IO gets 404; audit chain intact | manual run 2026-09-25 |
 
-Test totals on `main` at last merge: API 256 · worker 28 · ai-worker 17 · web 12 · station client 3 — all passing; root typecheck and web build green.
+Test totals on `main` at last merge: API 278 · worker 55 · ai-worker 17 · web 15 · station client 3 (368 total) — all passing; root typecheck and web build green.
 
 ## In Progress
-Dashboards/reports/alerts/monitoring · DevOps, CI/CD, backup & DR.
+DevOps, CI/CD, backup & DR · Security testing & threat model.
 
 ## Queued
-Security testing, E2E, performance, accessibility · Final documentation & production audit.
+E2E, performance, accessibility · Final documentation & production audit.
 
 ## Blocked / external
 CCTNS/FIR/case-diary API contracts (not in spec) · CERT-In VAPT · HSM/DSC signing key · production S3 IAM separation.

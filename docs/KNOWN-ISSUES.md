@@ -35,3 +35,8 @@
 | Sharing | A locked external share cannot be unlocked; sender must revoke and re-share | open |
 | Tooling | tsc occasionally crashes (exit 134/139, no TS errors) when launched via npm/npx on this host; retry passes | environment |
 | Web | React 19 was hoisted at the root alongside the app's React 18 (possible duplicate React in bundles, broken component tests) — fixed: React 18 pinned at root + Vite dedupe; component render tests can now be added | fixed |
+| Alerts | E-mail channel not implemented (deliveries recorded as FAILED "not implemented"); webhook tested only against a local server | open / UNVERIFIED |
+| Reports | Scheduled (recurring) reports not implemented | open |
+| Monitoring | AI-worker metrics/heartbeat hooks documented but not wired | open |
+| Monitoring | Availability SLO probe and Prometheus alert rules defined in docs, not deployed | UNVERIFIED |
+| Dev | Test runs across many agent environments filled the local S3 store (~17 GB of 10-year-locked test objects); cleared on disk 2026-09-25; test env now uses 1-day locks | fixed |

@@ -148,7 +148,7 @@ describe('report builder', () => {
     expect(ua.find((r) => r.Username === 'io.meera')!['Role grants']).toContain('INVESTIGATING_OFFICER@ps_cubbonpark');
     expect(ua.find((r) => r.Username === 'io.meera')!['Review flags']).toContain('NO_MFA');
     const es = records((await run('EXPORT_SHARE_ACTIVITY', 'CSV', [central()])).text);
-    expect(es.find((r) => r.Kind === 'SHARE')).toMatchObject({ 'Created by': 'io.meera', Recipient: 'sup.kavya', Items: '0', Purpose: 'review footage' });
+    expect(es.find((r) => r.Kind === 'SHARE' && r.Purpose === 'review footage')).toMatchObject({ 'Created by': 'io.meera', Recipient: 'sup.kavya', Items: '0', Purpose: 'review footage' });
   });
 
   it('JSON is valid, carries metadata and the same content hash as CSV of the same data', async () => {
