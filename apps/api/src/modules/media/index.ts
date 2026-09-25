@@ -211,7 +211,7 @@ export default async function media(fastify: FastifyInstance) {
     if (startsAtZero) {
       await appendAudit(app.db, auth.actor, {
         action: 'EVIDENCE_DOWNLOADED', resourceType: 'evidence', resourceId: ev.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id,
-        details: { sha256: ev.sha256, sizeBytes: Number(ev.size_bytes), range: range ?? null, storageTier: ev.storage_tier, via: auth.claims.typ === 'SHARE' ? 'share' : 'user' },
+        details: { sha256: ev.sha256, sizeBytes: Number(ev.size_bytes), range: range ?? null, storageTier: ev.storage_tier, via: auth.claims.typ.toLowerCase() },
       });
     }
     const filename = safeFilename(`${ev.evidence_number ?? ev.id}_${ev.original_filename}`);
