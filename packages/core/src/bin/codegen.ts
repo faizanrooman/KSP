@@ -7,7 +7,7 @@ const cfg = loadConfig();
 const out = resolve(repoRoot(), 'packages/core/src/db/types.ts');
 execFileSync(
   'npx',
-  ['kysely-codegen', '--dialect', 'postgres', '--url', cfg.DATABASE_MIGRATION_URL ?? cfg.DATABASE_URL, '--out-file', out, '--exclude-pattern', 'schema_migrations'],
+  ['kysely-codegen', '--dialect', 'postgres', '--url', cfg.DATABASE_MIGRATION_URL ?? cfg.DATABASE_URL, '--out-file', out, '--exclude-pattern', 'schema_migrations', '--default-schema', 'public', '--include-pattern', 'public.*'],
   { stdio: 'inherit' },
 );
 

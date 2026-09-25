@@ -8,8 +8,8 @@ export default defineConfig({
     globalSetup: ['./test/global-setup.ts'],
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
     fileParallelism: false,
-    testTimeout: 300_000,
-    hookTimeout: 300_000,
+    testTimeout: 60_000,
+    hookTimeout: 120_000,
     env: { NODE_ENV: 'test' },
   },
 });
