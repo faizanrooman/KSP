@@ -1,1 +1,25 @@
-{"name":"@ksp/ai-worker","version":"1.0.0","private":true,"type":"module"}
+{
+  "name": "@ksp/ai-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --conditions=ksp-src src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "fetch-models": "tsx --conditions=ksp-src scripts/fetch-models.ts"
+  },
+  "dependencies": {
+    "@ksp/core": "^1.0.0",
+    "@ksp/shared": "^1.0.0",
+    "jpeg-js": "^0.4.4",
+    "kysely": "^0.29.6",
+    "onnxruntime-node": "^1.30.0",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
+}
