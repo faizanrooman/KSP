@@ -224,12 +224,15 @@ export interface ApiClients {
 
 export interface AuditCheckpoints {
   algorithm: string;
+  cert_fingerprint: string | null;
+  chain_ok: boolean | null;
   created_at: Generated<Timestamp>;
   head_hash: string;
   head_seq: Int8;
   id: Generated<Int8>;
   key_id: string;
   signature: string;
+  verified_from_seq: Int8 | null;
 }
 
 export interface AuditEvents {
@@ -483,10 +486,13 @@ export interface EvidenceTags {
 export interface ExportItems {
   evidence_id: string;
   expected_sha256: string;
+  expected_sha512: string | null;
   export_id: string;
   verified_at: Timestamp | null;
   verified_ok: boolean | null;
   verified_sha256: string | null;
+  verified_sha512: string | null;
+  verify_error: string | null;
 }
 
 export interface Exports {
@@ -505,17 +511,26 @@ export interface Exports {
   expires_at: Timestamp | null;
   export_number: string;
   id: Generated<string>;
+  ledger_head_hash: string | null;
+  ledger_head_seq: Int8 | null;
+  manifest: Json | null;
   manifest_sha256: string | null;
   object_key: string | null;
   options: Generated<Json>;
   org_unit_id: string;
+  progress: Generated<number>;
   purpose: string;
   recipient: string | null;
+  revoke_reason: string | null;
+  revoked_at: Timestamp | null;
+  revoked_by: string | null;
   sha256: string | null;
   signature: string | null;
   signature_alg: string | null;
+  signing_cert_fingerprint: string | null;
   signing_key_id: string | null;
   size_bytes: Int8 | null;
+  started_at: Timestamp | null;
   status: Generated<string>;
 }
 
@@ -732,6 +747,7 @@ export interface ShareItems {
 export interface Shares {
   access_code_hash: string | null;
   allow_download: Generated<boolean>;
+  allow_original: Generated<boolean>;
   allow_print: Generated<boolean>;
   case_id: string | null;
   created_at: Generated<Timestamp>;
@@ -741,6 +757,7 @@ export interface Shares {
   failed_code_attempts: Generated<number>;
   id: Generated<string>;
   last_accessed_at: Timestamp | null;
+  locked_at: Timestamp | null;
   max_views: number | null;
   org_unit_id: string;
   purpose: string;
