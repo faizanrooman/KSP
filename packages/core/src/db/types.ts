@@ -329,6 +329,9 @@ export interface DisposalRequests {
   decision_note: string | null;
   evidence_id: string;
   executed_at: Timestamp | null;
+  execution_attempts: Generated<number>;
+  execution_error: string | null;
+  execution_result: Json | null;
   id: Generated<string>;
   reason: string;
   requested_by: string;
@@ -410,6 +413,17 @@ export interface EvidenceDerivatives {
   width: number | null;
 }
 
+export interface EvidenceLegalHoldEvents {
+  action: string;
+  actor_id: string;
+  created_at: Generated<Timestamp>;
+  evidence_id: string;
+  id: Generated<Int8>;
+  reason: string;
+  storage_hold: string;
+  storage_note: string | null;
+}
+
 export interface EvidenceNumberCounters {
   last_value: Generated<number>;
   org_unit_id: string;
@@ -424,6 +438,21 @@ export interface EvidenceRelations {
   id: Generated<string>;
   note: string | null;
   relation: string;
+}
+
+export interface EvidenceStorageCopies {
+  bucket: string;
+  created_at: Generated<Timestamp>;
+  evidence_id: string;
+  id: Generated<Int8>;
+  object_key: string;
+  object_lock_until: Timestamp | null;
+  sha256: string;
+  status: Generated<string>;
+  status_note: string | null;
+  tier: string;
+  updated_at: Generated<Timestamp>;
+  version_id: string | null;
 }
 
 export interface EvidenceTags {
@@ -873,8 +902,10 @@ export interface DB {
   disposal_requests: DisposalRequests;
   evidence: Evidence;
   evidence_derivatives: EvidenceDerivatives;
+  evidence_legal_hold_events: EvidenceLegalHoldEvents;
   evidence_number_counters: EvidenceNumberCounters;
   evidence_relations: EvidenceRelations;
+  evidence_storage_copies: EvidenceStorageCopies;
   evidence_tags: EvidenceTags;
   export_items: ExportItems;
   exports: Exports;

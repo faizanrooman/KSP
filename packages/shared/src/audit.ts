@@ -79,6 +79,11 @@ export const AUDIT_ACTIONS = {
   EVIDENCE_DISPOSAL_APPROVED: { category: 'CUSTODY', custody: true },
   EVIDENCE_DISPOSAL_REJECTED: { category: 'CUSTODY', custody: true },
   EVIDENCE_DISPOSED: { category: 'CUSTODY', custody: true },
+  EVIDENCE_DISPOSAL_CANCELLED: { category: 'CUSTODY', custody: true },
+  EVIDENCE_DISPOSAL_FAILED: { category: 'CUSTODY', custody: true },
+  EVIDENCE_INTEGRITY_CHECK_REQUESTED: { category: 'CUSTODY', custody: true },
+  EVIDENCE_TIER_CHANGE_REQUESTED: { category: 'CUSTODY', custody: true },
+  EVIDENCE_TIER_CHANGE_FAILED: { category: 'CUSTODY', custody: true },
   EVIDENCE_ACCESS_DENIED: { category: 'CUSTODY', custody: true },
   // Media processing
   MEDIA_PROCESSING_STARTED: { category: 'MEDIA', custody: true },
