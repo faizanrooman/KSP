@@ -40,16 +40,34 @@ interface ZipContents {
 
 const KEEP = new Set(['manifest.json', 'manifest.sig', 'signing-cert.pem']);
 
+/**
+ * Resource limits for online verification (SEC-14: zip bombs). Court packages hold already-compressed video, so the
+ * inflated size is close to the ZIP size; the limits leave ample headroom while bounding CPU/memory per request.
+ * Declared sizes are trustworthy for enforcement because yauzl `validateEntrySizes` fails a stream that inflates to
+ * anything other than the declared uncompressedSize.
+ */
+export const ZIP_LIMITS = { maxEntries: 10_000, maxTotalUncompressed: 256 * 1024 * 1024, maxRatio: 100, ratioFloorBytes: 1024 * 1024 };
+/** Manifests (JSON mode or inside a package) larger than this are not looked up item by item. */
+export const MAX_MANIFEST_ITEMS = 1_000;
+export const MAX_MANIFEST_FILES = 10_000;
+
 export function readZip(buf: Buffer): Promise<ZipContents> {
   return new Promise((resolve, reject) => {
     yauzl.fromBuffer(buf, { lazyEntries: true, validateEntrySizes: true }, (err, zip) => {
       if (err || !zip) return reject(err ?? new Error('not a zip file'));
+      if (zip.entryCount > ZIP_LIMITS.maxEntries) return reject(new Error(`too many entries (${zip.entryCount} > ${ZIP_LIMITS.maxEntries})`));
       const out: ZipContents = { files: new Map() };
+      let total = 0;
       zip.on('error', reject);
       zip.on('end', () => resolve(out));
       zip.on('entry', (entry: yauzl.Entry) => {
         if (/\/$/.test(entry.fileName)) return zip.readEntry();
-        if (entry.fileName.includes('..') || entry.fileName.startsWith('/')) return reject(new Error(`unsafe path in zip: ${entry.fileName}`));
+        if (entry.fileName.includes('..') || entry.fileName.startsWith('/') || entry.fileName.includes('\\')) return reject(new Error(`unsafe path in zip: ${entry.fileName.slice(0, 200)}`));
+        total += entry.uncompressedSize;
+        if (total > ZIP_LIMITS.maxTotalUncompressed) return reject(new Error(`inflated size exceeds the online verification limit (${ZIP_LIMITS.maxTotalUncompressed} bytes)`));
+        if (entry.uncompressedSize > ZIP_LIMITS.ratioFloorBytes && entry.uncompressedSize > ZIP_LIMITS.maxRatio * Math.max(1, entry.compressedSize)) {
+          return reject(new Error(`entry ${entry.fileName.slice(0, 200)} has a suspicious compression ratio`));
+        }
         zip.openReadStream(entry, (e2, stream) => {
           if (e2 || !stream) return reject(e2 ?? new Error('cannot read entry'));
           const h = createHash('sha256');
@@ -100,8 +118,13 @@ export async function verifyExport(db: Database, input: { manifest: Buffer; sign
   } catch {
     m = null;
   }
+  // SEC-14: every item costs a database lookup; real exports hold at most 100 items (export create schema).
+  if (m && (m.items.length > MAX_MANIFEST_ITEMS || m.files.length > MAX_MANIFEST_FILES)) {
+    problems.push(`manifest lists more items/files than any KSP export can contain (${m.items.length} items, ${m.files.length} files)`);
+    m = null;
+  }
   if (!m) {
-    problems.push('manifest.json is not a KSP court export manifest');
+    if (!problems.some((p) => p.startsWith('manifest lists'))) problems.push('manifest.json is not a KSP court export manifest');
     return { ok: false, signatureValid, manifestSha256, manifestParsed: false, packageCertificateMatches, signing: { algorithm: null, keyId: null, certificateFingerprint256: null }, export: null, items: [], ledgerHead: null, files: null, problems };
   }
   const ex = m.export?.id && /^[0-9a-f-]{36}$/i.test(m.export.id)
