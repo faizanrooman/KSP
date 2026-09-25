@@ -1,0 +1,10 @@
+import { LayoutDashboard } from 'lucide-react';
+import type { WebModule } from '@/lib/modules';
+import { DashboardPage } from './DashboardPage';
+
+const mod: WebModule = {
+  id: 'dashboard',
+  routes: [{ path: '', element: DashboardPage, anyOf: ['dashboard:view'] }],
+  nav: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview', anyOf: ['dashboard:view'], order: 0 }],
+};
+export default mod;

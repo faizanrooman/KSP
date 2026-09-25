@@ -2,8 +2,7 @@
 import { ListObjectVersionsCommand, PutObjectLegalHoldCommand } from '@aws-sdk/client-s3';
 import { createHash } from 'node:crypto';
 import type { Readable } from 'node:stream';
-import { sql } from 'kysely';
-import { enqueue as coreEnqueue, systemActor, type Database, type Storage, type Tx } from '@ksp/core';
+import { enqueue as coreEnqueue, raiseAlert as raiseSharedAlert, systemActor, type Database, type Storage, type Tx } from '@ksp/core';
 import type { QueueName } from '@ksp/shared';
 
 export interface LifecycleLog {
@@ -58,10 +57,8 @@ export async function raiseAlert(
   db: Database | Tx,
   a: { ruleCode: string; severity: 'INFO' | 'WARNING' | 'CRITICAL'; title: string; message: string; resourceType?: string; resourceId?: string; orgUnitId?: string | null; dedupeKey: string },
 ): Promise<void> {
-  await sql`INSERT INTO alerts (rule_code, severity, title, message, resource_type, resource_id, org_unit_id, dedupe_key)
-    VALUES (${a.ruleCode}, ${a.severity}, ${a.title}, ${a.message}, ${a.resourceType ?? null}, ${a.resourceId ?? null}, ${a.orgUnitId ?? null}::uuid, ${a.dedupeKey})
-    ON CONFLICT (dedupe_key) WHERE status <> 'RESOLVED' AND dedupe_key IS NOT NULL
-    DO UPDATE SET occurrences = alerts.occurrences + 1, last_seen_at = now(), message = EXCLUDED.message`.execute(db);
+  // Delegates to the shared helper: respects alert_rules.enabled and de-duplicates on open alerts.
+  await raiseSharedAlert(db, a);
 }
 
 /** All object versions and delete markers stored under `prefix` in `bucket`. */
