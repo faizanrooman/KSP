@@ -40,3 +40,14 @@
 | Monitoring | AI-worker metrics/heartbeat hooks documented but not wired | open |
 | Monitoring | Availability SLO probe and Prometheus alert rules defined in docs, not deployed | UNVERIFIED |
 | Dev | Test runs across many agent environments filled the local S3 store (~17 GB of 10-year-locked test objects); cleared on disk 2026-09-25; test env now uses 1-day locks | fixed |
+| DevOps | Container images, compose and Kubernetes never built/run (no Docker on host); validated statically + runtime layout simulated (`scripts/ci/simulate-image.sh`) | UNVERIFIED |
+| DevOps | GitHub Actions workflows (ci/release) never executed; versitygw release tarball name in the CI DR step is assumed | UNVERIFIED |
+| DevOps | Base image digests resolved 2026-09-25; must be refreshed monthly (no Renovate/Dependabot config yet) | open |
+| DR | 2-hour restoration at production scale not demonstrated; local drill (29 MB objects, 14.5 MB DB) restores in ~4 s. CNPG failover, PITR, native replication untested | UNVERIFIED |
+| DR | `s3-replicate.ts` copies get new version IDs → `--repoint` required after failover (native replication avoids it); full re-hash is O(bytes) — use `--trust-marker` inside the RTO and full fixity afterwards | by design |
+| DR | Disposal is not propagated to the DR store (copies there persist until their own lock expires) — a DR disposal sweep is needed | open |
+| Security | `DATA_ENCRYPTION_KEY` has no key versioning: rotating it requires re-encrypting MFA secrets (not implemented); it must be restored together with the DB | open |
+| Capacity | CPU transcoding of the full HLS ladder for state-wide volume (~40 000 footage-hours/day) needs ~1 100 4-vCPU workers — capacity decision (proxy-only default / GPU / on-demand HLS) pending | open |
+| npm audit | 4 moderate advisories (react-router 6.x, @vitest/mocker dev-only); 0 high/critical (`npm audit --audit-level=high --omit=dev` passes) | open |
+| Dev host | Intermittent node/tsc/eslint segfaults (exit 139) under concurrent load; single-threaded `eslint .` crashes reliably → lint uses `--concurrency=auto` | environment |
+| Storage | Staging-bucket lifecycle (abort incomplete multipart uploads) is applied by `ensure-buckets.mjs` where supported; versitygw returns NotImplemented | open (deployment) |
