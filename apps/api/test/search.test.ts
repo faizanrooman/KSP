@@ -84,6 +84,12 @@ describe('search security', () => {
     expect((await meera.post(S, { ai: { reviewStatus: 'PENDING' } })).status).toBe(400);
   });
 
+  it('routes are documented in the OpenAPI spec', async () => {
+    const app = await getApp();
+    const paths = Object.keys((app as unknown as { swagger(): { paths: Record<string, unknown> } }).swagger().paths);
+    for (const p of ['/api/v1/search/evidence', '/api/v1/search/saved', '/api/v1/workspaces/{id}/timeline', '/api/v1/workspaces/annotations']) expect(paths).toContain(p);
+  });
+
   it('identical query returns only each user’s jurisdiction', async () => {
     const m = await meera.post(S, { text: tok });
     const a = await arjun.post(S, { text: tok });
