@@ -200,7 +200,7 @@ async function verifyOrRepoint(dr: S3Client, db: pg.Client, originals: Map<strin
           if (upd.rowCount !== 1) throw new Error('evidence row changed concurrently');
           await db.query(`UPDATE evidence_storage_copies SET version_id = $2, status_note = coalesce(status_note || '; ', '') || 'DR repoint from ' || coalesce(version_id, 'null'), updated_at = now()
                            WHERE evidence_id = $1 AND status = 'CURRENT' AND object_key = $3`, [ev.id, h.VersionId, Key]);
-          await db.query(`SELECT audit_append('SYSTEM', 'dr-repoint', 'dr-repoint', NULL, NULL, NULL, 'EVIDENCE_STORAGE_REPOINTED', 'CUSTODY', 'SUCCESS', 'evidence', $1, $1::uuid, NULL, $2::uuid, $3::jsonb)`,
+          await db.query(`SELECT audit_append('SYSTEM', 'dr-repoint', 'dr-repoint', NULL, NULL, NULL, 'EVIDENCE_STORAGE_REPOINTED', 'CUSTODY', 'SUCCESS', 'evidence', $1::text, $1::uuid, NULL, $2::uuid, $3::jsonb)`,
             [ev.id, ev.orgUnitId, JSON.stringify({ bucket: Bucket, fromVersionId: ev.versionId, toVersionId: h.VersionId, sha256: got.sha256, reason: 'DR failover: pointer moved to verified DR copy' })]);
           await db.query('COMMIT');
           stats.repointed++;

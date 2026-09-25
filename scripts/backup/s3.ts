@@ -12,12 +12,13 @@
  *   s3.ts prune <bucket> <prefix> <days>               delete object versions older than <days>; versions still
  *                                                      under Object Lock are refused by the store and kept (reported)
  *   s3.ts rm-prefix <bucket> <prefix> [--bypass]       delete every version under prefix (drills/tests only)
+ *   s3.ts rb <bucket>                                  delete an empty bucket (drills/tests only)
  */
 import { createReadStream, createWriteStream, statSync } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
 import {
-  CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand,
+  CreateBucketCommand, DeleteBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand,
   ListObjectsV2Command, ListObjectVersionsCommand, PutBucketVersioningCommand, S3Client,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
@@ -133,6 +134,12 @@ async function main(): Promise<void> {
         versionMarker = r.IsTruncated ? r.NextVersionIdMarker : undefined;
       } while (keyMarker);
       console.log(JSON.stringify({ deleted, retainedByLock: retained }));
+      break;
+    }
+    case 'rb': {
+      // Remove an (empty) bucket — drills/tests only; run rm-prefix --bypass first.
+      await s3.send(new DeleteBucketCommand({ Bucket: bucket }));
+      console.log(`removed bucket ${bucket}`);
       break;
     }
     default:

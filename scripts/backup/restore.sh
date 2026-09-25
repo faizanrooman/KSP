@@ -90,7 +90,7 @@ log "step 5/5: database restored in $(( $(date +%s) - T0 )) s total"
 cat >&2 <<NEXT
 Next (docs/BACKUP-RESTORE-RUNBOOK.md):
   a. migrate:            node packages/core/dist/bin/migrate.js      (applies migrations newer than the backup)
-  b. storage:            S3_ENDPOINT=<DR store> node scripts/ops/ensure-buckets.mjs --check
+  b. storage:            S3_ENDPOINT=<DR store> node scripts/ops/ensure-buckets.mjs   (verifies WORM buckets, creates empty staging)
   c. originals:          node scripts/backup/s3-replicate.ts --verify-only   (DB sha256 vs DR objects)
   d. start api/worker against the restored DB + DR storage; check /health/ready; log in; open evidence
   e. record the incident + restore in the audit trail / incident register; rotate secrets if compromise suspected
