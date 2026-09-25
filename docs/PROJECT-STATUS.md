@@ -16,15 +16,16 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 | Evidence registry, legal hold, fixity, tiering, retention, dual-control disposal | API + worker tests |
 | Video pipeline (proxy, HLS ladder, poster/thumbnail/sprites), tokenised streaming with Range, original download, exact-frame snapshots, player + synchronised multi-player | API + worker tests; exact-frame pixel comparison; agent headless-browser smoke |
 | Identity & administration (users, role assignments with privilege-escalation guard, custom roles with SoD checks, org units, devices, settings; admin UI) | 51 admin/security API tests |
+| Cases/FIR, evidence linking (case-based visibility), append-only case diary, timeline; integration adapters (fixture + http-json skeleton, SSRF-guarded); API clients; external REST API (search/metadata/tokenised download) | 47 API tests; external systems UNVERIFIED |
 | End-to-end integration (orchestrator): station CLI upload → REGISTERED → media READY → HLS playable via token; other-jurisdiction IO gets 404; audit chain intact | manual run 2026-09-25 |
 
-Test totals on `main` at last merge: API 120 · worker 22 · web 3 · station client 3 — all passing; root typecheck and web build green.
+Test totals on `main` at last merge: API 167 · worker 22 · web 3 · station client 3 — all passing; root typecheck and web build green.
 
 ## In Progress
-AI analysis & human review · Cases/FIR & integration REST API.
+AI analysis & human review · Search & investigation workspace.
 
 ## Queued
-Search & investigation workspace · Chain-of-custody viewer, audit viewer, court export, secure sharing · Dashboards, reports, alerts, monitoring · DevOps (containers, CI/CD, k8s), backup & DR · Security testing, E2E, performance, accessibility · Final documentation & production audit.
+Chain-of-custody viewer, audit viewer, court export, secure sharing · Dashboards, reports, alerts, monitoring · DevOps (containers, CI/CD, k8s), backup & DR · Security testing, E2E, performance, accessibility · Final documentation & production audit.
 
 ## Blocked / external
 CCTNS/FIR/case-diary API contracts (not in spec) · CERT-In VAPT · HSM/DSC signing key · production S3 IAM separation.

@@ -15,3 +15,8 @@
 | Video | Snapshot extraction runs in the API process (rate-limited, 90 s timeout) — move to queue at scale | open |
 | Video | Watermark burn-in for shared media not implemented yet (pending secure-sharing module) | open |
 | Storage | versitygw ignores Object Lock on CopyObject and refuses conditional writes to tombstoned keys; code uses multipart copy and never reuses keys | mitigated |
+| Integrations | Real CCTNS/FIR/case-diary/evidence-repository contracts unknown; `http-json` adapter contract `ksp-cctns-json-v0` is a best guess; push operations exist but are not scheduled | UNVERIFIED (external) |
+| Integrations | mTLS client auth path never exercised | UNVERIFIED |
+| API clients | argon2 verification on every Basic-auth request (no cache) — CPU cost under high integration load | open |
+| API clients | IPv6 allow-list entries must be exact addresses (no IPv6 CIDR matching) | open |
+| Web | Admin, cases/FIR, integrations and API-client UIs not yet exercised in a browser | UNVERIFIED (pending E2E) |
