@@ -556,7 +556,11 @@ export default async function uploads(fastify: FastifyInstance) {
     if (s.expires_at < new Date() && s.status !== 'COMPLETING') throw gone('Upload session has expired; start a new upload');
 
     const parts = await app.db.transaction().execute(async (tx) => {
-      await tx.selectFrom('upload_sessions').select('id').where('id', '=', s.id).forUpdate().executeTakeFirstOrThrow();
+      // Re-check the state under the row lock: a concurrent complete may have finished meanwhile (SEC-10: without
+      // this, a racing request reset COMPLETED -> COMPLETING and registered a second evidence row).
+      const cur = await tx.selectFrom('upload_sessions').select(['status']).where('id', '=', s.id).forUpdate().executeTakeFirstOrThrow();
+      if (cur.status === 'COMPLETED') return null;
+      if (!['INITIATED', 'UPLOADING', 'COMPLETING'].includes(cur.status)) throw conflict(`Upload is ${cur.status}`, { status: cur.status });
       const rows = await tx.selectFrom('upload_parts').select(['part_number', 'size_bytes', 'etag']).where('session_id', '=', s.id).orderBy('part_number').execute();
       const have = new Set(rows.map((r) => r.part_number));
       const missing: number[] = [];
@@ -572,6 +576,7 @@ export default async function uploads(fastify: FastifyInstance) {
       await tx.updateTable('upload_sessions').set({ status: 'COMPLETING' }).where('id', '=', s.id).execute();
       return rows;
     });
+    if (!parts) return viewFor(p, s.id, false);
 
     try {
       await app.storage.completeMultipart(s.staging_bucket, s.staging_key, s.s3_upload_id!, parts.map((x) => ({ partNumber: x.part_number, etag: x.etag })));
@@ -596,7 +601,7 @@ export default async function uploads(fastify: FastifyInstance) {
     const lon = typeof md.longitude === 'number' ? md.longitude : null;
     const evidenceId = await app.db.transaction().execute(async (tx) => {
       const cur = await tx.selectFrom('upload_sessions').select(['status', 'evidence_id']).where('id', '=', s.id).forUpdate().executeTakeFirstOrThrow();
-      if (cur.status === 'COMPLETED' && cur.evidence_id) return cur.evidence_id;
+      if (cur.evidence_id) return cur.evidence_id;
       const ev = await tx
         .insertInto('evidence')
         .values({

@@ -924,6 +924,10 @@ export interface Users {
   locked_until: Timestamp | null;
   mfa_enabled: Generated<boolean>;
   mfa_enrolled_at: Timestamp | null;
+  /**
+   * Last accepted TOTP time step (unix time / 30); codes for this or an earlier step are refused (replay).
+   */
+  mfa_last_totp_step: Int8 | null;
   mfa_pending_secret_enc: string | null;
   mfa_recovery_codes: Generated<string[]>;
   mfa_secret_enc: string | null;

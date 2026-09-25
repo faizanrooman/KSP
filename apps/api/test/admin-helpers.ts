@@ -4,7 +4,7 @@
  * login. No policy is relaxed.
  */
 import { authenticator } from 'otplib';
-import { Agent, createUser, getApp, login } from './helpers.js';
+import { Agent, createUser, getApp, login, nextTotp } from './helpers.js';
 
 export interface AdminSession {
   agent: Agent;
@@ -30,7 +30,7 @@ export async function loginWithMfa(username: string, password: string, secret: s
   const agent = new Agent(app);
   const s1 = await agent.post('/api/v1/auth/login', { username, password });
   if (s1.status !== 200 || !s1.body.mfaRequired) throw new Error(`login step 1 failed: ${s1.status} ${s1.raw}`);
-  const s2 = await agent.post('/api/v1/auth/mfa/verify', { mfaToken: s1.body.mfaToken, code: authenticator.generate(secret) });
+  const s2 = await agent.post('/api/v1/auth/mfa/verify', { mfaToken: s1.body.mfaToken, code: await nextTotp(secret, username) });
   if (s2.status !== 200) throw new Error(`mfa verify failed: ${s2.status} ${s2.raw}`);
   return agent;
 }
