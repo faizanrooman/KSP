@@ -8,7 +8,8 @@
  *   node scripts/backup/s3-replicate.ts --repoint       after a failover restore: point evidence.storage_version_id
  *                                                       at the DR copy (only after a full re-hash matches the DB;
  *                                                       one custody audit event per item)
- * Options: --buckets evidence,archive,longterm,derived,exports,reports  --concurrency 4  --lock-days N (override the
+ * Options: --trust-marker (with --repoint: skip the re-read when the replication-time hash marker matches)
+ *          --buckets evidence,archive,longterm,derived,exports,reports  --concurrency 4  --lock-days N (override the
  *          source retain-until on DR copies; drills only)  --rehash (re-read objects already replicated)  --dry-run
  *
  * Environment
@@ -59,6 +60,9 @@ const concurrency = mode === 'repoint' ? 1 : Math.max(1, Number(opt('--concurren
 const lockDaysOverride = opt('--lock-days') ? Number(opt('--lock-days')) : undefined;
 const rehash = has('--rehash');
 const dryRun = has('--dry-run');
+// --trust-marker (repoint at scale): accept a DR copy whose replication-time marker equals the DB hash and whose size
+// matches, without re-reading it (O(objects) HEADs instead of O(bytes)); schedule full fixity afterwards.
+const trustMarker = has('--trust-marker');
 const drPrefix = process.env.DR_BUCKET_PREFIX ?? '';
 
 function s3(prefix: 'S3' | 'DR_S3'): S3Client {
@@ -190,7 +194,8 @@ async function verifyOrRepoint(dr: S3Client, db: pg.Client, originals: Map<strin
     try {
       const h = await head(dr, Bucket, Key);
       if (!h) throw new Error('missing in DR store');
-      const got = await hashObject(dr, Bucket, Key, h.VersionId);
+      const markerOk = trustMarker && mode === 'repoint' && h.Metadata?.['ksp-replica-of'] === ev.sha256 && h.ContentLength === ev.size;
+      const got = markerOk ? { sha256: ev.sha256, size: ev.size } : await hashObject(dr, Bucket, Key, h.VersionId);
       if (got.sha256 !== ev.sha256 || got.size !== ev.size) throw new Error(`DR copy sha256 ${got.sha256}/${got.size} B != DB ${ev.sha256}/${ev.size} B`);
       stats.verified++;
       if (mode === 'repoint' && h.VersionId && h.VersionId !== ev.versionId && !dryRun) {
@@ -201,7 +206,7 @@ async function verifyOrRepoint(dr: S3Client, db: pg.Client, originals: Map<strin
           await db.query(`UPDATE evidence_storage_copies SET version_id = $2, status_note = coalesce(status_note || '; ', '') || 'DR repoint from ' || coalesce(version_id, 'null'), updated_at = now()
                            WHERE evidence_id = $1 AND status = 'CURRENT' AND object_key = $3`, [ev.id, h.VersionId, Key]);
           await db.query(`SELECT audit_append('SYSTEM', 'dr-repoint', 'dr-repoint', NULL, NULL, NULL, 'EVIDENCE_STORAGE_REPOINTED', 'CUSTODY', 'SUCCESS', 'evidence', $1::text, $1::uuid, NULL, $2::uuid, $3::jsonb)`,
-            [ev.id, ev.orgUnitId, JSON.stringify({ bucket: Bucket, fromVersionId: ev.versionId, toVersionId: h.VersionId, sha256: got.sha256, reason: 'DR failover: pointer moved to verified DR copy' })]);
+            [ev.id, ev.orgUnitId, JSON.stringify({ bucket: Bucket, fromVersionId: ev.versionId, toVersionId: h.VersionId, sha256: got.sha256, reason: 'DR failover: pointer moved to verified DR copy', verification: markerOk ? 'replication-marker' : 'full-rehash' })]);
           await db.query('COMMIT');
           stats.repointed++;
         } catch (err) {

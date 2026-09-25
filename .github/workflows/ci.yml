@@ -111,7 +111,15 @@ jobs:
           mkdir -p .local/bin && curl -fsSL https://github.com/FiloSottile/age/releases/download/v1.2.1/age-v1.2.1-linux-amd64.tar.gz | tar xz -C .local/bin --strip-components=1 age/age age/age-keygen
           PATH="$PWD/.local/bin:$PATH" PGDATABASE=ksp scripts/backup/test/verify-backup.test.sh
       - name: DR drill (backup -> loss -> restore -> verify)
-        run: PATH="$PWD/.local/bin:$PATH" tests/dr/drill.sh --ci
+        env:
+          PGADMIN_URL: postgres://postgres:ci-only-password@127.0.0.1:5432/postgres
+          PRIMARY_S3_ENDPOINT: http://127.0.0.1:7070
+          S3_ROOT_ACCESS: kspciaccess
+          S3_ROOT_SECRET: kspcisecret-not-secret
+        run: |
+          curl -fsSL https://github.com/versity/versitygw/releases/download/v1.8.0/versitygw_v1.8.0_Linux_x86_64.tar.gz | tar xz -C .local/bin versitygw
+          npm run build
+          PATH="$PWD/.local/bin:$PATH" tests/dr/drill.sh --ci
 
   security:
     name: security (audit · SAST · secrets · SBOM · filesystem scan)
