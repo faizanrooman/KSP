@@ -95,6 +95,14 @@ export function extractMetadata(p: ProbeResult): ExtractedMetadata | null {
   };
 }
 
+/**
+ * Tool output quotes the input (an internal presigned URL). Messages end up in status_reason and audit
+ * details that users see, so strip the input and any URL before storing them.
+ */
+export function scrubToolMessage(msg: string, input: string): string {
+  return msg.split(input).join('<staged-object>').replace(/\b(?:https?|tcp|tls):\/\/\S+/gi, '<url>');
+}
+
 /** Decode a window of the input; returns error text when the decoder reports corruption, null when clean. */
 async function decodeWindow(input: string, window: 'head' | 'tail' | 'all', timeoutMs: number): Promise<string | null> {
   const cfg = loadConfig();
@@ -124,7 +132,7 @@ export async function inspectMedia(input: string, opts: { timeoutMs?: number } =
   try {
     p = await probe(input, timeoutMs);
   } catch (err) {
-    if (err instanceof MediaError) return { ok: false, code: 'NOT_VIDEO', message: `ffprobe could not read the file: ${err.message.slice(0, 400)}`, probe: null, meta: null };
+    if (err instanceof MediaError) return { ok: false, code: 'NOT_VIDEO', message: `ffprobe could not read the file: ${scrubToolMessage(err.message, input).slice(0, 400)}`, probe: null, meta: null };
     throw err;
   }
   const fmt = p.format.format_name ?? '';
@@ -144,7 +152,7 @@ export async function inspectMedia(input: string, opts: { timeoutMs?: number } =
   const windows: Array<'head' | 'tail' | 'all'> = meta.durationMs <= DECODE_WINDOW_SECONDS * 2 * 1000 ? ['all'] : ['head', 'tail'];
   for (const w of windows) {
     const err = await decodeWindow(input, w, timeoutMs);
-    if (err) return { ok: false, code: 'CORRUPT', message: `Decode error in ${w === 'all' ? 'stream' : `${w} of stream`}: ${err.slice(0, 600)}`, probe: p, meta };
+    if (err) return { ok: false, code: 'CORRUPT', message: `Decode error in ${w === 'all' ? 'stream' : `${w} of stream`}: ${scrubToolMessage(err, input).slice(0, 600)}`, probe: p, meta };
   }
   return { ok: true, probe: p, meta };
 }

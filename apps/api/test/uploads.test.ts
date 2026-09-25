@@ -306,6 +306,7 @@ describe('finalize pipeline', () => {
     const ev = await evidenceRow(complete.body.evidence.id);
     expect(ev.status).toBe('QUARANTINED');
     expect(ev.status_reason).toMatch(/^CORRUPT: /);
+    expect(ev.status_reason).not.toMatch(/https?:|X-Amz/);
     expect(ev.video_codec).toBe('h264'); // metadata still recorded for the reviewer
     expect(await auditActions(ev.id)).toEqual(expect.arrayContaining(['EVIDENCE_VALIDATION_FAILED', 'EVIDENCE_QUARANTINED']));
   });
@@ -316,6 +317,10 @@ describe('finalize pipeline', () => {
     await runFinalize(app, complete.body.id);
     const ev = await evidenceRow(complete.body.evidence.id);
     expect(ev.status_reason).toMatch(/^NOT_VIDEO: /);
+    // tool output quotes the internal presigned URL: it must never reach user-visible fields
+    expect(ev.status_reason).not.toMatch(/https?:|X-Amz|7480/);
+    const audits = await app.db.selectFrom('audit_events').select('details').where('evidence_id', '=', ev.id).execute();
+    expect(JSON.stringify(audits)).not.toMatch(/X-Amz|https?:\/\//);
     expect(ev.storage_tier).toBe('STAGING');
   });
 
