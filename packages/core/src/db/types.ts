@@ -699,6 +699,15 @@ export interface Roles {
   updated_at: Generated<Timestamp>;
 }
 
+export interface SavedSearches {
+  created_at: Generated<Timestamp>;
+  criteria: Json;
+  id: Generated<string>;
+  name: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface Sessions {
   absolute_expires_at: Timestamp;
   created_at: Generated<Timestamp>;
@@ -944,6 +953,7 @@ export interface DB {
   report_runs: ReportRuns;
   retention_policies: RetentionPolicies;
   roles: Roles;
+  saved_searches: SavedSearches;
   sessions: Sessions;
   share_access_log: ShareAccessLog;
   share_items: ShareItems;
