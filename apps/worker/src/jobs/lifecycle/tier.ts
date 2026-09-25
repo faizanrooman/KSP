@@ -3,13 +3,13 @@
  * copy and verify SHA-256/SHA-512/size BEFORE switching the evidence pointer, then try to delete the superseded
  * version with governance bypass. If the store refuses, the old copy is kept and recorded as RETAINED.
  */
+import { wormCopy } from '@ksp/core';
 import { HeadObjectCommand } from '@aws-sdk/client-s3';
 import { appendAudit } from '@ksp/core';
 import type { TierMigratePayload } from '@ksp/shared';
 import { ProcessingTracker } from '../../lib/processing.js';
 import { ACTOR, STORED_STATUSES, ensureCurrentCopy, errText, hashWithProgress, noopLog, raiseAlert, setObjectLegalHold, type LifecycleDeps } from './common.js';
 
-const COPY_LIMIT = 5 * 1024 ** 3; // single CopyObject limit
 
 export interface TierResult {
   status: 'MIGRATED' | 'NOOP' | 'FAILED' | 'SKIPPED';
@@ -29,7 +29,14 @@ export async function runTierMigration(deps: LifecycleDeps, payload: TierMigrate
   if (!ev || !STORED_STATUSES.includes(ev.status) || !ev.storage_bucket || !ev.storage_key || !ev.sha256) return { status: 'SKIPPED', reason: ev ? `status ${ev.status}` : 'not found' };
   if (ev.storage_tier === payload.targetTier) return { status: 'NOOP' };
   const src = { bucket: ev.storage_bucket, key: ev.storage_key, versionId: ev.storage_version_id ?? undefined };
-  const dst = { bucket: storage.bucketForTier(payload.targetTier), key: ev.storage_key };
+  const dstBucket = storage.bucketForTier(payload.targetTier);
+  // WORM stores may keep a tombstone for a key whose versions were all deleted and refuse a conditional
+  // write to it again (observed on versitygw). Never reuse a key: if this bucket already held a copy under the
+  // base key, suffix it deterministically (stable across retries: the copy count only changes at switch time).
+  const baseKey = ev.storage_key.split('@')[0]!;
+  const prior = await db.selectFrom('evidence_storage_copies').select(['bucket', 'object_key']).where('evidence_id', '=', ev.id).execute();
+  const reused = prior.some((c) => c.bucket === dstBucket && c.object_key.split('@')[0] === baseKey);
+  const dst = { bucket: dstBucket, key: reused ? `${baseKey}@${prior.length}` : baseKey };
   if (dst.bucket === src.bucket) return { status: 'FAILED', reason: 'target tier maps to the same bucket; check S3_BUCKET_* configuration' };
 
   const tracker = await ProcessingTracker.start(db, { kind: 'TIER_MIGRATE', evidenceId: ev.id, queueJobId });
@@ -38,8 +45,9 @@ export async function runTierMigration(deps: LifecycleDeps, payload: TierMigrate
     let newVersion: string | undefined;
     const existing = await storage.head(dst.bucket, dst.key);
     if (existing) newVersion = existing.VersionId;
-    else if (ev.size_bytes <= COPY_LIMIT) newVersion = (await storage.copy(src, dst, { lock: true })).versionId;
-    else newVersion = (await storage.put(dst.bucket, dst.key, await storage.getStream(src.bucket, src.key, undefined, src.versionId), { lock: true })).versionId;
+    // Server-side multipart copy: honours Object Lock + If-None-Match on stores that ignore them on CopyObject
+    // (observed on versitygw) and has no 5 GiB CopyObject limit. Retention of the source copy is preserved.
+    else newVersion = (await wormCopy(storage, { ...src, size: Number(ev.size_bytes) }, dst, { lockUntil: ev.object_lock_until ?? undefined })).versionId ?? undefined;
     await tracker.progress(0.3);
 
     // 2. Verify the new copy byte-for-byte via hashes.

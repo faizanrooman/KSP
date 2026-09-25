@@ -24,7 +24,6 @@ export default async function register(ctx: WorkerContext): Promise<void> {
   });
 
   for (const name of ['lifecycle.scan', 'integrity.sweep'] as const) {
-    if (!(await ctx.boss.getQueue(name))) await ctx.boss.createQueue(name);
     await ctx.boss.schedule(name, SCHEDULES[name]);
   }
   await ctx.boss.work('lifecycle.scan', async () => {

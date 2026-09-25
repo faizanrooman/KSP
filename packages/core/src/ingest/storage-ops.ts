@@ -34,13 +34,13 @@ function isPreconditionFailed(err: unknown): boolean {
   return e?.name === 'PreconditionFailed' || e?.Code === 'PreconditionFailed' || e?.$metadata?.httpStatusCode === 412;
 }
 
-function copySource(bucket: string, key: string): string {
-  return `${bucket}/${encodeURIComponent(key).replace(/%2F/g, '/')}`;
+function copySource(bucket: string, key: string, versionId?: string | null): string {
+  return `${bucket}/${encodeURIComponent(key).replace(/%2F/g, '/')}${versionId ? `?versionId=${encodeURIComponent(versionId)}` : ''}`;
 }
 
 export async function wormCopy(
   storage: Storage,
-  src: { bucket: string; key: string; size: number },
+  src: { bucket: string; key: string; size: number; versionId?: string | null },
   dst: { bucket: string; key: string; contentType?: string; metadata?: Record<string, string> },
   opts: { partSize?: number; lockUntil?: Date | null } = {},
 ): Promise<WormCopyResult> {
@@ -67,7 +67,7 @@ export async function wormCopy(
           Key: dst.key,
           UploadId: uploadId,
           PartNumber: i + 1,
-          CopySource: copySource(src.bucket, src.key),
+          CopySource: copySource(src.bucket, src.key, src.versionId),
           CopySourceRange: n === 1 ? undefined : `bytes=${start}-${end}`,
         }),
       );
