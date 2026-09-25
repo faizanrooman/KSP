@@ -19,6 +19,7 @@ export const QUEUE_DEFAULTS: Record<QueueName, { retryLimit: number; expireInSec
   [QUEUES.DISPOSAL_EXECUTE]: { retryLimit: 5, expireInSeconds: 3600 },
   [QUEUES.TIER_MIGRATE]: { retryLimit: 5, expireInSeconds: 12 * 3600 },
   [QUEUES.AI_TRAINING_EXPORT]: { retryLimit: 2, expireInSeconds: 3600 },
+  [QUEUES.SHARE_WATERMARK]: { retryLimit: 3, expireInSeconds: 6 * 3600 },
 };
 
 export async function getQueue(connectionString?: string): Promise<PgBoss> {

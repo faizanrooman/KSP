@@ -20,6 +20,8 @@ export const QUEUES = {
   TIER_MIGRATE: 'lifecycle.tier',
   /** Export reviewed AI detections as a labelled training dataset. */
   AI_TRAINING_EXPORT: 'ai.training_export',
+  /** Burn the recipient watermark into a playback variant for an external share (per share + evidence). */
+  SHARE_WATERMARK: 'share.watermark',
 } as const;
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 
@@ -42,6 +44,7 @@ export interface ReportBuildPayload { reportRunId: string }
 export interface FixityCheckPayload { evidenceId: string; trigger: 'SCHEDULED' | 'ON_DEMAND' | 'EXPORT' | 'TIER_MIGRATION' | 'RESTORE'; requestedBy?: string }
 export interface DisposalExecutePayload { disposalRequestId: string }
 export interface TierMigratePayload { evidenceId: string; targetTier: 'ACTIVE' | 'ARCHIVE' | 'LONG_TERM' }
+export interface ShareWatermarkPayload { shareId: string; evidenceId: string }
 export interface AiTrainingExportPayload { trainingExportId: string }
 
 export const AI_JOBS_CHANNEL = 'ksp_ai_jobs';
