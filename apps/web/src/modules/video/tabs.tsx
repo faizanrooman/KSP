@@ -67,7 +67,8 @@ export function SnapshotsTab({ evidence }: { evidence: EvidenceSummary }) {
   const [time, setTime] = useState('00:00.000');
   const [source, setSource] = useState<'proxy' | 'original'>('proxy');
   const parsed = parseTimeInput(time);
-  const canCreate = can('evidence:snapshot') && evidence.mediaStatus !== 'UNSUPPORTED';
+  const flags = (evidence as EvidenceSummary & { permissions?: { canSnapshot?: boolean } }).permissions;
+  const canCreate = can('evidence:snapshot') && flags?.canSnapshot !== false && evidence.mediaStatus === 'READY';
 
   return (
     <div className="space-y-4">
@@ -124,7 +125,7 @@ export function SnapshotsTab({ evidence }: { evidence: EvidenceSummary }) {
                 </div>
                 <div className="text-ink-500">{s.width}×{s.height} · {s.createdBy?.name ?? 'System'} · {formatDateTime(s.createdAt)}</div>
                 <div className="flex gap-2 pt-1">
-                  <Link to={`/evidence/${evidence.id}/player?t=${Math.round(s.frameTimeMs ?? s.timeMs ?? 0) + 1}`} className="text-brand-700 hover:underline">Show in player</Link>
+                  <Link to={`/evidence/${evidence.id}?tab=playback&t=${Math.round(s.frameTimeMs ?? s.timeMs ?? 0) + 1}`} className="text-brand-700 hover:underline">Show in player</Link>
                   <a href={s.downloadUrl} className="inline-flex items-center gap-1 text-brand-700 hover:underline"><Download className="h-3.5 w-3.5" aria-hidden /> Download PNG</a>
                 </div>
               </div>

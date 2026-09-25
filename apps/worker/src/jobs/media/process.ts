@@ -14,7 +14,7 @@
  * touched. See docs/VIDEO-PIPELINE.md.
  */
 import { createReadStream } from 'node:fs';
-import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { sql } from 'kysely';
@@ -55,7 +55,7 @@ export interface MediaJobMeta {
   finalAttempt?: boolean;
 }
 export type MediaOutcome =
-  | { status: 'READY'; derivatives: number; elapsedMs: number; durationMs: number }
+  | { status: 'READY'; derivatives: number; elapsedMs: number; durationMs: number; phases: Record<string, number> }
   | { status: 'SKIPPED'; reason: string }
   | { status: 'UNSUPPORTED'; error: string };
 
@@ -138,6 +138,12 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
     const outputs: DerivativeRow[] = [];
     const progress = (base: number, span: number) => (f: number) => void tracker.progress(base + span * f).catch(() => undefined);
 
+    const phases: Record<string, number> = {};
+    let mark = Date.now();
+    const phase = (name: string) => {
+      phases[name] = Date.now() - mark;
+      mark = Date.now();
+    };
     // 1. Proxy MP4 (from the original)
     const proxyPath = join(work, 'proxy.mp4');
     const pdim = fitLongSide(src.displayWidth, src.displayHeight, PROXY_MAX_LONG_SIDE);
@@ -149,6 +155,7 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
       audio: !!src.audio, faststart: true, durationMs: proxyDur, sourceVfr: src.vfr, sourceFps: src.rFps, sourceAvgFps: src.avgFps, rotation: src.rotation,
     }));
 
+    phase('proxyMs');
     // 2. HLS ladder (from the original, so the 1080p rung is not limited by the proxy resolution)
     const hlsDir = join(work, 'hls');
     const ladder = planLadder(src);
@@ -156,6 +163,7 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
     await runFfmpeg(hlsArgs(url, src, rate, ladder, hlsDir), src.durationMs, 6, progress(0.45, 0.43));
     outputs.push(await uploadHls(deps, evidenceId, hlsDir, ladder, rate));
 
+    phase('hlsMs');
     // 3. Poster + thumbnail (from the proxy)
     const at = Math.max(0, (proxyDur * 0.1) / 1000);
     const posterPath = join(work, 'poster.jpg');
@@ -166,6 +174,7 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
     await runFfmpeg(['-ss', at.toFixed(3), '-i', proxyPath, '-frames:v', '1', '-vf', `scale=${tdim.width}:${tdim.height}`, '-q:v', '3', thumbPath], 0, 0);
     outputs.push(await uploadFile(deps, evidenceId, thumbPath, 'thumbnail/thumb.jpg', 'THUMBNAIL', 'image/jpeg', tdim, { timeMs: Math.round(at * 1000) }));
     await tracker.progress(0.9);
+    phase('stillsMs');
 
     // 4. Sprite sheets + WebVTT thumbnail track (keyframes only: the proxy has one every <= 1 s)
     const sp = planSprite(proxyDur, pdim.width, pdim.height);
@@ -185,18 +194,19 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
     await writeFile(vttPath, buildSpriteVtt(sp, proxyDur, sheets.length));
     outputs.push(await uploadFile(deps, evidenceId, vttPath, 'sprite/thumbnails.vtt', 'SPRITE', 'text/vtt', null, { role: 'vtt', sheets: sheets.length, ...spriteMeta(sp) }));
 
+    phase('spriteMs');
     const elapsedMs = Date.now() - started;
     await db.transaction().execute(async (tx) => {
       await tx.insertInto('evidence_derivatives').values(outputs.map((o) => ({ ...o, evidence_id: evidenceId, meta: JSON.stringify(o.meta) }))).execute();
       await tx.updateTable('evidence').set({ media_status: 'READY', media_error: null }).where('id', '=', evidenceId).execute();
       await appendAudit(tx, ACTOR, {
         action: 'MEDIA_PROCESSING_COMPLETED', resourceType: 'evidence', resourceId: evidenceId, evidenceId, orgUnitId: ev.org_unit_id,
-        details: { force, derivatives: outputs.length, kinds: [...new Set(outputs.map((o) => o.kind))], durationMs: proxyDur, elapsedMs, renditions: ladder.map((r) => r.name), processingJobId: tracker.id },
+        details: { force, derivatives: outputs.length, kinds: [...new Set(outputs.map((o) => o.kind))], durationMs: proxyDur, elapsedMs, renditions: ladder.map((r) => r.name), phases, processingJobId: tracker.id },
       });
     });
-    await tracker.complete({ derivatives: outputs.length, elapsedMs, durationMs: proxyDur, realtimeFactor: Math.round((proxyDur / Math.max(1, elapsedMs)) * 100) / 100 });
+    await tracker.complete({ derivatives: outputs.length, elapsedMs, durationMs: proxyDur, phases, realtimeFactor: Math.round((proxyDur / Math.max(1, elapsedMs)) * 100) / 100 });
     log.info({ evidenceId, elapsedMs, durationMs: proxyDur }, 'media processed');
-    return { status: 'READY', derivatives: outputs.length, elapsedMs, durationMs: proxyDur };
+    return { status: 'READY', derivatives: outputs.length, elapsedMs, durationMs: proxyDur, phases };
   } catch (err) {
     await clearPipelineDerivatives(deps, evidenceId).catch(() => undefined);
     const unsupported = err instanceof UnsupportedMediaError;
@@ -236,8 +246,13 @@ const inputArgs = (url: string) => (/^https?:/.test(url) ? [...HTTP_IN, '-i', ur
 
 function audioArgs(src: SourceInfo): string[] {
   if (!src.audio) return [];
+  // Keep the source sample rate when AAC supports it (resampling long low-rate body-cam audio to 48 kHz
+  // dominated processing time); downmix only above stereo.
   const ch = src.audio.channels ?? 2;
-  return ['-c:a', 'aac', '-b:a', '128k', '-ar', '48000', ...(ch > 2 || ch < 1 ? ['-ac', '2'] : [])];
+  const sr = Number(src.audio.sample_rate ?? 0);
+  const keepRate = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000].includes(sr);
+  const outCh = ch > 2 || ch < 1 ? 2 : ch;
+  return ['-c:a', 'aac', '-b:a', outCh === 1 ? '64k' : '128k', ...(keepRate ? [] : ['-ar', '48000']), ...(outCh !== ch ? ['-ac', '2'] : [])];
 }
 
 const x264 = (gop: number) => ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-g', String(gop), '-keyint_min', String(gop), '-sc_threshold', '0'];
@@ -261,7 +276,7 @@ export function hlsArgs(url: string, src: SourceInfo, rate: { rate: string; gop:
   const rates = ladder.flatMap((r, i) => [`-maxrate:v:${i}`, `${r.maxrateKbps}k`, `-bufsize:v:${i}`, `${r.maxrateKbps * 2}k`]);
   const varMap = ladder.map((r, i) => (src.audio ? `v:${i},a:${i},name:${r.name}` : `v:${i},name:${r.name}`)).join(' ');
   return [
-    ...inputArgs(url), '-filter_complex', graph, ...maps, ...x264(rate.gop), ...rates, ...(src.audio ? ['-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2'] : []),
+    ...inputArgs(url), '-filter_complex', graph, ...maps, ...x264(rate.gop), ...rates, ...audioArgs(src),
     '-f', 'hls', '-hls_time', String(HLS_SEGMENT_SECONDS), '-hls_playlist_type', 'vod', '-hls_flags', 'independent_segments', '-hls_segment_type', 'mpegts',
     '-hls_segment_filename', join(dir, '%v', 'seg_%05d.ts'), '-master_pl_name', 'master.m3u8', '-var_stream_map', varMap, join(dir, '%v', 'index.m3u8'),
   ];
@@ -294,6 +309,9 @@ interface DerivativeRow {
   meta: Record<string, unknown>;
 }
 
+const SINGLE_PUT_MAX = 16 * 1024 * 1024;
+const UPLOAD_CONCURRENCY = 8;
+
 async function fileSha256(path: string): Promise<string> {
   const h = createHash('sha256');
   for await (const c of createReadStream(path)) h.update(c as Buffer);
@@ -304,7 +322,9 @@ async function putFile(deps: MediaDeps, key: string, path: string, contentType: 
   const { size } = await stat(path);
   const sha256 = await fileSha256(path);
   const bucket = deps.storage.bucket('derived');
-  await deps.storage.put(bucket, key, createReadStream(path), { contentType, metadata: { sha256 } });
+  // Small objects (HLS segments, images, playlists) go up in a single PUT; large ones stream multipart.
+  const body = size <= SINGLE_PUT_MAX ? await readFile(path) : createReadStream(path);
+  await deps.storage.put(bucket, key, body, { contentType, metadata: { sha256 }, contentLength: size <= SINGLE_PUT_MAX ? size : undefined });
   return { size, sha256 };
 }
 
@@ -328,11 +348,14 @@ async function uploadHls(deps: MediaDeps, evidenceId: string, dir: string, ladde
     const files = (await readdir(join(dir, r.name))).filter((f) => /^(index\.m3u8|seg_\d{5}\.ts)$/.test(f)).sort();
     if (!files.includes('index.m3u8')) throw new RetryableMediaError(`HLS rendition ${r.name} has no playlist`);
     let bytes = 0;
-    for (const f of files) {
-      const { size } = await putFile(deps, `${prefix}${r.name}/${f}`, join(dir, r.name, f), HLS_MIME[f.split('.').pop()!]!);
-      bytes += size;
-      if (f.endsWith('.ts')) segments++;
-    }
+    const queue = [...files];
+    await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, queue.length) }, async () => {
+      for (let f = queue.shift(); f !== undefined; f = queue.shift()) {
+        const { size } = await putFile(deps, `${prefix}${r.name}/${f}`, join(dir, r.name, f), HLS_MIME[f.split('.').pop()!]!);
+        bytes += size;
+        if (f.endsWith('.ts')) segments++;
+      }
+    }));
     total += bytes;
     renditions.push({ name: r.name, width: r.width, height: r.height, maxrateKbps: r.maxrateKbps, playlist: `${r.name}/index.m3u8`, segments: files.length - 1, bytes });
   }

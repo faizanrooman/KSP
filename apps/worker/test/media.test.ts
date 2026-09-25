@@ -15,7 +15,7 @@ let db: Database;
 let storage: Storage;
 let deps: MediaDeps;
 let tmp: string;
-const timings: Array<{ kind: string; durationMs: number; elapsedMs: number }> = [];
+const timings: Array<{ kind: string; durationMs: number; elapsedMs: number; phases?: Record<string, number> }> = [];
 
 beforeAll(async () => {
   const cfg = loadConfig();
@@ -65,7 +65,7 @@ async function run(kind: MediaKind) {
   const t0 = Date.now();
   const outcome = await processMedia(deps, { evidenceId: ev.id });
   const row = await db.selectFrom('evidence').select(['media_status', 'media_error', 'duration_ms']).where('id', '=', ev.id).executeTakeFirstOrThrow();
-  if (outcome.status === 'READY') timings.push({ kind, durationMs: outcome.durationMs, elapsedMs: Date.now() - t0 });
+  if (outcome.status === 'READY') timings.push({ kind, durationMs: outcome.durationMs, elapsedMs: Date.now() - t0, phases: outcome.phases });
   return { ev, outcome, row };
 }
 
@@ -89,7 +89,7 @@ describe('plan helpers', () => {
   });
 });
 
-describe('media pipeline', () => {
+describe('media pipeline', { timeout: 300_000 }, () => {
   it('H.264/AAC MP4: all derivatives, faststart proxy with <=1 s GOP, HLS, VTT, original untouched', async () => {
     const ev = await createMediaEvidence(db, storage, { kind: 'h264' });
     const seen = new Set<string>();

@@ -8,8 +8,11 @@ import { formatBytes, shortHash } from '@/lib/format';
 import { Button, ConfirmDialog, useToast } from '@/components/ui';
 import { playbackKey } from './api';
 
-/** The evidence detail endpoint may add this flag (download_original permission incl. share grants). */
-type WithDownloadFlag = EvidenceSummary & { canDownloadOriginal?: boolean; originalFilename?: string; sizeBytes?: number };
+/**
+ * The evidence detail object (evidence module's EvidenceDetail) carries per-item flags computed by the API
+ * (`permissions.canDownloadOriginal`, which also covers share-granted downloads). Missing flag = hidden.
+ */
+type WithDownloadFlag = EvidenceSummary & { permissions?: { canDownloadOriginal?: boolean }; canDownloadOriginal?: boolean };
 
 function DownloadOriginal({ evidence }: { evidence: EvidenceSummary }) {
   const ev = evidence as WithDownloadFlag;
@@ -30,7 +33,7 @@ function DownloadOriginal({ evidence }: { evidence: EvidenceSummary }) {
     },
   });
   // Hidden unless the detail object explicitly grants it (missing flag = hidden).
-  if (ev.canDownloadOriginal !== true) return null;
+  if (ev.permissions?.canDownloadOriginal !== true && ev.canDownloadOriginal !== true) return null;
   return (
     <>
       <Button variant="secondary" icon={<Download className="h-4 w-4" />} onClick={() => setOpen(true)}>
@@ -93,7 +96,7 @@ function Reprocess({ evidence }: { evidence: EvidenceSummary }) {
 }
 
 const actions: EvidenceAction[] = [
-  { id: 'download-original', order: 50, component: DownloadOriginal },
+  { id: 'download-original', order: 50, anyOf: ['evidence:download_original'], component: DownloadOriginal },
   { id: 'reprocess-media', order: 90, anyOf: ['evidence:edit_metadata', 'system:monitor'], component: Reprocess },
 ];
 export default actions;
