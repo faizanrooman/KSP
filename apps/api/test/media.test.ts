@@ -165,7 +165,7 @@ describe('stream endpoint', () => {
     const [payload, mac] = t.split('.');
     const forged = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(payload!, 'base64url').toString()), eid: frames.id })).toString('base64url');
     expect((await anon().get(`/api/v1/media/stream/${frames.id}/proxy/proxy.mp4?t=${forged}.${mac}`)).status).toBe(401);
-    expect((await anon().get(`${path}?t=${payload}.${mac!.slice(0, -2)}xx`)).status).toBe(401);
+    expect((await anon().get(`${path}?t=${payload}.${mac!.slice(0, 10)}${mac![10] === 'A' ? 'B' : 'A'}${mac!.slice(11)}`)).status).toBe(401);
     const session = await app.db.selectFrom('sessions').select('id').where('user_id', '=', meeraId).where('revoked_at', 'is', null).orderBy('created_at', 'desc').executeTakeFirstOrThrow();
     const expired = signMediaToken({ typ: 'USER', sub: meeraId, sid: session.id, eid: clip.id, scope: 'stream', ttlSeconds: -5 });
     expect((await anon().get(`${path}?t=${expired}`)).status).toBe(401);

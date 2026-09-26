@@ -99,7 +99,9 @@ describe('reports API', () => {
     await build(other.body.id);
     const link = (await kavya.post(`/api/v1/reports/runs/${r.body.id}/download-link`)).body.url as string;
     const t = new URL(link, 'http://x').searchParams.get('t')!;
-    expect((await app.inject({ method: 'GET', url: `/api/v1/reports/runs/${r.body.id}/download?t=${t.slice(0, -2)}xx` })).statusCode).toBe(401);
+    // Flip a full-entropy character in the middle of the token (the last base64url char carries only 4 significant bits).
+    const tamper = (v: string) => { const i = Math.floor(v.length / 2); return v.slice(0, i) + (v[i] === 'A' ? 'B' : 'A') + v.slice(i + 1); };
+    expect((await app.inject({ method: 'GET', url: `/api/v1/reports/runs/${r.body.id}/download?t=${tamper(t)}` })).statusCode).toBe(401);
     expect((await app.inject({ method: 'GET', url: `/api/v1/reports/runs/${other.body.id}/download?t=${encodeURIComponent(t)}` })).statusCode).toBe(401);
     expect((await app.inject({ method: 'GET', url: `/api/v1/reports/runs/${r.body.id}/download` })).statusCode).toBe(400);
     const ok = await app.inject({ method: 'GET', url: link });
