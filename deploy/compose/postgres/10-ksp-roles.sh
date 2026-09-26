@@ -5,7 +5,7 @@
 set -euo pipefail
 s() { tr -d '\n' < "/run/secrets/$1"; }
 psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres \
-  -v app_password="'$(s ksp_app_db_password)'" -v ai_password="'$(s ksp_ai_db_password)'" -f /ksp/roles.sql
+  -v app_password="$(s ksp_app_db_password)" -v ai_password="$(s ksp_ai_db_password)" -f /ksp/roles.sql
 psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres \
   -v owner_password="'$(s ksp_owner_db_password)'" -v backup_password="'$(s ksp_backup_db_password)'" \
   -v db="$POSTGRES_DB" <<'SQL'

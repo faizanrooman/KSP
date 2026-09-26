@@ -242,6 +242,14 @@ describe('limits', () => {
     expect((await app.db.selectFrom('shares').select('view_count').where('id', '=', s.id).executeTakeFirstOrThrow()).view_count).toBe(2);
   });
 
+  it('maxViews: concurrent opens never exceed the limit (atomic increment)', async () => {
+    const s = await share({ maxViews: 2 });
+    const res = await Promise.all(Array.from({ length: 8 }, () => anon().post('/api/v1/share-portal/open', { token: s.token, code: s.code })));
+    expect(res.filter((r) => r.status === 200).length).toBe(2);
+    expect(res.filter((r) => r.status === 403).every((r) => r.body.error.code === 'SHARE_VIEW_LIMIT')).toBe(true);
+    expect((await app.db.selectFrom('shares').select('view_count').where('id', '=', s.id).executeTakeFirstOrThrow()).view_count).toBe(2);
+  });
+
   it('expired shares refuse opens and existing sessions', async () => {
     const s = await share();
     const session = await open(s);

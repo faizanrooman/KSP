@@ -49,6 +49,17 @@ describe('authentication', () => {
     expect(wrong.body.error.code).toBe('ACCOUNT_LOCKED');
   });
 
+  it('an expired lockout starts a fresh failure count (one wrong password does not re-lock)', async () => {
+    const u = await createUser({ role: 'FIELD_OFFICER', org: 'ps_cubbonpark' });
+    const app = await getApp();
+    for (let i = 0; i < 5; i++) await new Agent(app).post('/api/v1/auth/login', { username: u.username, password: 'wrong-password' });
+    await app.db.updateTable('users').set({ locked_until: new Date(Date.now() - 1000) }).where('username', '=', u.username).execute();
+    const once = await new Agent(app).post('/api/v1/auth/login', { username: u.username, password: 'wrong-password' });
+    expect(once.status).toBe(401);
+    const ok = await new Agent(app).post('/api/v1/auth/login', { username: u.username, password: u.password });
+    expect(ok.status).toBe(200);
+  });
+
   it('enforces CSRF double-submit on cookie-authenticated unsafe requests', async () => {
     const a = await login('io.meera');
     const noHeader = await a.request('POST', '/api/v1/auth/logout', { body: {}, headers: { 'x-csrf-token': 'forged' } });

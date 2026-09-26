@@ -194,17 +194,31 @@ export default async function sharePortal(fastify: FastifyInstance) {
       }
       throw new AppError(401, 'UNAUTHENTICATED', GENERIC, { attemptsRemaining: MAX_CODE_ATTEMPTS - attempts });
     }
-    await app.db.transaction().execute(async (tx) => {
-      await tx.updateTable('shares').set((eb) => ({ view_count: eb('view_count', '+', 1), failed_code_attempts: 0, last_accessed_at: new Date() })).where('id', '=', share.id).execute();
-      for (const e of evs) await appendAudit(tx, actorFor(req, share), { action: 'SHARE_ACCESSED', resourceType: 'share', resourceId: share.id, evidenceId: e.id, caseId: share.case_id, orgUnitId: e.org_unit_id, details: { via: 'open', view: share.view_count + 1 } });
+    // Atomic, conditional increment: concurrent opens can never push view_count past max_views (the check above
+    // is only a fast path on a possibly stale row).
+    const opened = await app.db.transaction().execute(async (tx) => {
+      const row = await tx
+        .updateTable('shares')
+        .set((eb) => ({ view_count: eb('view_count', '+', 1), failed_code_attempts: 0, last_accessed_at: new Date() }))
+        .where('id', '=', share.id)
+        .where('status', '=', 'ACTIVE')
+        .where((eb) => eb.or([eb('max_views', 'is', null), eb('view_count', '<', eb.ref('max_views'))]))
+        .returning(['view_count'])
+        .executeTakeFirst();
+      if (!row) return null;
+      for (const e of evs) await appendAudit(tx, actorFor(req, share), { action: 'SHARE_ACCESSED', resourceType: 'share', resourceId: share.id, evidenceId: e.id, caseId: share.case_id, orgUnitId: e.org_unit_id, details: { via: 'open', view: row.view_count } });
+      return row.view_count;
     });
+    if (opened === null) {
+      await deny(req, share, evs, 'view limit reached', new AppError(403, 'SHARE_VIEW_LIMIT', 'This share has reached its maximum number of views'));
+    }
     await log(req, share.id, 'OPEN', null, null);
     // Kick off watermark generation for every item so playback is ready by the time the recipient clicks.
     if (share.watermark) {
       for (const e of evs) if (STORED.includes(e.status) && e.media_status === 'READY' && !(await variant(share, e.id))) await ensureWatermark(share, e.id);
     }
     const sess = signShareSession(share.id);
-    return { sessionToken: sess.token, sessionExpiresAt: sess.expiresAt, share: { ...shareView(share), viewCount: share.view_count + 1 }, items: await itemsView(share.id) };
+    return { sessionToken: sess.token, sessionExpiresAt: sess.expiresAt, share: { ...shareView(share), viewCount: opened ?? share.view_count + 1 }, items: await itemsView(share.id) };
   });
 
   app.get('/session', {

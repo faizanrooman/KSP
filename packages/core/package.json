@@ -25,10 +25,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "migrate": "tsx src/bin/migrate.ts",
+    "migrate": "tsx --conditions=ksp-src src/bin/migrate.ts",
     "migrate:test": "NODE_ENV=test tsx src/bin/migrate.ts",
     "seed": "KSP_SEED_CLI=1 tsx --conditions=ksp-src src/bin/seed.ts",
-    "codegen": "tsx src/bin/codegen.ts",
+    "codegen": "tsx --conditions=ksp-src src/bin/codegen.ts",
     "test": "NODE_ENV=test vitest run"
   },
   "dependencies": {
