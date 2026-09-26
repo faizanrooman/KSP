@@ -69,3 +69,6 @@
 | Auth | TOTP codes were replayable within their validity window — fixed by SEC-12 (migration 0991, single-use TOTP step + atomic recovery-code consumption) | fixed |
 | Auth | During a lockout the 423 "locked" message was returned only for the correct password (password oracle) — fixed: locked accounts answer 423 for any password; hash still computed for uniform timing | fixed |
 | Dev host | During E2E work PostgreSQL parallel workers, Vite/esbuild/rollup and Node repeatedly segfaulted (14+ PG crashes in 30 min; corrupted Vite pre-bundles) under load average 10–30; a host reboot fixed it temporarily. The app now survives DB connection drops (pool/client error listeners) but in-flight requests fail | environment |
+| E2E | E2E TOTP helper reused codes within a 30 s step after TOTP became single-use (SEC-12) — fixed: strictly increasing steps per secret | fixed |
+| Product decision | Should EVIDENCE_CUSTODIAN hold `export:approve`? Default matrix gives it only to SUPERVISOR | open (decision) |
+| Auth | Locked accounts answer 423 for any password (no password oracle); this reveals that a username exists and is locked | accepted trade-off |

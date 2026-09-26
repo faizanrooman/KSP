@@ -28,6 +28,7 @@ scripts/dev/init-env.sh              # main checkout only: secrets + .env/.env.t
 scripts/dev/agent-env.sh <name> <n>  # in a worktree: private DBs ksp_<name>/ksp_test_<name>, buckets, ports
 npm ci                               # in a fresh worktree
 npm run db:migrate && npm run db:seed && npm run db:codegen
+npm run fetch-models -w @ksp/ai-worker   # downloads + SHA-256-verifies + registers AI models (required for AI tasks/E2E)
 ```
 
 Docker is **not** available on the development host (no socket permission). Docker/compose/k8s artefacts

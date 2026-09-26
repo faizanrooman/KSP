@@ -24,16 +24,19 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 | Internal security assessment (route-level authz/CSRF sweep of every route, SSRF, malicious media inputs, DB privilege tests, headers, crypto; semgrep, gitleaks, npm audit; STRIDE threat model) — 7 findings fixed incl. HIGH: FFmpeg followed references inside uploaded HLS playlists | 7 security suites; `docs/SECURITY-TEST-REPORT.md` (NOT a CERT-In VAPT) |
 | DevOps & DR: multi-target Dockerfile, compose, kustomize k8s (staging/prod), CI + release workflows, encrypted backups (age) + verification, S3 replication/repoint, local DR drill | production entrypoints run from simulated image layouts; validators green; backup verify 8/8; DR drill restore→ready 3.9 s on ~44 MB (small-data only) |
 | End-to-end browser suite (Playwright, real stack, Chrome headless): 11 scenario specs + axe on 64 page states + keyboard-only + responsive (1280/768); runtime guard (console errors, failed API calls, storage-URL/bucket-name leaks) on every test. 14 UI/API bugs fixed | 48/48 passed in two consecutive runs (4.4 min and 4.3 min); 0 axe violations after fixes (4 serious before); `docs/E2E-TESTS.md`, `docs/ACCESSIBILITY.md` |
+| Security round 2 (IDOR matrix 115 routes × 3 users, JWT/session/MFA attacks, races, media tokens/traversal/Range, upload abuse, zip bombs, injection, production headers/rate limits; Trivy) — 8 more findings fixed (SEC-09…SEC-16) + lockout password oracle | 12 security suites; 0 HIGH/CRITICAL (Trivy/npm audit) |
+| Performance (100k evidence, 500k detections, 1.14M audit events): query-shape fixes, list 84→14 ms (station) / 393→57 ms (state), dashboard 306→33 ms; upload 203 MB/s single file; audit append ≤1.2k/s | `docs/PERFORMANCE.md` (single host, noisy) |
+| E2E browser suite (48 Playwright specs across all 11 scenario areas, real stack) + accessibility (axe on 64 page states: 0 violations; keyboard walkthrough; 1280/768 px) — 14 UI/integration bugs fixed | 48/48 twice on main (≈4 min) |
 | End-to-end integration (orchestrator): station CLI upload → REGISTERED → media READY → HLS playable via token; other-jurisdiction IO gets 404; audit chain intact | manual run 2026-09-25 |
 
-Test totals on `main` at last merge: API 364 · worker 55 · ai-worker 19 · web 15 · station client 3 (456 total) — all passing; root build, typecheck, lint (0 errors) and web build green.
+Test totals on `main` at last merge: API 444 · worker 55 · ai-worker 19 · web 23 · station client 3 · E2E 48 (592 total) — all passing; build, typecheck (+e2e), lint (0 errors), web build green.
 
 ## In Progress
-Security round 2 (SEC-10..SEC-18, docs/SECURITY-TEST-REPORT.md) and single-host performance measurements (docs/PERFORMANCE.md) done on the secperf branch. Next: E2E browser tests, accessibility, final audit.
+Final production-readiness audit.
 E2E + accessibility workstream complete (branch pending merge). Next: performance, final audit.
 
 ## Queued
-E2E, performance, accessibility · Final documentation & production audit.
+Nothing.
 
 ## Blocked / external
 CCTNS/FIR/case-diary API contracts (not in spec) · CERT-In VAPT · HSM/DSC signing key · production S3 IAM separation.
@@ -45,7 +48,7 @@ AI model accuracy on real KSP body-worn footage and Indian plates · GPU inferen
 See totals above. Commands: `npm run typecheck`; `(cd apps/api && npx vitest run)`; `(cd apps/worker && npx vitest run)`; `(cd apps/web && npx vitest run && npx vite build)`; `(cd tools/station-client && npx vitest run)`.
 
 ## Security
-Implemented: RBAC + jurisdiction scoping (404 for out-of-scope), least-privilege DB roles, CSRF, rate limiting, security headers/CSP, tokenised media, no storage URLs to clients, audit of every evidence touch. Not yet done: SAST/dependency/container scanning, full security test suite, threat model document.
+Implemented: RBAC + jurisdiction scoping (404 for out-of-scope), least-privilege DB roles, CSRF, rate limiting, security headers/CSP, tokenised media, no storage URLs to clients, audit of every evidence touch. Done: two internal assessment rounds (see SECURITY-TEST-REPORT.md), semgrep/gitleaks/npm audit/Trivy fs+config, STRIDE threat model. Not done: CERT-In empanelled VAPT, container image scanning (no Docker).
 
 ## Deployment
 DevOps/DR workstream (see DEPLOYMENT.md, DISASTER-RECOVERY.md): multi-target Dockerfile, compose stack, kustomize base +

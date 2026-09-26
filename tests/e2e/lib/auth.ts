@@ -23,13 +23,29 @@ export function saveMfa(user: string, entry: MfaEntry): void {
   mkdirSync(STATE_DIR, { recursive: true });
   writeFileSync(MFA_FILE, JSON.stringify({ ...readMfa(), [user]: entry }, null, 2));
 }
+// The server accepts each TOTP time-step at most once per user (SEC-12) and a ±1 step window. Hand out codes for a
+// strictly increasing step per secret, waiting (synchronously; the suite runs with workers: 1) when the next step is
+// not yet acceptable.
+const STEP_MS = 30_000;
+const lastStep = new Map<string, number>();
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+export function totpFor(secret: string): string {
+  for (;;) {
+    const now = Math.floor(Date.now() / STEP_MS);
+    const step = Math.max(now, (lastStep.get(secret) ?? -1) + 1);
+    if (step <= now + 1) {
+      lastStep.set(secret, step);
+      return authenticator.clone({ epoch: step * STEP_MS + 1_000 }).generate(secret);
+    }
+    sleepSync(1_000);
+  }
+}
 export function totp(user: string): string {
   const e = readMfa()[user];
   if (!e) throw new Error(`no MFA secret recorded for ${user} — run the setup project (tests/e2e/specs/00-setup.spec.ts)`);
-  return authenticator.generate(e.secret);
-}
-export function totpFor(secret: string): string {
-  return authenticator.generate(secret);
+  return totpFor(e.secret);
 }
 /** Take (and consume) one unused recovery code. */
 export function takeRecoveryCode(user: string): string {
