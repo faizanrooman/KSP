@@ -102,7 +102,7 @@ export function mapListItem(p: Principal, r: ListRow) {
 
 function baseList(db: Database, p: Principal, f: ListFilters) {
   // Filters reference evidence columns only: no joins here (the page is hydrated separately, see listEvidence).
-  let q = db.selectFrom('evidence as e').where(evidenceVisibleSql(p, 'e'));
+  let q = db.selectFrom('evidence as e').where(evidenceVisibleSql(p, 'e', { relationships: 'initplan' }));
   if (f.q) {
     const like = `%${f.q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
     q = q.where(

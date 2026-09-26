@@ -65,7 +65,7 @@ async function uploadOne(username, path, parallelParts) {
   }
   const tReg = Date.now();
   let media = null;
-  if (view.evidence.status === 'REGISTERED') {
+  if (view.evidence.status === 'REGISTERED' && !process.argv.includes('--no-media')) {
     for (let i = 0; i < 7200; i++) {
       const pb = await api(token, 'GET', `/api/v1/media/evidence/${view.evidence.id}/playback`);
       if (pb.mediaStatus === 'READY' || pb.mediaStatus === 'FAILED' || pb.mediaStatus === 'UNSUPPORTED') { media = pb.mediaStatus; break; }

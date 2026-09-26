@@ -19,26 +19,34 @@ import { hasPermission, hasPermissionAt, scopePaths, type Principal } from './pr
 import { forbidden, notFound } from './errors.js';
 import type { AuditActor } from '@ksp/core';
 
-export function evidenceVisibleSql(p: Principal, alias = 'evidence', opts: { jurisdiction?: boolean } = {}): RawBuilder<boolean> {
+/**
+ * `opts.relationships: 'initplan'` writes the case/share branches as uncorrelated `id = ANY(ARRAY(...))` InitPlans
+ * (evaluated once) so the planner can BitmapOr them with the org_path GiST scan. Measured faster for plain
+ * lists / dashboard aggregates, but it misleads the planner when the query ALSO has a selective semi-join (AI search
+ * picked a 100k-row nested loop), so the default stays correlated EXISTS. Semantics are identical.
+ */
+export function evidenceVisibleSql(p: Principal, alias = 'evidence', opts: { jurisdiction?: boolean; relationships?: 'exists' | 'initplan' } = {}): RawBuilder<boolean> {
   const e = sql.raw(`"${alias.replace(/"/g, '')}"`);
   const readPaths = opts.jurisdiction === false ? [] : scopePaths(p, 'evidence:read');
   const parts: RawBuilder<unknown>[] = [];
-  // Perf: every branch is written so the planner can BitmapOr index scans instead of a sequential scan with a
-  // per-row filter: `<@ ANY(array)` is GiST-indexable on org_path (the `ltree <@ ltree[]` operator is not), and the
-  // relationship branches are uncorrelated InitPlans (`id = ANY(ARRAY(...))`, evaluated once) instead of correlated
-  // EXISTS. Semantics are identical to the per-row EXISTS form.
+  // Perf: `<@ ANY(array)` is GiST-indexable on org_path (the `ltree <@ ltree[]` operator is not); same result.
+  const initplan = opts.relationships === 'initplan';
   if (readPaths.length) parts.push(sql`${e}.org_path <@ ANY(${sql.val(readPaths)}::ltree[])`);
   if (p.userId) {
     const uid = p.userId;
     if (hasPermission(p, 'evidence:read_own')) parts.push(sql`(${e}.uploaded_by = ${uid}::uuid OR ${e}.officer_id = ${uid}::uuid)`);
-    if (hasPermission(p, 'cases:read')) {
-      parts.push(sql`${e}.id = ANY(ARRAY(SELECT ce.evidence_id FROM case_evidence ce JOIN cases c ON c.id = ce.case_id
-        WHERE ce.unlinked_at IS NULL AND c.status <> 'ARCHIVED'
+    const caseRel = sql`ce.unlinked_at IS NULL AND c.status <> 'ARCHIVED'
           AND (c.investigating_officer_id = ${uid}::uuid OR c.supervisor_id = ${uid}::uuid
-               OR EXISTS (SELECT 1 FROM case_members cm WHERE cm.case_id = c.id AND cm.user_id = ${uid}::uuid))))`);
+               OR EXISTS (SELECT 1 FROM case_members cm WHERE cm.case_id = c.id AND cm.user_id = ${uid}::uuid))`;
+    const shareRel = sql`s.recipient_user_id = ${uid}::uuid AND s.status = 'ACTIVE' AND s.expires_at > now()`;
+    if (hasPermission(p, 'cases:read')) {
+      parts.push(initplan
+        ? sql`${e}.id = ANY(ARRAY(SELECT ce.evidence_id FROM case_evidence ce JOIN cases c ON c.id = ce.case_id WHERE ${caseRel}))`
+        : sql`EXISTS (SELECT 1 FROM case_evidence ce JOIN cases c ON c.id = ce.case_id WHERE ce.evidence_id = ${e}.id AND ${caseRel})`);
     }
-    parts.push(sql`${e}.id = ANY(ARRAY(SELECT si.evidence_id FROM share_items si JOIN shares s ON s.id = si.share_id
-      WHERE s.recipient_user_id = ${uid}::uuid AND s.status = 'ACTIVE' AND s.expires_at > now()))`);
+    parts.push(initplan
+      ? sql`${e}.id = ANY(ARRAY(SELECT si.evidence_id FROM share_items si JOIN shares s ON s.id = si.share_id WHERE ${shareRel}))`
+      : sql`EXISTS (SELECT 1 FROM share_items si JOIN shares s ON s.id = si.share_id WHERE si.evidence_id = ${e}.id AND ${shareRel})`);
   }
   if (!parts.length) return sql<boolean>`false`;
   return sql<boolean>`(${sql.join(parts, sql` OR `)})`;

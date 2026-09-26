@@ -56,7 +56,7 @@ export default async function dashboard(fastify: FastifyInstance) {
     }
     const orgE = org ? sql<boolean>`e.org_path <@ ${org.path}::ltree` : sql<boolean>`true`;
     const orgO = org ? sql<boolean>`o.path <@ ${org.path}::ltree` : sql<boolean>`true`;
-    const visE = sql<boolean>`${evidenceVisibleSql(p, 'e')} AND ${orgE}`;
+    const visE = sql<boolean>`${evidenceVisibleSql(p, 'e', { relationships: 'initplan' })} AND ${orgE}`;
     const visS = sql<boolean>`${sessionVisibleSql(p)} AND ${orgO}`;
     const timings: Record<string, number> = {};
     const time = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {
