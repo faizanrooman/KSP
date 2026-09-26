@@ -14,7 +14,8 @@ export interface AxeSummary {
 
 /** Wait until the SPA has rendered real content (no loading spinners). */
 export async function settle(page: Page): Promise<void> {
-  await page.waitForLoadState('networkidle').catch(() => undefined);
+  // Pages that poll (dashboards, players) never go network-idle: bound the wait.
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
   await expect(page.getByRole('status').filter({ hasText: /^Loading/ })).toHaveCount(0, { timeout: 20_000 });
 }
 

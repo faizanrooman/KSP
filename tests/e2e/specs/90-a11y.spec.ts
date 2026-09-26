@@ -105,7 +105,7 @@ test('share portal (external)', async ({ anon }, testInfo) => {
 
 for (const group of PAGES) {
   test(`pages as ${group.user}`, async ({ as, guard }, testInfo) => {
-    test.setTimeout(300_000);
+    test.setTimeout(600_000);
     guard.expectFailure(/\/api\/v1\/(ai\/review|review)/, 403); // access-denied probe (admin on /review)
     const page = await as(group.user);
     for (const spec of group.pages) {

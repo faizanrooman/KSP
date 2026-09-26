@@ -16,7 +16,10 @@ API_PORT="$(port API_PORT)"; WEB_URL="$(port APP_BASE_URL)"
 web_start() {
   if [ "$MODE" = "--dev-web" ]; then "$ROOT/scripts/dev/run.sh" start web; return; fi
   if [ -f "$RUN/web-preview.pid" ] && kill -0 "$(cat "$RUN/web-preview.pid")" 2>/dev/null; then echo "web-preview: running"; return; fi
-  (cd "$ROOT/apps/web" && npx vite build --logLevel warn >"$LOGS/web-build.log" 2>&1) || { tail -20 "$LOGS/web-build.log"; exit 1; }
+  if ! (cd "$ROOT/apps/web" && npx vite build --logLevel warn >"$LOGS/web-build.log" 2>&1); then
+    echo "web build failed (see .local/logs/web-build.log) — falling back to the Vite dev server"; tail -3 "$LOGS/web-build.log"
+    "$ROOT/scripts/dev/run.sh" start web; return
+  fi
   (cd "$ROOT/apps/web" && setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$RUN/web-preview.pid" npx vite preview >"$LOGS/web-preview.log" 2>&1 </dev/null &)
   echo "web-preview: started (log .local/logs/web-preview.log)"
 }

@@ -51,6 +51,7 @@ test('workspace: add items, sync offsets persist, bookmark + region, timeline', 
     .toEqual([0, 200]);
   await page.reload();
   await expect(page.getByText('+00:00.200').or(page.getByText('+0:00.200'))).toBeVisible();
+  for (const v of await page.locator('video').all()) await expect.poll(() => v.evaluate((e: HTMLVideoElement) => e.readyState), { timeout: 60_000 }).toBeGreaterThanOrEqual(2);
   await transport.getByRole('button', { name: 'Play all' }).click();
   await expect.poll(async () => page.locator('video').first().evaluate((v: HTMLVideoElement) => v.currentTime), { timeout: 20_000 }).toBeGreaterThan(0.5);
   await transport.getByRole('button', { name: 'Pause all' }).click();

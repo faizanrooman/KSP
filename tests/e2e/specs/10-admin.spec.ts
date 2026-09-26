@@ -137,6 +137,7 @@ test('reports: run and download; system health; dashboards render with data', as
   test.setTimeout(180_000);
   const admin = await as('admin');
   await admin.goto('/reports');
+  await expect.poll(() => admin.getByLabel('Report type').locator('option:not([disabled])').count()).toBeGreaterThan(1);
   const types = await admin.getByLabel('Report type').locator('option').evaluateAll((o) => (o as HTMLOptionElement[]).filter((x) => !x.disabled).map((x) => ({ v: x.value, t: x.textContent ?? '' })).filter((x) => x.v));
   const pick = types.find((t) => /user|access/i.test(t.t)) ?? types[0]!;
   await admin.getByLabel('Report type').selectOption(pick.v);

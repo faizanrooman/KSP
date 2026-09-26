@@ -14,6 +14,15 @@ import { activeAt, regionFromDrag } from './geometry';
 
 const COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7'];
 
+/** Black or white text, whichever contrasts more with the (user-chosen) label background. */
+function labelText(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return '#fff';
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(m[1]!.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const L = 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+  return (L + 0.05) / 0.05 > 1.05 / (L + 0.05) ? '#000' : '#fff';
+}
+
 interface Props {
   evidenceId: string;
   workspaceId?: string;
@@ -113,7 +122,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
       className="pointer-events-none absolute border-2"
       style={{ left: `${reg.x * 100}%`, top: `${reg.y * 100}%`, width: `${reg.w * 100}%`, height: `${reg.h * 100}%`, borderColor: color, borderStyle: dashed ? 'dashed' : 'solid' }}
     >
-      {label && <span className="absolute -top-5 left-0 max-w-[16rem] truncate rounded px-1 text-[11px] text-white" style={{ background: color }}>{label}</span>}
+      {label && <span className="absolute -top-5 left-0 max-w-[16rem] truncate rounded px-1 text-[11px]" style={{ background: color, color: labelText(color) }}>{label}</span>}
     </div>
   );
 
