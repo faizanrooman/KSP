@@ -17,7 +17,14 @@ pg.types.setTypeParser(1041 as never, pg.types.getTypeParser(1009 as never));
 
 export function createPool(connectionString: string, max?: number): pg.Pool {
   const cfg = loadConfig();
-  return new pg.Pool({ connectionString, max: max ?? cfg.DATABASE_POOL_MAX, idleTimeoutMillis: 30_000, application_name: process.env.KSP_SERVICE ?? 'ksp' });
+  const pool = new pg.Pool({ connectionString, max: max ?? cfg.DATABASE_POOL_MAX, idleTimeoutMillis: 30_000, application_name: process.env.KSP_SERVICE ?? 'ksp' });
+  // A backend terminated under a checked-out client (DB restart, crash recovery, failover, admin kill) emits 'error'
+  // on that Client; without a listener Node treats it as fatal and the whole API/worker process exits (observed
+  // during load testing, SEC-16). The in-flight query is still rejected, so requests fail cleanly and the pool reconnects.
+  const onError = (err: Error) => console.error(`[db] connection error: ${err.message}`);
+  pool.on('error', onError);
+  pool.on('connect', (client) => client.on('error', onError));
+  return pool;
 }
 
 export function createDb(connectionString?: string, max?: number): { db: Database; pool: pg.Pool } {

@@ -47,7 +47,7 @@ export async function run(name, { connections, duration = Number(process.env.PER
       ...r,
       setupRequest: (req) => {
         n++;
-        req.headers = { ...(req.headers ?? {}), 'x-forwarded-for': ip(100000 + (n % 50000)), ...(token ? { authorization: `Bearer ${token}` } : {}), ...(r.body ? { 'content-type': 'application/json' } : {}) };
+        req.headers = { ...(req.headers ?? {}), 'x-forwarded-for': ip(100000 + (n % 50000)), ...(token ? { authorization: `Bearer ${token}` } : {}), ...(r.method === 'POST' ? { 'content-type': 'application/json' } : {}) };
         return r.setup ? r.setup(req, n) : req;
       },
     })),

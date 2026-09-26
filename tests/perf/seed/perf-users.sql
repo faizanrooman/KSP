@@ -9,8 +9,8 @@ ON CONFLICT (code) DO NOTHING;
 INSERT INTO roles (code, name, description, permissions, is_system)
 SELECT 'PERF_STATE', 'Perf state auditor', 'perf test persona', array_append(permissions, 'search:use'), false FROM roles WHERE code = 'AUDITOR'
 ON CONFLICT (code) DO NOTHING;
-INSERT INTO users (username, full_name, badge_number, home_org_unit_id, password_hash, password_changed_at)
-SELECT v.u, v.n, v.b, (SELECT id FROM org_units WHERE code = v.org), (SELECT password_hash FROM users WHERE username = 'io.meera'), now()
+INSERT INTO users (username, full_name, badge_number, home_org_unit_id, password_hash, password_changed_at, must_change_password)
+SELECT v.u, v.n, v.b, (SELECT id FROM org_units WHERE code = v.org), (SELECT password_hash FROM users WHERE username = 'io.meera'), now(), false
   FROM (VALUES ('perf.sup', 'Perf Supervisor', 'PERF-SUP', 'blr_central'), ('perf.state', 'Perf State Auditor', 'PERF-STATE', 'ksp')) v(u, n, b, org)
 ON CONFLICT (username) DO NOTHING;
 INSERT INTO user_roles (user_id, role_id, org_unit_id)

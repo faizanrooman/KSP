@@ -37,9 +37,9 @@ SELECT format('ps_perf_%s_%s', d.code, s), format('Perf Station %s/%s', d.code, 
 CREATE TEMP TABLE perf_stations AS
 SELECT id, path, latitude, longitude, row_number() OVER (ORDER BY path) AS n FROM org_units WHERE unit_type = 'STATION';
 
-INSERT INTO users (username, full_name, badge_number, rank, home_org_unit_id, password_hash, password_changed_at)
+INSERT INTO users (username, full_name, badge_number, rank, home_org_unit_id, password_hash, password_changed_at, must_change_password)
 SELECT format('perf.u%s', lpad(i::text, 5, '0')), format('Perf Officer %s', i), format('PERF-%s', lpad(i::text, 5, '0')), 'Police Constable',
-       s.id, (SELECT password_hash FROM users WHERE username = 'io.meera'), now()
+       s.id, (SELECT password_hash FROM users WHERE username = 'io.meera'), now(), false
   FROM generate_series(1, (SELECT count(*) * 10 FROM perf_stations)) i
   JOIN perf_stations s ON s.n = 1 + (i % (SELECT count(*) FROM perf_stations));
 

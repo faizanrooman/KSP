@@ -23,18 +23,22 @@ export function evidenceVisibleSql(p: Principal, alias = 'evidence', opts: { jur
   const e = sql.raw(`"${alias.replace(/"/g, '')}"`);
   const readPaths = opts.jurisdiction === false ? [] : scopePaths(p, 'evidence:read');
   const parts: RawBuilder<unknown>[] = [];
-  if (readPaths.length) parts.push(sql`${e}.org_path <@ ${sql.val(readPaths)}::ltree[]`);
+  // Perf: every branch is written so the planner can BitmapOr index scans instead of a sequential scan with a
+  // per-row filter: `<@ ANY(array)` is GiST-indexable on org_path (the `ltree <@ ltree[]` operator is not), and the
+  // relationship branches are uncorrelated InitPlans (`id = ANY(ARRAY(...))`, evaluated once) instead of correlated
+  // EXISTS. Semantics are identical to the per-row EXISTS form.
+  if (readPaths.length) parts.push(sql`${e}.org_path <@ ANY(${sql.val(readPaths)}::ltree[])`);
   if (p.userId) {
     const uid = p.userId;
     if (hasPermission(p, 'evidence:read_own')) parts.push(sql`(${e}.uploaded_by = ${uid}::uuid OR ${e}.officer_id = ${uid}::uuid)`);
     if (hasPermission(p, 'cases:read')) {
-      parts.push(sql`EXISTS (SELECT 1 FROM case_evidence ce JOIN cases c ON c.id = ce.case_id
-        WHERE ce.evidence_id = ${e}.id AND ce.unlinked_at IS NULL AND c.status <> 'ARCHIVED'
+      parts.push(sql`${e}.id = ANY(ARRAY(SELECT ce.evidence_id FROM case_evidence ce JOIN cases c ON c.id = ce.case_id
+        WHERE ce.unlinked_at IS NULL AND c.status <> 'ARCHIVED'
           AND (c.investigating_officer_id = ${uid}::uuid OR c.supervisor_id = ${uid}::uuid
-               OR EXISTS (SELECT 1 FROM case_members cm WHERE cm.case_id = c.id AND cm.user_id = ${uid}::uuid)))`);
+               OR EXISTS (SELECT 1 FROM case_members cm WHERE cm.case_id = c.id AND cm.user_id = ${uid}::uuid))))`);
     }
-    parts.push(sql`EXISTS (SELECT 1 FROM share_items si JOIN shares s ON s.id = si.share_id
-      WHERE si.evidence_id = ${e}.id AND s.recipient_user_id = ${uid}::uuid AND s.status = 'ACTIVE' AND s.expires_at > now())`);
+    parts.push(sql`${e}.id = ANY(ARRAY(SELECT si.evidence_id FROM share_items si JOIN shares s ON s.id = si.share_id
+      WHERE s.recipient_user_id = ${uid}::uuid AND s.status = 'ACTIVE' AND s.expires_at > now()))`);
   }
   if (!parts.length) return sql<boolean>`false`;
   return sql<boolean>`(${sql.join(parts, sql` OR `)})`;
@@ -118,5 +122,5 @@ export async function loadEvidenceFor(
 export function orgScopeSql(p: Principal, perm: Permission, column = 'org_path'): RawBuilder<boolean> {
   const paths = scopePaths(p, perm);
   if (!paths.length) return sql<boolean>`false`;
-  return sql<boolean>`${sql.ref(column)} <@ ${sql.val(paths)}::ltree[]`;
+  return sql<boolean>`${sql.ref(column)} <@ ANY(${sql.val(paths)}::ltree[])`;
 }
