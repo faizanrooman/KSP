@@ -23,12 +23,13 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 | Dashboards (role/jurisdiction-scoped KPIs, charts with text summaries), alerts (10 rules, cursor-based idempotent evaluator, dedupe, auto-resolve, notifications, webhook channel), 9 report types (CSV/JSON/PDF, hashed, jurisdiction-scoped), storage snapshots, Prometheus metrics, worker heartbeats, `/system/health` | 22 API + 27 worker tests; dashboard 75–82 ms on 50k rows |
 | Internal security assessment (route-level authz/CSRF sweep of every route, SSRF, malicious media inputs, DB privilege tests, headers, crypto; semgrep, gitleaks, npm audit; STRIDE threat model) — 7 findings fixed incl. HIGH: FFmpeg followed references inside uploaded HLS playlists | 7 security suites; `docs/SECURITY-TEST-REPORT.md` (NOT a CERT-In VAPT) |
 | DevOps & DR: multi-target Dockerfile, compose, kustomize k8s (staging/prod), CI + release workflows, encrypted backups (age) + verification, S3 replication/repoint, local DR drill | production entrypoints run from simulated image layouts; validators green; backup verify 8/8; DR drill restore→ready 3.9 s on ~44 MB (small-data only) |
+| End-to-end browser suite (Playwright, real stack, Chrome headless): 11 scenario specs + axe on 64 page states + keyboard-only + responsive (1280/768); runtime guard (console errors, failed API calls, storage-URL/bucket-name leaks) on every test. 14 UI/API bugs fixed | 48/48 passed in two consecutive runs (4.4 min and 4.3 min); 0 axe violations after fixes (4 serious before); `docs/E2E-TESTS.md`, `docs/ACCESSIBILITY.md` |
 | End-to-end integration (orchestrator): station CLI upload → REGISTERED → media READY → HLS playable via token; other-jurisdiction IO gets 404; audit chain intact | manual run 2026-09-25 |
 
 Test totals on `main` at last merge: API 364 · worker 55 · ai-worker 19 · web 15 · station client 3 (456 total) — all passing; root build, typecheck, lint (0 errors) and web build green.
 
 ## In Progress
-Nothing running. Next: E2E browser tests, performance, accessibility, final audit.
+E2E + accessibility workstream complete (branch pending merge). Next: performance, final audit.
 
 ## Queued
 E2E, performance, accessibility · Final documentation & production audit.

@@ -19,7 +19,7 @@
 | Integrations | mTLS client auth path never exercised | UNVERIFIED |
 | API clients | argon2 verification on every Basic-auth request (no cache) — CPU cost under high integration load | open |
 | API clients | IPv6 allow-list entries must be exact addresses (no IPv6 CIDR matching) | open |
-| Web | Admin, cases/FIR, integrations and API-client UIs not yet exercised in a browser | UNVERIFIED (pending E2E) |
+| Web | Admin, cases/FIR, sharing, export, AI review, workspace UIs now exercised by the Playwright suite (Chrome only); integrations and API-client screens only axe-scanned, not driven | partly verified |
 | Search | Totals use `count(*) OVER ()` — slow for very large match sets (switch to keyset + approximate totals) | open |
 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | accepted |
 | Tests | Heavy FFmpeg/upload suites were intermittently slow/failing when several agents ran suites concurrently on one host; green on repeated sequential runs | monitor |
@@ -59,3 +59,10 @@
 | DR | Disposed evidence persists in the DR store until its own lock expires (no DR disposal sweep yet) | open |
 | Capacity | CPU transcoding of the full HLS ladder at state-wide volume needs ~1,100 worker instances — hardware/GPU transcoding decision required (see INFRASTRUCTURE.md) | open (decision) |
 | Environment | Dev host shows intermittent node/tsc/eslint segfaults and one in-memory data corruption → possible RAM/hardware fault; run memtest; re-verify results on another machine | open |
+| E2E | Suite runs in Chrome only; Firefox/Safari/Edge, screen readers, zoom/forced-colours untested (see ACCESSIBILITY.md) | UNVERIFIED |
+| E2E | API runs with NODE_ENV=test semantics during E2E (relaxed rate limits only); production rate limits are not exercised in the browser | by design |
+| Accessibility | Region annotations are pointer-only (no keyboard alternative); remaining items listed in ACCESSIBILITY.md | open |
+| Roles | Default role matrix: EVIDENCE_CUSTODIAN has no `export:approve` (only SUPERVISOR); the E2E brief expected the custodian to approve exports — product decision needed | open (decide) |
+| Auth | TOTP codes are not replay-protected within their validity window (same code can complete two logins) | open (security) |
+| Auth | During a lockout, the 423 "locked" message is only returned when the password is correct (wrong passwords still get the generic 401) — an attacker can confirm a password while the account is locked | open (security) |
+| Dev host | During E2E work PostgreSQL parallel workers, Vite/esbuild/rollup and Node repeatedly segfaulted (14+ PG crashes in 30 min; corrupted Vite pre-bundles) under load average 10–30; a host reboot fixed it temporarily. The app now survives DB connection drops (pool/client error listeners) but in-flight requests fail | environment |
