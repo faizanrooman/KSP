@@ -1,4 +1,5 @@
 /** Data hooks for /api/v1/ai and /api/v1/review. */
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AiDetectionDto, AiJobDto, AiModelDto, AiTask, AiTaskDto, ReviewAction, ReviewEventDto } from '@ksp/shared';
 import { api } from '@/lib/api';
@@ -27,11 +28,25 @@ export const aiKeys = {
 export const useAiTasks = () => useQuery({ queryKey: aiKeys.tasks, queryFn: () => api.get<{ items: AiTaskDto[] }>('/ai/tasks'), staleTime: 60_000 });
 
 export function useEvidenceJobs(evidenceId: string) {
-  return useQuery({
+  const qc = useQueryClient();
+  const q = useQuery({
     queryKey: aiKeys.jobs(evidenceId),
     queryFn: () => api.get<{ items: AiJobDto[] }>(`/ai/evidence/${evidenceId}/jobs`),
-    refetchInterval: (q) => (q.state.data?.items.some((j) => j.status === 'QUEUED' || j.status === 'RUNNING') ? 2000 : false),
+    refetchInterval: (query) => (query.state.data?.items.some((j) => j.status === 'QUEUED' || j.status === 'RUNNING') ? 2000 : false),
   });
+  // Detections are written while a job runs and when it finishes: refresh them whenever job state/progress changes
+  // (E2E finding: the Detections card stayed at 0 after a job completed until the page was reloaded).
+  const signature = q.data?.items.map((j) => `${j.id}:${j.status}:${j.progress}`).join('|');
+  const previous = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (signature === undefined) return;
+    if (previous.current !== undefined && previous.current !== signature) {
+      void qc.invalidateQueries({ queryKey: aiKeys.detections(evidenceId) });
+      void qc.invalidateQueries({ queryKey: aiKeys.queue });
+    }
+    previous.current = signature;
+  }, [signature, evidenceId, qc]);
+  return q;
 }
 
 export function useDetections(evidenceId: string, filters: { task?: string; reviewStatus?: string; minConfidence?: string; label?: string }) {

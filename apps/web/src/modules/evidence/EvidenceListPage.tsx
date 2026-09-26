@@ -25,7 +25,7 @@ function toIsoEnd(d: string) {
 export function Thumb({ url, label }: { url: string | null; label: string }) {
   if (!url) {
     return (
-      <div className="flex h-12 w-20 items-center justify-center rounded bg-ink-100 text-ink-400" aria-label={`${label}: no thumbnail`}>
+      <div className="flex h-12 w-20 items-center justify-center rounded bg-ink-100 text-ink-400" role="img" aria-label={`${label}: no thumbnail`}>
         <Film className="h-5 w-5" aria-hidden />
       </div>
     );
@@ -56,7 +56,7 @@ export function EvidenceListPage() {
       render: (r) => (
         <div className="min-w-[14rem]">
           <p className="mono text-xs font-semibold text-brand-800">{r.evidenceNumber ?? '—'}</p>
-          <p className="text-sm text-ink-900">{r.title ?? <span className="text-ink-400">Untitled</span>}</p>
+          <p className="text-sm text-ink-900">{r.title ?? <span className="text-ink-500">Untitled</span>}</p>
           {r.tags.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {r.tags.slice(0, 4).map((t) => (

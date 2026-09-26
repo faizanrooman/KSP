@@ -103,6 +103,14 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const record = (success: boolean, reason: string | null) =>
       db.insertInto('login_attempts').values({ username, user_id: user?.id ?? null, ip: req.ip, user_agent: req.headers['user-agent']?.slice(0, 512) ?? null, success, reason }).execute();
 
+    // While locked, answer identically for correct and wrong passwords (the hash is still computed above, so timing is
+    // unchanged): otherwise a 423-only-on-correct-password response is a password oracle during the lockout window.
+    if (user && user.locked_until && user.locked_until > new Date()) {
+      await record(false, ok ? 'LOCKED' : 'LOCKED_BAD_PASSWORD');
+      authFailures.inc({ reason: 'locked' });
+      await appendAudit(db, anon(req, user.id, username), { action: 'LOGIN_FAILED', outcome: 'DENIED', resourceType: 'login', details: { reason: 'LOCKED' } });
+      throw new AppError(423, 'ACCOUNT_LOCKED', 'Account is temporarily locked after repeated failed attempts. Try again later or contact an administrator.');
+    }
     if (!user || !ok) {
       await record(false, user ? 'BAD_PASSWORD' : 'UNKNOWN_USER');
       authFailures.inc({ reason: user ? 'bad_password' : 'unknown_user' });
@@ -114,10 +122,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
         if (lock) await appendAudit(db, anon(req, user.id, username), { action: 'ACCOUNT_LOCKED', outcome: 'SUCCESS', resourceType: 'user', resourceId: user.id, details: { failedAttempts: count, minutes: lp.lockoutMinutes } });
       }
       throw unauthenticated(GENERIC_LOGIN_ERROR);
-    }
-    if (user.locked_until && user.locked_until > new Date()) {
-      await record(false, 'LOCKED');
-      throw new AppError(423, 'ACCOUNT_LOCKED', 'Account is temporarily locked after repeated failed attempts. Try again later or contact an administrator.');
     }
     if (user.status !== 'ACTIVE') {
       await record(false, `STATUS_${user.status}`);

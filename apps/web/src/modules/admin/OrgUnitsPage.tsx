@@ -109,7 +109,7 @@ export function OrgUnitsPage() {
                   </button>
                 ) : <span className="inline-block w-5" />}
                 <Building2 className="h-4 w-4 text-ink-400" aria-hidden />
-                <span className={u.active ? 'font-medium text-ink-900' : 'font-medium text-ink-400 line-through'}>{u.name}</span>
+                <span className={u.active ? 'font-medium text-ink-900' : 'font-medium text-ink-500 line-through'}>{u.name}</span>
                 <span className="mono text-xs text-ink-500">{u.code}</span>
                 <Badge>{titleCase(u.unitType)}</Badge>
                 {!u.active && <Badge tone="gray">Inactive</Badge>}

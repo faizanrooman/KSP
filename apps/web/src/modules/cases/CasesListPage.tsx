@@ -46,7 +46,7 @@ export function CasesListPage() {
     },
     { key: 'fir', header: 'FIR', render: (r) => (r.fir ? <Link className="mono text-sm text-brand-700 hover:underline" to={`/firs/${r.fir.id}`} onClick={(e) => e.stopPropagation()}>{r.fir.displayNumber}</Link> : <span className="text-ink-400">—</span>) },
     { key: 'station', header: 'Station', render: (r) => r.orgUnit.name },
-    { key: 'io', header: 'Investigating officer', render: (r) => r.investigatingOfficer?.fullName ?? <span className="text-ink-400">Unassigned</span> },
+    { key: 'io', header: 'Investigating officer', render: (r) => r.investigatingOfficer?.fullName ?? <span className="text-ink-500">Unassigned</span> },
     { key: 'priority', header: 'Priority', sortKey: 'priority', render: (r) => <PriorityBadge priority={r.priority} /> },
     { key: 'status', header: 'Status', sortKey: 'status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'ev', header: 'Evidence', render: (r) => <span className="tabular-nums">{r.evidenceCount}</span> },
@@ -124,11 +124,11 @@ export function FirSelect({ value, onChange, id }: { value: Fir | null; onChange
     <div className="space-y-1">
       <Input id={id} placeholder="Type FIR number, complainant…" value={q} onChange={(e) => setQ(e.target.value)} />
       {q && (
-        <ul className="max-h-48 overflow-y-auto rounded-md border border-ink-200 bg-white text-sm" role="listbox" aria-label="Matching FIRs">
+        <ul className="max-h-48 overflow-y-auto rounded-md border border-ink-200 bg-white text-sm" aria-label="Matching FIRs">
           {res.isFetching && !res.data && <li className="px-3 py-2 text-ink-500">Searching…</li>}
           {res.data?.items.length === 0 && <li className="px-3 py-2 text-ink-500">No FIRs found</li>}
           {res.data?.items.map((f) => (
-            <li key={f.id} role="option" aria-selected={false}>
+            <li key={f.id}>
               <button type="button" className="w-full px-3 py-1.5 text-left hover:bg-brand-50" onClick={() => { onChange(f); setQ(''); }}>
                 <span className="mono">{f.displayNumber}</span> · {f.orgUnit.name} <span className="text-ink-500">{f.actsSections.join(', ')}</span>
               </button>

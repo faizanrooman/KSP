@@ -125,7 +125,7 @@ export function ProfilePage() {
               { key: 'seen', header: 'Last active', render: (r) => formatDateTime(r.last_seen_at) },
               {
                 key: 'act',
-                header: '',
+                header: <span className="sr-only">Session actions</span>,
                 render: (r) =>
                   r.current ? (
                     <Badge tone="green">This session</Badge>

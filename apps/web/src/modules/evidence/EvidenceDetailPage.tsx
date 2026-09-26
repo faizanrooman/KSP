@@ -52,7 +52,7 @@ export function EvidenceDetailPage() {
   if (q.isLoading) return <Spinner label="Loading evidence…" />;
   if (q.error) {
     if (q.error instanceof ApiError && q.error.status === 404) {
-      return <EmptyState title="Evidence not found" description="It does not exist or is outside your jurisdiction." action={<Link className="text-brand-700 hover:underline" to="/evidence">Back to evidence</Link>} />;
+      return <EmptyState heading="h1" title="Evidence not found" description="It does not exist or is outside your jurisdiction." action={<Link className="text-brand-700 hover:underline" to="/evidence">Back to evidence</Link>} />;
     }
     return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
   }

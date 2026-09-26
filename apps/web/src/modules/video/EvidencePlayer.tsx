@@ -50,6 +50,8 @@ export interface EvidencePlayerProps {
   muted?: boolean;
   /** Max stage height (CSS length), default 70vh. */
   maxHeight?: string;
+  /** Distinguishes several players on one page (landmark names must be unique), e.g. the evidence number. */
+  label?: string;
   className?: string;
 }
 
@@ -479,7 +481,7 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
       className={clsx('relative flex flex-col rounded-lg bg-ink-950 text-ink-100 outline-none focus-visible:ring-2 focus-visible:ring-brand-500', fullscreen && 'h-screen justify-center rounded-none', props.className)}
       tabIndex={0}
       role="region"
-      aria-label="Evidence video player"
+      aria-label={props.label ? `Evidence video player: ${props.label}` : 'Evidence video player'}
       aria-keyshortcuts="Space ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight [ ] + - 0 s f ?"
       onKeyDown={onKeyDown}
     >

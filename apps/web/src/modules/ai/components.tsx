@@ -41,7 +41,7 @@ export function CropThumb({ d, size = 'md' }: { d: Pick<AiDetectionDto, 'cropUrl
   const cls = size === 'sm' ? 'h-12 w-12' : size === 'lg' ? 'h-48 w-48' : 'h-24 w-24';
   if (!d.cropUrl) {
     return (
-      <div className={clsx(cls, 'flex shrink-0 items-center justify-center rounded bg-ink-100 text-ink-400')} aria-label="No crop available">
+      <div className={clsx(cls, 'flex shrink-0 items-center justify-center rounded bg-ink-100 text-ink-400')} role="img" aria-label="No crop available">
         <ImageOff className="h-5 w-5" aria-hidden />
       </div>
     );

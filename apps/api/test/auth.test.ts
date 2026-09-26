@@ -43,6 +43,10 @@ describe('authentication', () => {
     const r = await new Agent(app).post('/api/v1/auth/login', { username: u.username, password: u.password });
     expect(r.status).toBe(423);
     expect(r.body.error.code).toBe('ACCOUNT_LOCKED');
+    // No password oracle while locked: a wrong password gets exactly the same answer as the correct one.
+    const wrong = await new Agent(app).post('/api/v1/auth/login', { username: u.username, password: 'another-wrong-one' });
+    expect(wrong.status).toBe(423);
+    expect(wrong.body.error.code).toBe('ACCOUNT_LOCKED');
   });
 
   it('enforces CSRF double-submit on cookie-authenticated unsafe requests', async () => {

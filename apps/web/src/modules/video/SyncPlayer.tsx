@@ -178,6 +178,7 @@ export function SyncPlayer({ items: input, onOffsetsChange, className }: SyncPla
                   refs.current[i] = h;
                 }}
                 evidenceId={it.evidenceId}
+                label={it.label}
                 hideControls
                 muted={i > 0}
                 maxHeight={items.length > 2 ? '32vh' : '45vh'}

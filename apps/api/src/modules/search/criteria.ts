@@ -96,6 +96,9 @@ export function caseVisibleSql(p: Principal, alias = 'c'): RawBuilder<boolean> {
     OR EXISTS (SELECT 1 FROM case_members cm WHERE cm.case_id = ${c}.id AND cm.user_id = ${p.userId}::uuid))`;
 }
 
+/** True when the text uses websearch_to_tsquery syntax: a -excluded term, a "quoted phrase" or OR. */
+export const hasSearchOperators = (text: string) => /(^|\s)-\S|"|\sor\s/i.test(text);
+
 /** The text query as a tsquery (english stemming OR simple tokens, so evidence numbers / codes also match). */
 export const tsQuery = (text: string) => sql`(websearch_to_tsquery('english', ${text}) || websearch_to_tsquery('simple', ${text}))`;
 
@@ -143,7 +146,13 @@ export function buildConditions(p: Principal, c: SearchCriteria): RawBuilder<boo
   const conds: RawBuilder<boolean>[] = [evidenceVisibleSql(p, 'e')];
   if (c.text) {
     const like = `%${escapeLike(c.text)}%`;
-    conds.push(sql<boolean>`(e.search_text @@ ${tsQuery(c.text)} OR ${c.text} <<% e.title OR e.evidence_number ILIKE ${like} OR e.original_filename ILIKE ${like})`);
+    // With web-search operators (-exclusion, "phrase", OR) only the tsquery can honour them: the fuzzy/ILIKE
+    // fallbacks matched the raw text and re-included excluded items (E2E finding: "tok -traffic" returned "traffic stop").
+    conds.push(
+      hasSearchOperators(c.text)
+        ? sql<boolean>`e.search_text @@ ${tsQuery(c.text)}`
+        : sql<boolean>`(e.search_text @@ ${tsQuery(c.text)} OR ${c.text} <<% e.title OR e.evidence_number ILIKE ${like} OR e.original_filename ILIKE ${like})`,
+    );
   }
   if (c.evidenceNumber) conds.push(sql<boolean>`e.evidence_number ILIKE ${`${escapeLike(c.evidenceNumber)}%`}`);
   if (c.orgUnitIds?.length) conds.push(sql<boolean>`e.org_path <@ ARRAY(SELECT ou.path FROM org_units ou WHERE ou.id = ANY(${c.orgUnitIds}::uuid[]))`);

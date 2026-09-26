@@ -1,5 +1,5 @@
 /** Shared pickers backed by /api/v1/directory. */
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Input, Select } from '@/components/ui';
@@ -53,7 +53,12 @@ export function UserPicker({ value, onChange, id, placeholder = 'Search by name,
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
   const [open, setOpen] = useState(false);
+  // Highlight by user id, so late (debounced) results do not move or clear it under the keyboard user.
+  const [activeId, setActiveId] = useState<string | null>(null);
   const listId = useId();
+  const changeRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const refocus = useRef<'change' | 'input' | null>(null);
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q), 250);
     return () => clearTimeout(t);
@@ -63,30 +68,98 @@ export function UserPicker({ value, onChange, id, placeholder = 'Search by name,
     queryFn: () => api.get<{ items: UserOption[] }>('/directory/users', { q: debounced, orgUnitId }),
     enabled: open,
   });
+  const items = data?.items ?? [];
+  const active = items.findIndex((u) => u.id === activeId);
+  // Keep keyboard focus on the control after picking / clearing (it swaps between input and "Change" button).
+  useEffect(() => {
+    if (refocus.current === 'change') changeRef.current?.focus();
+    if (refocus.current === 'input') inputRef.current?.focus();
+    refocus.current = null;
+  }, [value]);
+  const pick = (u: UserOption) => {
+    refocus.current = 'change';
+    onChange(u);
+    setQ('');
+    setOpen(false);
+  };
   if (value) {
     return (
       <div className="flex items-center justify-between rounded-md border border-ink-300 bg-white px-3 py-2 text-sm">
-        <span>
+        <span id={id ? `${id}-value` : undefined}>
           {value.fullName} <span className="text-ink-500">{value.badgeNumber ? `(${value.badgeNumber})` : `@${value.username}`} · {value.orgUnitName}</span>
         </span>
-        <button type="button" className="text-xs text-brand-700 hover:underline" onClick={() => onChange(null)}>
+        <button
+          ref={changeRef}
+          type="button"
+          className="text-xs text-brand-700 hover:underline"
+          aria-describedby={id ? `${id}-value` : undefined}
+          onClick={() => {
+            refocus.current = 'input';
+            onChange(null);
+          }}
+        >
           Change
         </button>
       </div>
     );
   }
+  // WAI-ARIA combobox: ↓/↑ move through options (aria-activedescendant), Enter picks, Escape closes.
+  // Before: options were buttons inside role=option and Tab closed the list on blur — not keyboard operable.
+  const optionId = (u: UserOption) => `${listId}-${u.id}`;
   return (
     <div className="relative">
-      <Input id={id} role="combobox" aria-expanded={open} aria-controls={listId} autoComplete="off" placeholder={placeholder} value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} />
+      <Input
+        ref={inputRef}
+        id={id}
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={open && items[active] ? optionId(items[active]!) : undefined}
+        autoComplete="off"
+        placeholder={placeholder}
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setOpen(true);
+            const n = items[Math.min(items.length - 1, active + 1)];
+            if (n) setActiveId(n.id);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const n = items[Math.max(0, active - 1)];
+            if (n) setActiveId(n.id);
+          } else if (e.key === 'Enter' && open && items[active]) {
+            e.preventDefault();
+            pick(items[active]!);
+          } else if (e.key === 'Escape' && open) {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(false);
+          }
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
       {open && (
-        <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-ink-200 bg-white py-1 text-sm shadow-lg">
-          {isFetching && !data && <li className="px-3 py-2 text-ink-500">Searching…</li>}
-          {data?.items.length === 0 && <li className="px-3 py-2 text-ink-500">No users found</li>}
-          {data?.items.map((u) => (
-            <li key={u.id} role="option" aria-selected={false}>
-              <button type="button" className="w-full px-3 py-1.5 text-left hover:bg-brand-50" onMouseDown={(e) => e.preventDefault()} onClick={() => { onChange(u); setQ(''); setOpen(false); }}>
-                {u.fullName} <span className="text-ink-500">{u.badgeNumber ?? `@${u.username}`} · {u.orgUnitName}</span>
-              </button>
+        <ul id={listId} role="listbox" aria-label="Matching users" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-ink-200 bg-white py-1 text-sm shadow-lg">
+          {isFetching && !data && <li role="presentation" className="px-3 py-2 text-ink-500">Searching…</li>}
+          {data?.items.length === 0 && <li role="presentation" className="px-3 py-2 text-ink-500">No users found</li>}
+          {items.map((u, i) => (
+            <li
+              key={u.id}
+              id={optionId(u)}
+              role="option"
+              aria-selected={i === active}
+              className={`cursor-pointer px-3 py-1.5 ${i === active ? 'bg-brand-100' : 'hover:bg-brand-50'}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(u)}
+            >
+              {u.fullName} <span className="text-ink-500">{u.badgeNumber ?? `@${u.username}`} · {u.orgUnitName}</span>
             </li>
           ))}
         </ul>

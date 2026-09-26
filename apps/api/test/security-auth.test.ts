@@ -191,6 +191,8 @@ describe('login timing (user enumeration)', () => {
     // Interleave so drift (GC, other load) affects both series equally.
     for (let i = 0; i < 30; i++) {
       ex.push(await attempt(u.username, i * 2));
+      // Measure the normal wrong-password path, not the lockout path (lockout is covered in auth.test.ts).
+      await app.db.updateTable('users').set({ failed_login_count: 0, locked_until: null }).where('id', '=', u.id).execute();
       nx.push(await attempt(`nobody_${randomUUID().slice(0, 8)}`, i * 2 + 1));
     }
     const mean = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length;

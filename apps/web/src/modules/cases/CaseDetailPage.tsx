@@ -28,7 +28,7 @@ export function CaseDetailPage() {
   if (q.isLoading) return <Spinner label="Loading case…" />;
   if (q.error) {
     if (q.error instanceof ApiError && q.error.status === 404) {
-      return <EmptyState title="Case not found" description="It does not exist or is outside your jurisdiction." action={<Link className="text-brand-700 hover:underline" to="/cases">Back to cases</Link>} />;
+      return <EmptyState heading="h1" title="Case not found" description="It does not exist or is outside your jurisdiction." action={<Link className="text-brand-700 hover:underline" to="/cases">Back to cases</Link>} />;
     }
     return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
   }

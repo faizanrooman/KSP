@@ -19,7 +19,7 @@
 | Integrations | mTLS client auth path never exercised | UNVERIFIED |
 | API clients | argon2 verification on every Basic-auth request (no cache) — CPU cost under high integration load | open |
 | API clients | IPv6 allow-list entries must be exact addresses (no IPv6 CIDR matching) | open |
-| Web | Admin, cases/FIR, integrations and API-client UIs not yet exercised in a browser | UNVERIFIED (pending E2E) |
+| Web | Admin, cases/FIR, sharing, export, AI review, workspace UIs now exercised by the Playwright suite (Chrome only); integrations and API-client screens only axe-scanned, not driven | partly verified |
 | Search | Totals use `count(*) OVER ()` — slow for very large match sets (switch to keyset + approximate totals) | open |
 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | accepted |
 | Tests | Heavy FFmpeg/upload suites were intermittently slow/failing when several agents ran suites concurrently on one host; green on repeated sequential runs | monitor |
@@ -62,3 +62,10 @@
 | Environment | Dev host shows intermittent node/tsc/eslint segfaults and one in-memory data corruption → possible RAM/hardware fault; run memtest; re-verify results on another machine | open |
 | Performance | Single-host measurements only (docs/PERFORMANCE.md). Remaining bottlenecks: full-text search count/rank over large match sets (~0.2–0.3 s per state-wide query), facets (~0.2–0.35 s), custody view returns every event unpaginated (1 000 events ≈ 0.6 MB, ~50 rps), login throughput bound by argon2 on the libuv pool (≈ 80/s per API process), finalize concurrency = WORKER_CONCURRENCY | open |
 | Environment | The development host showed hardware-level memory corruption (PostgreSQL SIGSEGVs, non-reproducible hash mismatches, one audit row altered after write — detected by audit_verify at seq 1 024 318 in the perf DB). Do not use this host for production-like data; run memtest | open (host) |
+| E2E | Suite runs in Chrome only; Firefox/Safari/Edge, screen readers, zoom/forced-colours untested (see ACCESSIBILITY.md) | UNVERIFIED |
+| E2E | API runs with NODE_ENV=test semantics during E2E (relaxed rate limits only); production rate limits are not exercised in the browser | by design |
+| Accessibility | Region annotations are pointer-only (no keyboard alternative); remaining items listed in ACCESSIBILITY.md | open |
+| Roles | Default role matrix: EVIDENCE_CUSTODIAN has no `export:approve` (only SUPERVISOR); the E2E brief expected the custodian to approve exports — product decision needed | open (decide) |
+| Auth | TOTP codes were replayable within their validity window — fixed by SEC-12 (migration 0991, single-use TOTP step + atomic recovery-code consumption) | fixed |
+| Auth | During a lockout the 423 "locked" message was returned only for the correct password (password oracle) — fixed: locked accounts answer 423 for any password; hash still computed for uniform timing | fixed |
+| Dev host | During E2E work PostgreSQL parallel workers, Vite/esbuild/rollup and Node repeatedly segfaulted (14+ PG crashes in 30 min; corrupted Vite pre-bundles) under load average 10–30; a host reboot fixed it temporarily. The app now survives DB connection drops (pool/client error listeners) but in-flight requests fail | environment |

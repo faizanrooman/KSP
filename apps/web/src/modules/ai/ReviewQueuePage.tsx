@@ -24,6 +24,22 @@ export function ReviewQueuePage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [prompt, setPrompt] = useState<{ ids: string[]; action: 'REJECT' | 'REQUEST_SECOND_REVIEW' | 'CORRECT_LABEL' | 'COMMENT' } | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
+  // Single-key shortcuts can be switched off (WCAG 2.1.4 Character Key Shortcuts); the choice is remembered.
+  const [shortcuts, setShortcuts] = useState(() => {
+    try {
+      return localStorage.getItem(SHORTCUTS_KEY) !== 'off';
+    } catch {
+      return true;
+    }
+  });
+  const toggleShortcuts = (on: boolean) => {
+    setShortcuts(on);
+    try {
+      localStorage.setItem(SHORTCUTS_KEY, on ? 'on' : 'off');
+    } catch {
+      /* storage unavailable */
+    }
+  };
   const current = items[Math.min(cursor, items.length - 1)];
 
   useEffect(() => setCursor((c) => Math.min(c, Math.max(0, items.length - 1))), [items.length]);
@@ -49,7 +65,7 @@ export function ReviewQueuePage() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (prompt || historyId || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!shortcuts || prompt || historyId || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (k === 'j') { setCursor((c) => Math.min(items.length - 1, c + 1)); e.preventDefault(); }
       else if (k === 'k') { setCursor((c) => Math.max(0, c - 1)); e.preventDefault(); }
@@ -62,7 +78,7 @@ export function ReviewQueuePage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [items, current, prompt, historyId, act]);
+  }, [items, current, prompt, historyId, act, shortcuts]);
 
   useEffect(() => {
     if (current) document.getElementById(`rq-${current.id}`)?.scrollIntoView({ block: 'nearest' });
@@ -102,7 +118,13 @@ export function ReviewQueuePage() {
           {url.evidenceId && <Badge tone="blue">Evidence filter active</Badge>}
           <Button variant="ghost" onClick={reset}>Clear filters</Button>
         </form>
-        <p className="mt-3 flex items-center gap-2 text-xs text-ink-500"><Keyboard className="h-4 w-4" aria-hidden /> J/K move · A approve · R reject · S second review · X select · H history</p>
+        <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-ink-500">
+          <Checkbox label="Keyboard shortcuts" checked={shortcuts} onChange={toggleShortcuts} />
+          <p className="flex items-center gap-2" id="rq-shortcuts"><Keyboard className="h-4 w-4" aria-hidden /> J/K move · A approve · R reject · S second review · X select · H history</p>
+        </div>
+        <p className="sr-only" aria-live="polite" data-testid="rq-current">
+          {current ? `Item ${Math.min(cursor, items.length - 1) + 1} of ${items.length}: ${taskLabel(current.task)} ${current.correctedLabel ?? current.label}, ${Math.round(current.confidence * 100)}% confidence, ${current.reviewStatus.replace(/_/g, ' ').toLowerCase()}` : ''}
+        </p>
       </Card>
 
       {selected.size > 0 && (
@@ -176,6 +198,8 @@ function QueueCard({ d, active, selected, busy, onFocus, onSelect, onApprove, on
     </li>
   );
 }
+
+const SHORTCUTS_KEY = 'ksp.review.shortcuts';
 
 const PROMPT_TEXT = {
   REJECT: { title: 'Reject AI result', label: 'Reason (required, recorded in the audit trail)', required: true, button: 'Reject' },

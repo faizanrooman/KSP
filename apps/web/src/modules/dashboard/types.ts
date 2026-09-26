@@ -33,7 +33,7 @@ export interface StorageUtilisation {
   capturedAt: string | null; usedBytes: number; capacityBytes: number | null; percentUsed: number | null;
   warnThresholdPercent: number; criticalThresholdPercent: number;
   byTier: Array<{ tier: string; bytes: number; objects: number }>;
-  byBucket: Array<{ bucket: string; tier: string; objects: number; bytes: number; source: string; dbBytes: number | null; capturedAt: string }>;
+  byBucket: Array<{ role: string; tier: string; objects: number; bytes: number; source: string; dbBytes: number | null; capturedAt: string }>;
   trend: Array<{ day: string; bytes: number }>;
   growthBytesPerDay: number | null;
 }

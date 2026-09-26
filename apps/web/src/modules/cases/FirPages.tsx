@@ -204,7 +204,7 @@ export function FirDetailPage() {
   });
   if (q.isLoading) return <Spinner label="Loading FIR…" />;
   if (q.error) {
-    if (q.error instanceof ApiError && q.error.status === 404) return <EmptyState title="FIR not found" description="It does not exist or is outside your jurisdiction." action={<Link className="text-brand-700 hover:underline" to="/firs">Back to FIRs</Link>} />;
+    if (q.error instanceof ApiError && q.error.status === 404) return <EmptyState heading="h1" title="FIR not found" description="It does not exist or is outside your jurisdiction." action={<Link className="text-brand-700 hover:underline" to="/firs">Back to FIRs</Link>} />;
     return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
   }
   const f = q.data!;

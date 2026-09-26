@@ -105,6 +105,10 @@ export async function ledgerStatus(app: FastifyInstance) {
   };
 }
 
+function roleOfBucket(app: FastifyInstance, bucket: string): string {
+  return BUCKET_ROLES.find((role) => app.storage.bucket(role) === bucket) ?? 'other';
+}
+
 export async function storageUtilisation(app: FastifyInstance) {
   const settings = await getSettings(app.db);
   const { rows: latest } = await sql<{ bucket: string; tier: string; object_count: string; total_bytes: string; capacity_bytes: string | null; captured_at: Date; source: string; db_total_bytes: string | null }>`
@@ -135,7 +139,8 @@ export async function storageUtilisation(app: FastifyInstance) {
     warnThresholdPercent: settings.storagePolicy.warnThresholdPercent,
     criticalThresholdPercent: settings.storagePolicy.criticalThresholdPercent,
     byTier: [...byTier.values()],
-    byBucket: latest.map((r) => ({ bucket: r.bucket, tier: r.tier, objects: Number(r.object_count), bytes: Number(r.total_bytes), capacityBytes: r.capacity_bytes === null ? null : Number(r.capacity_bytes), source: r.source, dbBytes: r.db_total_bytes === null ? null : Number(r.db_total_bytes), capturedAt: r.captured_at })),
+    // Clients see the bucket ROLE, never the physical bucket name (storage topology stays server-side).
+    byBucket: latest.map((r) => ({ role: roleOfBucket(app, r.bucket), tier: r.tier, objects: Number(r.object_count), bytes: Number(r.total_bytes), capacityBytes: r.capacity_bytes === null ? null : Number(r.capacity_bytes), source: r.source, dbBytes: r.db_total_bytes === null ? null : Number(r.db_total_bytes), capturedAt: r.captured_at })),
     trend: trend.map((t) => ({ day: t.day, bytes: Number(t.bytes) })),
     growthBytesPerDay: first !== null && lastT !== null && days ? Math.round((lastT - first) / days) : null,
   };
