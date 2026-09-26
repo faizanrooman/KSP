@@ -62,6 +62,9 @@ test('station operator uploads videos via drag-and-drop and file input', async (
     const dlg = page.getByRole('dialog', { name: `Details — ${file}` });
     await dlg.getByLabel('Title').fill(title);
     if (file === basename(clipA)) await dlg.getByLabel('Location').fill('MG Road, Bengaluru');
+    // Two angles of the same incident, 3 s apart (used by the workspace timeline in 07).
+    if (file === basename(clipA)) await dlg.getByLabel('Recorded at').fill('2026-09-20T22:15:00');
+    if (file === basename(clipB)) await dlg.getByLabel('Recorded at').fill('2026-09-20T22:15:03');
     await dlg.getByRole('button', { name: 'Save' }).click();
     await expect(dlg).toHaveCount(0);
     await expect(queue.getByRole('listitem').filter({ hasText: file })).toContainText(title);

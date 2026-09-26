@@ -17,7 +17,12 @@ pg.types.setTypeParser(1041 as never, pg.types.getTypeParser(1009 as never));
 
 export function createPool(connectionString: string, max?: number): pg.Pool {
   const cfg = loadConfig();
-  return new pg.Pool({ connectionString, max: max ?? cfg.DATABASE_POOL_MAX, idleTimeoutMillis: 30_000, application_name: process.env.KSP_SERVICE ?? 'ksp' });
+  const pool = new pg.Pool({ connectionString, max: max ?? cfg.DATABASE_POOL_MAX, idleTimeoutMillis: 30_000, application_name: process.env.KSP_SERVICE ?? 'ksp' });
+  // An idle client dropped by the server (DB restart/failover, pg_terminate_backend) is emitted as a pool 'error'.
+  // Without a listener Node treats it as an unhandled 'error' event and the whole process exits (E2E finding: the
+  // worker died after a Postgres restart and approved exports never built). pg-pool discards the broken client.
+  pool.on('error', (err) => console.error(`[db] idle client error (discarded): ${err.message}`));
+  return pool;
 }
 
 export function createDb(connectionString?: string, max?: number): { db: Database; pool: pg.Pool } {

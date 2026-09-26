@@ -120,7 +120,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
   const overlays = (
     <div
       ref={overlayRef}
-      className={`absolute inset-0 ${drawing ? 'cursor-crosshair' : 'pointer-events-none'}`}
+      className={`absolute inset-0 ${drawing ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}

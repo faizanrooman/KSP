@@ -89,7 +89,6 @@ export function UserPicker({ value, onChange, id, placeholder = 'Search by name,
         </span>
         <button
           ref={changeRef}
-          id={id}
           type="button"
           className="text-xs text-brand-700 hover:underline"
           aria-describedby={id ? `${id}-value` : undefined}
