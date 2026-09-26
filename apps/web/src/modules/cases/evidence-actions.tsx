@@ -48,11 +48,11 @@ function LinkToCaseButton({ evidence }: { evidence: EvidenceSummary }) {
         <div className="space-y-3">
           <Field label="Find case" htmlFor="ltc-q"><Input id="ltc-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Case number, title or FIR number" autoFocus /></Field>
           {cases.isLoading ? <Spinner /> : cases.error ? <Alert tone="red">{errorMessage(cases.error)}</Alert> : (
-            <ul className="max-h-60 divide-y divide-ink-100 overflow-y-auto rounded-md border border-ink-200 text-sm" role="listbox" aria-label="Cases">
+            <ul className="max-h-60 divide-y divide-ink-100 overflow-y-auto rounded-md border border-ink-200 text-sm" aria-label="Cases">
               {cases.data?.items.length === 0 && <li className="px-3 py-2 text-ink-500">No open cases found</li>}
               {cases.data?.items.map((c) => (
-                <li key={c.id} role="option" aria-selected={picked?.id === c.id}>
-                  <button type="button" className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-brand-50 ${picked?.id === c.id ? 'bg-brand-50 ring-1 ring-brand-300' : ''}`} onClick={() => setPicked(c)}>
+                <li key={c.id}>
+                  <button type="button" aria-pressed={picked?.id === c.id} className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-brand-50 ${picked?.id === c.id ? 'bg-brand-50 ring-1 ring-brand-300' : ''}`} onClick={() => setPicked(c)}>
                     <span className="mono">{c.caseNumber}</span><span className="flex-1 truncate">{c.title}</span><StatusBadge status={c.status} />
                   </button>
                 </li>

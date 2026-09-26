@@ -192,6 +192,12 @@ describe('text relevance, snippets, pagination', () => {
     expect(hits).toContain('arson');
   });
 
+  it('exclusions and phrases are honoured (fuzzy fallback must not re-include excluded items)', async () => {
+    expect(idsOf(await meera.post(S, { text: `${tok} -traffic` }))).toEqual(sorted('A1'));
+    expect(idsOf(await meera.post(S, { text: `"traffic stop" ${tok}` }))).toEqual(sorted('A2'));
+    expect(idsOf(await meera.post(S, { text: `robbery or traffic ${tok}` }))).toEqual(sorted('A1', 'A2'));
+  });
+
   it('trigram fallback on evidence number / filename', async () => {
     const app = await getApp();
     const n = (await app.db.selectFrom('evidence').select('evidence_number').where('id', '=', ids.A1!).executeTakeFirstOrThrow()).evidence_number!;

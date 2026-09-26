@@ -256,7 +256,7 @@ function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPl
 function Timeline({ items, durationMs, onPick }: { items: AiDetectionDto[]; durationMs: number; onPick: (d: AiDetectionDto) => void }) {
   const tasks = [...new Set(items.map((d) => d.task))];
   return (
-    <div className="space-y-1" aria-label="Detections timeline">
+    <div className="space-y-1" role="group" aria-label="Detections timeline">
       {tasks.map((t) => (
         <div key={t} className="flex items-center gap-2">
           <span className="w-40 shrink-0 truncate text-xs text-ink-600">{taskLabel(t)}</span>

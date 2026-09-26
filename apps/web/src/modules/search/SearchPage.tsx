@@ -256,7 +256,7 @@ function ResultCard({ item }: { item: SearchItem }) {
           <div className="flex flex-wrap gap-1">{item.tags.map((t) => <Badge key={t}>{t}</Badge>)}</div>
         )}
         {m.ai.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1" aria-label="Matching AI moments">
+          <div className="flex flex-wrap items-center gap-1.5 pt-1" role="group" aria-label="Matching AI moments">
             <Sparkles className="h-3.5 w-3.5 text-brand-700" aria-hidden />
             {m.ai.map((a) => (
               <Link
