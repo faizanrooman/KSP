@@ -67,5 +67,8 @@ test('supervisor approves; package builds; requester downloads and verifies it',
   await meera.getByLabel(/Export package/).setInputFiles({ name: dl.suggestedFilename(), mimeType: 'application/zip', buffer: readFileSync(zip) });
   await meera.getByRole('button', { name: 'Verify' }).click();
   await expect(meera.getByText('Package verified')).toBeVisible({ timeout: 60_000 });
-  await expect(meera.getByRole('table', { name: 'Package files' })).toContainText(/manifest/);
+  const files = meera.getByRole('table', { name: 'Package files' });
+  await expect(files).toContainText(/watermarked\/.*\.mp4/);
+  await expect(files).toContainText('FACT_SHEET.pdf');
+  await expect(files).not.toContainText(/originals\//); // no originals without evidence:download_original
 });
