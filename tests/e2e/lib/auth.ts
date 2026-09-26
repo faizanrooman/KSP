@@ -59,5 +59,6 @@ export async function login(page: Page, username: DevUser | string, opts: { pass
     await code.fill(totp(username));
     await page.getByRole('button', { name: 'Verify' }).click();
   }
-  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
+  // The app shell (sidebar is collapsed behind a menu button below 1024 px, the header is always there).
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 }

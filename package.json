@@ -25,7 +25,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run test --workspaces --if-present",
-    "test:e2e": "playwright test -c tests/e2e/playwright.config.ts"
+    "test:e2e": "playwright test -c tests/e2e/playwright.config.ts",
+    "test:e2e:stack": "tests/e2e/scripts/stack.sh",
+    "typecheck:e2e": "tsc -p tests/e2e/tsconfig.json"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

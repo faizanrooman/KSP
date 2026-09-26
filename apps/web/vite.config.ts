@@ -16,6 +16,8 @@ export default defineConfig({
     // Same-origin in development so SameSite=Strict cookies and CSP work exactly as in production (behind one ingress).
     proxy: { '/api': { target: `http://127.0.0.1:${apiPort}`, changeOrigin: false } },
   },
+  // `vite preview` (used by the E2E suite: the built bundle, same-origin /api proxy, same port as dev).
+  preview: { port: webPort, strictPort: true, host: '127.0.0.1', proxy: { '/api': { target: `http://127.0.0.1:${apiPort}`, changeOrigin: false } } },
   build: { sourcemap: true, chunkSizeWarningLimit: 1500 },
   test: { environment: 'jsdom', setupFiles: ['./src/test-setup.ts'], include: ['src/**/*.test.tsx', 'src/**/*.test.ts'] },
 } as never);
