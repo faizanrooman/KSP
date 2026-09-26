@@ -17,7 +17,12 @@ test('internal share to another officer', async ({ as }) => {
   const user = dlg.getByRole('combobox', { name: 'User' });
   await user.fill('mysuru');
   await expect(page.getByRole('listbox', { name: 'Matching users' }).getByRole('option').first()).toContainText('Deepa Nayak');
-  await user.press('ArrowDown');
+  await expect(async () => {
+    await user.press('ArrowDown');
+    const id = await user.getAttribute('aria-activedescendant');
+    expect(id).toBeTruthy();
+    await expect(page.locator(`[id="${id}"]`)).toContainText('Deepa Nayak', { timeout: 500 });
+  }).toPass({ timeout: 10_000 });
   await user.press('Enter');
   await dlg.getByRole('textbox', { name: 'Purpose' }).fill(`Cross-station review E2E ${runId()}`);
   await dlg.getByRole('button', { name: 'Create share' }).click();

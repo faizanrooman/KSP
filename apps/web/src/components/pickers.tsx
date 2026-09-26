@@ -53,7 +53,8 @@ export function UserPicker({ value, onChange, id, placeholder = 'Search by name,
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(-1);
+  // Highlight by user id, so late (debounced) results do not move or clear it under the keyboard user.
+  const [activeId, setActiveId] = useState<string | null>(null);
   const listId = useId();
   const changeRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,7 +69,7 @@ export function UserPicker({ value, onChange, id, placeholder = 'Search by name,
     enabled: open,
   });
   const items = data?.items ?? [];
-  useEffect(() => setActive(-1), [data]);
+  const active = items.findIndex((u) => u.id === activeId);
   // Keep keyboard focus on the control after picking / clearing (it swaps between input and "Change" button).
   useEffect(() => {
     if (refocus.current === 'change') changeRef.current?.focus();
@@ -126,10 +127,12 @@ export function UserPicker({ value, onChange, id, placeholder = 'Search by name,
           if (e.key === 'ArrowDown') {
             e.preventDefault();
             setOpen(true);
-            setActive((a) => Math.min(items.length - 1, a + 1));
+            const n = items[Math.min(items.length - 1, active + 1)];
+            if (n) setActiveId(n.id);
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setActive((a) => Math.max(0, a - 1));
+            const n = items[Math.max(0, active - 1)];
+            if (n) setActiveId(n.id);
           } else if (e.key === 'Enter' && open && items[active]) {
             e.preventDefault();
             pick(items[active]!);

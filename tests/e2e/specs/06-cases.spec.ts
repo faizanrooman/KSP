@@ -53,8 +53,13 @@ test('IO registers a FIR and opens a case, links evidence, adds a member, writes
   const picker = page.getByRole('combobox', { name: 'Officer' });
   await picker.fill('arjun');
   await expect(page.getByRole('listbox', { name: 'Matching users' }).getByRole('option').first()).toContainText('Arjun Shetty');
-  await picker.press('ArrowDown');
-  await expect(picker).toHaveAttribute('aria-activedescendant', /.+/);
+  // Results refresh after the debounce (which resets the highlight): retry ↓ until an Arjun option is active.
+  await expect(async () => {
+    await picker.press('ArrowDown');
+    const id = await picker.getAttribute('aria-activedescendant');
+    expect(id).toBeTruthy();
+    await expect(page.locator(`[id="${id}"]`)).toContainText('Arjun Shetty', { timeout: 500 });
+  }).toPass({ timeout: 10_000 });
   await picker.press('Enter');
   await expect(page.getByRole('button', { name: 'Change', exact: true })).toBeFocused();
   await page.getByRole('button', { name: 'Add to team' }).click();
