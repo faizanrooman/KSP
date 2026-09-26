@@ -83,6 +83,7 @@ Owner is a role, not a person.
 | FN-21 | Storage | versitygw ignores Object Lock on CopyObject and refuses conditional writes to tombstoned keys — code uses multipart copy and never reuses keys | LOW | mitigated |
 | FN-22 | Station CLI | Summary "Detail" column can show a stale status | LOW | open (cosmetic) |
 | FN-23 | E2E | API runs with `NODE_ENV=test` semantics during E2E (relaxed rate limits) | LOW | by design |
+| FN-24 | Web | Production bundle is a single 2.6 MB JS chunk (627 kB gzip) — no route-level code splitting | LOW | open |
 
 ## Development host (ENV)
 

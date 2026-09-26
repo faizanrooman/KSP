@@ -40,8 +40,10 @@ API = `apps/api/test/`, W = `apps/worker/test/`, AI = `apps/ai-worker/test/`, E2
 | 19 | Monitoring / performance / security | P | AI-worker metrics missing; Prometheus stack UV; no CERT-In VAPT |
 | 20 | Backup / DR / deployment | P (runtime UV) | scripts + local drill IT; images/k8s/CI never run |
 
-Counts: IT 15 · IT with PARTIAL/MISSING sub-items counted above · P 2 (19, 20) · M 0 whole modules ·
-UV components in 8 modules (5, 8, 12, 14, 16, 19, 20, plus real-S3 behaviour everywhere).
+Counts (module level): IMPLEMENTED+TESTED 18 (of which 5 have UNVERIFIED external parts: 5, 8, 12, 14, 16; the
+runtime parts of 19/20 are counted under PARTIAL) · PARTIAL 2 (19, 20) · MISSING 0. Sub-capabilities that are
+MISSING: e-mail alerts, scheduled reports, AI-worker metrics, share notifications (plus out-of-brief items: SSO,
+redaction, AV scan).
 
 ---
 

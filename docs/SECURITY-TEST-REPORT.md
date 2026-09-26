@@ -185,3 +185,17 @@ Browser-based XSS / DOM testing; container image scanning (no Docker); fuzzing o
 integration path and real CCTNS endpoints; share-portal brute force from many IPs (per-IP limit + share lockout exist;
 a distributed attacker was not simulated); Kubernetes admission / NetworkPolicy behaviour in a real cluster; DoS
 beyond the load measured in `docs/PERFORMANCE.md`; HSM-backed keys and key rotation.
+
+## Final audit (2026-09-27) — additional findings
+
+Found while spot-checking code for the requirements traceability (not a new test campaign):
+
+| ID | Finding | Severity | Status |
+|---|---|---|---|
+| FA-1 | Share portal `maxViews` check-then-increment race: concurrent opens could exceed the limit | LOW | fixed (atomic conditional UPDATE; test `maxViews: concurrent opens never exceed the limit`) |
+| FA-2 | Failure counter not reset after a lockout expired → one wrong password re-locked the account (availability / DoS on users) | LOW | fixed (test `an expired lockout starts a fresh failure count`) |
+| FA-3 | `restore.sh` interpolated role passwords into SQL text (`-v "app_password='…'"`) | LOW | fixed (`roles.sql` uses `:'var'`) |
+| FA-4 | `audit_canonical()` omits `user_agent` from the hash | MEDIUM | open (KNOWN-ISSUES SEC-R1) |
+| FA-5 | Further LOW items (MFA disable TOTP replay window, MFA re-enrol without re-auth, `/health/ready` error echo, API-client id timing, `ANY_NON_REJECTED` search gate, `ksp_ai` job status transitions, dashboard org filter) | LOW | open (KNOWN-ISSUES SEC-R5…R12) |
+
+Still **no CERT-In empanelled VAPT** has been performed.
