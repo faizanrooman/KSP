@@ -13,8 +13,8 @@ outside your jurisdiction is simply not found.
 
 * **Sign in** — username + password. Supervisors, administrators, auditors and custodians must enrol two-step
   verification on first sign-in: scan the QR code with an authenticator app, enter the 6-digit code, and store
-  the recovery codes shown once. Five-ish consecutive failures lock the account for a period set by the
-  administrator (policy in **System settings**). (E2E `01-auth`)
+  the recovery codes shown once. Five consecutive failures lock the account for 15 minutes (defaults; the administrator can change them
+  in **System settings**). (E2E `01-auth`)
 * **My profile** — change password (history and complexity policy apply), view/enable two-step verification,
   sign out other sessions.
 * **Dashboard** — KPIs and charts scoped to your jurisdiction; each chart has a text summary for screen readers.

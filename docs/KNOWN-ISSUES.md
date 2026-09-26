@@ -1,74 +1,111 @@
 # Known Issues & Limitations
 
-| Area | Issue | Status |
+_Consolidated by the final audit, 2026-09-27. Duplicates merged; fixed items moved to the appendix._
+
+Severity: **HIGH** blocks production · **MEDIUM** fix or accept explicitly before production · **LOW** hardening /
+cosmetic · **ENV** development-host only.
+Status: `open` · `UNVERIFIED` (not run anywhere yet) · `decision` (product/legal owner must decide) · `accepted`.
+Owner is a role, not a person.
+
+## Compliance, legal & external dependencies
+
+| ID | Issue | Sev | Status | Owner / next step |
+|---|---|---|---|---|
+| EXT-1 | No CERT-In empanelled VAPT performed (two internal assessment rounds only, see SECURITY-TEST-REPORT.md) | HIGH | open | Security officer: commission VAPT on staging |
+| EXT-2 | CCTNS / FIR / case-diary / evidence-repository API contracts not in the specification; `http-json` adapter contract `ksp-cctns-json-v0` is a guess; push operations implemented but not scheduled; mTLS client path never exercised | HIGH | UNVERIFIED | Integration owner: obtain contracts + test endpoint |
+| EXT-3 | Signing uses a self-signed dev RSA-3072 key; production needs HSM/PKCS#11 or DSC/CCA eSign-backed key and CA-issued certificate | HIGH | open | Security officer: procure HSM/DSC; wire `packages/core` signer |
+| EXT-4 | ANPR plate detector is a YOLOv9 derivative published as MIT while upstream YOLOv9 is GPL-3.0 | HIGH | decision | Legal: licence review before production use of ANPR |
+| EXT-5 | Face recognition is biometric processing — legal basis / DPIA required | HIGH | decision | Legal / DPO: DPIA; until then keep FACE_RECOGNITION disabled |
+| EXT-6 | Legal acceptance of the court export package and the pre-filled BSA s.63 certificate template not established (aids only) | HIGH | decision | Legal / prosecution: review template and package format |
+| EXT-7 | Production S3 IAM separation (AI worker → derived bucket only; app/backup/replicate identities) cannot be shown on versitygw (single account); policies in `deploy/s3/policies/` | HIGH | UNVERIFIED | Infra: apply on the production store, run negative tests |
+| EXT-8 | Object Lock runs in GOVERNANCE mode in dev (bypassable by privileged credentials); production should use COMPLIANCE | MEDIUM | decision | Custodian + infra: choose mode/retention per bucket |
+| EXT-9 | CPU transcoding of the full HLS ladder at state-wide volume (~40 000 footage-hours/day) needs ~1 100 4-vCPU workers — GPU / proxy-only default / on-demand HLS decision | HIGH | decision | Infra / product: capacity decision (INFRASTRUCTURE.md) |
+| EXT-10 | Should EVIDENCE_CUSTODIAN hold `export:approve`? Default matrix gives it only to SUPERVISOR | MEDIUM | decision | Product owner |
+| EXT-11 | react-router 6.30.x advisories (`npm audit --omit=dev`: 2 moderate — GHSA-wrjc-x8rr-h8h6 open redirect via backslash in `<Link>`/`useNavigate`, GHSA-337j-9hxr-rhxg SSR hydration, SSR not used) fixed only in 7.18 (major upgrade); 0 high/critical | MEDIUM | open | Web: plan react-router 7 upgrade |
+
+## Deployment, DR & operations
+
+| ID | Issue | Sev | Status | Owner / next step |
+|---|---|---|---|---|
+| OPS-1 | Container images, compose and Kubernetes never built or run (no Docker on the dev host); validated statically (`scripts/ci/validate-deploy.sh`) + runtime layout simulated (`scripts/ci/simulate-image.sh`) | HIGH | UNVERIFIED | DevOps: build images + deploy to staging |
+| OPS-2 | GitHub Actions `ci.yml` / `release.yml` never executed; versitygw release tarball name in the CI DR step assumed; CI does not run the Playwright suite | MEDIUM | UNVERIFIED | DevOps: first CI run; add E2E job |
+| OPS-3 | 2-hour restoration and 99.5 % availability not demonstrated at production scale; local drill only (small data); CNPG failover, PITR, native replication untested | HIGH | UNVERIFIED | DevOps: staging DR drill at realistic volume |
+| OPS-4 | `s3-replicate.ts` copies get new version IDs → `--repoint` needed after failover (native replication avoids it); full re-hash is O(bytes) — use `--trust-marker` within the RTO | LOW | accepted | by design |
+| OPS-5 | Disposal is not propagated to the DR store (copies persist until their own lock expires) — DR disposal sweep needed | MEDIUM | open | DevOps / custodian |
+| OPS-6 | Staging bucket lifecycle (abort incomplete multipart, orphaned/quarantined objects) not applied on versitygw (NotImplemented); `ensure-buckets.mjs` applies it where supported | LOW | open | Infra: verify on production store |
+| OPS-7 | Base image digests resolved 2026-09-25; must be refreshed monthly (no Renovate/Dependabot yet) | LOW | open | DevOps |
+| OPS-8 | Backup manifests are not signed (dump hashes live inside the manifest); `restore.sh` places manifest `headSeq` into SQL unquoted | LOW | open | DevOps: sign manifest with the backup key |
+| OPS-9 | Trivy k8s notes: `ksp-ai-config` carries inert key-shaped placeholders; container UIDs/GIDs ≤ 10000 | LOW | open | DevOps |
+| OPS-10 | `DATA_ENCRYPTION_KEY` has no key versioning; rotation needs re-encryption of MFA secrets (not implemented); must be restored with the DB | MEDIUM | open | Backend |
+
+## Security (residual / hardening)
+
+| ID | Issue | Sev | Status | Owner / next step |
+|---|---|---|---|---|
+| SEC-R1 | `audit_canonical()` (migration 0002) does not include `user_agent`, so a DB superuser could alter that column without breaking the hash chain (all other columns are covered; the app role cannot UPDATE at all) | MEDIUM | open | Backend: new migration with a versioned canonical form (old rows keep v1) |
+| SEC-R2 | Residual: FFmpeg demuxer/decoder memory-safety; media tokens are bearer secrets for their TTL (not re-checked against permission changes); DB superuser can bypass triggers (detected by the hash chain, not prevented); keys not in HSM | MEDIUM | accepted | Security officer |
+| SEC-R3 | Not yet tested: browser XSS fuzzing, container images, FFmpeg fuzzing, distributed share-portal brute force, real-cluster NetworkPolicies | MEDIUM | UNVERIFIED | VAPT scope |
+| SEC-R4 | Rate limits use an in-memory store → per API replica | LOW | open | Backend: shared store if needed |
+| SEC-R5 | `/auth/mfa/disable` checks the TOTP code without the single-use step (password also required) | LOW | open | Backend |
+| SEC-R6 | `/auth/mfa/setup` replaces an existing MFA secret without re-authentication (live session required) | LOW | open | Backend |
+| SEC-R7 | Public `/health/ready` echoes backend error text (≤ 200 chars) | LOW | open | Backend: generic message, detail in logs |
+| SEC-R8 | API-client Basic auth skips argon2 for an unknown `client_id` (timing enumeration of client ids) | LOW | open | Backend: dummy hash as in login |
+| SEC-R9 | Search `ai.reviewStatus=ANY_NON_REJECTED` needs only `search:use` (every default role with `search:use` also holds `ai:request`; only custom roles are affected) | LOW | open | Backend: require an AI permission |
+| SEC-R10 | `ksp_ai` may set any `ai_jobs.status` (no transition guard) — a compromised AI worker could revive a cancelled job | LOW | open | Backend: transition trigger |
+| SEC-R11 | Snapshot with `source: original` needs only `evidence:snapshot`, not `evidence:download_original` (output is a custody-audited still image) | LOW | decision | Product: confirm intended |
+| SEC-R12 | Dashboard `orgUnitId` filter does not check the unit is inside the viewer's jurisdiction (data stays scoped; unit existence leaks) | LOW | open | Backend |
+| SEC-R13 | Locked accounts answer 423 for any password — reveals that a username exists and is locked | LOW | accepted | trade-off |
+
+## Functional gaps
+
+| ID | Area | Issue | Sev | Status |
+|---|---|---|---|---|
+| FN-1 | Alerts | E-mail channel not implemented (deliveries recorded FAILED "not implemented"); webhook tested only against a local server; failed external deliveries are not retried | MEDIUM | open |
+| FN-2 | Reports | Scheduled (recurring) reports not implemented | LOW | open |
+| FN-3 | Monitoring | AI worker has no service metrics/heartbeat (only per-job heartbeat); availability SLO probe and Prometheus alert rules authored, not deployed | MEDIUM | open / UNVERIFIED |
+| FN-4 | Ingestion | Quarantine release re-hashes the object inside the HTTP request (slow for multi-GB files) | LOW | open |
+| FN-5 | Ingestion | Client-declared `recordedAt` overrides container creation time | LOW | open |
+| FN-6 | Integrity | Nightly fixity sweep samples 100 items/night (≈36k/year) — too small for state-wide volume; secondary copies not fixity-checked | MEDIUM | open |
+| FN-7 | Video | Reprocess deletes old derivatives before new ones exist; reprocess enqueues even when already processing | LOW | open |
+| FN-8 | Video | Snapshot extraction runs in the API process (rate-limited, 90 s timeout) — move to queue at scale | LOW | open |
+| FN-9 | Export / custody | PDFs use standard fonts: Kannada / non-Latin text not rendered | MEDIUM | open |
+| FN-10 | Sharing | Locked external share cannot be unlocked or extended; no e-mail/SMS delivery of link/code; revoke does not delete per-share watermarked variants | LOW | open |
+| FN-11 | Sharing | `maxViews` counts portal opens and is not applied to internal-user shares | LOW | open |
+| FN-12 | Investigation | Manual timeline events are hard-deleted (audit row remains), unlike annotations | LOW | open |
+| FN-13 | Search | Totals use `count(*) OVER ()`; ranking over large match sets ~0.2–0.35 s state-wide | LOW | open |
+| FN-14 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | LOW | accepted |
+| FN-15 | API clients | argon2 on every Basic-auth request (no cache); IPv6 allow-list entries must be exact addresses | LOW | open |
+| FN-16 | AI | Accuracy figures are upstream; no evaluation on KSP footage; plate OCR not validated on Indian plates; GPU inference untested; small-face track fragmentation during pans | MEDIUM | UNVERIFIED |
+| FN-17 | Accessibility | Region annotations are pointer-only; E2E/axe in Chrome only (Firefox/Safari/Edge, screen readers, zoom/forced colours untested) — ACCESSIBILITY.md | MEDIUM | open / UNVERIFIED |
+| FN-18 | Web | Integrations, API-client, retention and disposal screens axe-scanned only, not driven by E2E | LOW | open |
+| FN-19 | Performance | Single-host measurements only (PERFORMANCE.md); custody view unpaginated (1 000 events ≈ 0.6 MB); login ≈ 80/s per API process (argon2); audit append ≤ 1.2k/s | MEDIUM | open |
+| FN-20 | Storage | Uploads > 5 GiB, AWS S3 / MinIO / Ceph behaviour, Safari native HLS, real 1080p30 long-footage throughput untested | MEDIUM | UNVERIFIED |
+| FN-21 | Storage | versitygw ignores Object Lock on CopyObject and refuses conditional writes to tombstoned keys — code uses multipart copy and never reuses keys | LOW | mitigated |
+| FN-22 | Station CLI | Summary "Detail" column can show a stale status | LOW | open (cosmetic) |
+| FN-23 | E2E | API runs with `NODE_ENV=test` semantics during E2E (relaxed rate limits) | LOW | by design |
+
+## Development host (ENV)
+
+| ID | Issue | Status |
 |---|---|---|
-| Environment | Docker socket not accessible on the development host; container builds untested | UNVERIFIED |
-| Environment | System PostgreSQL (5432) credentials unavailable; project uses its own cluster on 5433 | by design for dev |
-| Storage | versitygw runs single-account: per-service S3 credential isolation (AI worker → derived bucket only) cannot be demonstrated locally | UNVERIFIED |
-| Signing | Dev signing key is a self-signed RSA-3072 certificate; production requires an HSM / DSC-backed key and CA-issued certificate | external dependency |
-| Integrations | CCTNS/FIR/case-diary API contracts are not defined in the specification; adapters are interface + fixture only | external dependency |
-| Compliance | No CERT-In empanelled VAPT has been performed | external dependency |
-| Ingestion | Quarantine release re-hashes the stored object inside the HTTP request — slow for multi-GB files (make async) | open |
-| Ingestion | No lifecycle rule configured on the staging bucket; orphaned/quarantined staged objects persist until reviewed | open (deployment) |
-| Ingestion | Station CLI summary "Detail" column can show a stale evidence status (e.g. RECEIVED next to REGISTERED) | open (cosmetic) |
-| Video | Reprocess deletes old derivatives before new ones exist (playback unavailable during reprocess) | open |
-| Video | Snapshot extraction runs in the API process (rate-limited, 90 s timeout) — move to queue at scale | open |
-| Video | Watermark burn-in for shared media not implemented yet (pending secure-sharing module) | open |
-| Storage | versitygw ignores Object Lock on CopyObject and refuses conditional writes to tombstoned keys; code uses multipart copy and never reuses keys | mitigated |
-| Integrations | Real CCTNS/FIR/case-diary/evidence-repository contracts unknown; `http-json` adapter contract `ksp-cctns-json-v0` is a best guess; push operations exist but are not scheduled | UNVERIFIED (external) |
-| Integrations | mTLS client auth path never exercised | UNVERIFIED |
-| API clients | argon2 verification on every Basic-auth request (no cache) — CPU cost under high integration load | open |
-| API clients | IPv6 allow-list entries must be exact addresses (no IPv6 CIDR matching) | open |
-| Web | Admin, cases/FIR, sharing, export, AI review, workspace UIs now exercised by the Playwright suite (Chrome only); integrations and API-client screens only axe-scanned, not driven | partly verified |
-| Search | Totals use `count(*) OVER ()` — slow for very large match sets (switch to keyset + approximate totals) | open |
-| Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | accepted |
-| Tests | Heavy FFmpeg/upload suites were intermittently slow/failing when several agents ran suites concurrently on one host; green on repeated sequential runs | monitor |
-| Tests | Test runs leaked fixtures in /tmp (~11 GB) and 10-year-locked S3 test objects; fixed: per-run temp dir removed on teardown; test env OBJECT_LOCK_DAYS=1 | fixed |
-| AI (licence) | ANPR plate detector is a YOLOv9 derivative published as MIT while upstream YOLOv9 is GPL-3.0 — legal review required before production | open (legal) |
-| AI (legal) | Face recognition is biometric processing — requires legal basis / DPIA before production use | open (legal) |
-| AI | Model accuracy metrics are upstream figures; no evaluation on KSP footage; plate OCR not validated on Indian plates | UNVERIFIED |
-| AI | Track fragmentation for very small faces during camera pans (more duplicate detections to review) | open |
-| Dev | Editing migration 0600 after a worktree applied it causes checksum errors in that worktree's private DB (rebuild the private DB) | note |
-| Signing | HSM/PKCS#11, Indian DSC and CCA eSign are documented integration points only; dev key is self-signed | UNVERIFIED (external) |
-| Export | Legal acceptance of the export package and the pre-filled BSA s.63 certificate template not established — aids only | UNVERIFIED (legal) |
-| Export | PDF documents use standard fonts: Kannada/non-Latin text not rendered | open |
-| Sharing | A locked external share cannot be unlocked; sender must revoke and re-share | open |
-| Tooling | tsc occasionally crashes (exit 134/139, no TS errors) when launched via npm/npx on this host; retry passes | environment |
-| Web | React 19 was hoisted at the root alongside the app's React 18 (possible duplicate React in bundles, broken component tests) — fixed: React 18 pinned at root + Vite dedupe; component render tests can now be added | fixed |
-| Alerts | E-mail channel not implemented (deliveries recorded as FAILED "not implemented"); webhook tested only against a local server | open / UNVERIFIED |
-| Reports | Scheduled (recurring) reports not implemented | open |
-| Monitoring | AI-worker metrics/heartbeat hooks documented but not wired | open |
-| Monitoring | Availability SLO probe and Prometheus alert rules defined in docs, not deployed | UNVERIFIED |
-| Dev | Test runs across many agent environments filled the local S3 store (~17 GB of 10-year-locked test objects); cleared on disk 2026-09-25; test env now uses 1-day locks | fixed |
-| DevOps | Container images, compose and Kubernetes never built/run (no Docker on host); validated statically + runtime layout simulated (`scripts/ci/simulate-image.sh`) | UNVERIFIED |
-| DevOps | GitHub Actions workflows (ci/release) never executed; versitygw release tarball name in the CI DR step is assumed | UNVERIFIED |
-| DevOps | Base image digests resolved 2026-09-25; must be refreshed monthly (no Renovate/Dependabot config yet) | open |
-| DR | 2-hour restoration at production scale not demonstrated; local drill (29 MB objects, 14.5 MB DB) restores in ~4 s. CNPG failover, PITR, native replication untested | UNVERIFIED |
-| DR | `s3-replicate.ts` copies get new version IDs → `--repoint` required after failover (native replication avoids it); full re-hash is O(bytes) — use `--trust-marker` inside the RTO and full fixity afterwards | by design |
-| DR | Disposal is not propagated to the DR store (copies there persist until their own lock expires) — a DR disposal sweep is needed | open |
-| Security | `DATA_ENCRYPTION_KEY` has no key versioning: rotating it requires re-encrypting MFA secrets (not implemented); it must be restored together with the DB | open |
-| Capacity | CPU transcoding of the full HLS ladder for state-wide volume (~40 000 footage-hours/day) needs ~1 100 4-vCPU workers — capacity decision (proxy-only default / GPU / on-demand HLS) pending | open |
-| npm audit | 4 moderate advisories (react-router 6.x, @vitest/mocker dev-only); 0 high/critical (`npm audit --audit-level=high --omit=dev` passes) | open |
-| Dev host | Intermittent node/tsc/eslint segfaults (exit 139) under concurrent load; single-threaded `eslint .` crashes reliably → lint uses `--concurrency=auto` | environment |
-| Storage | Staging-bucket lifecycle (abort incomplete multipart uploads) is applied by `ensure-buckets.mjs` where supported; versitygw returns NotImplemented | open (deployment) |
-| Security | SEC-08 / SEC-18: npm + Trivy advisories — react-router 6.30.x CVE-2026-53666 / CVE-2026-53669 (MEDIUM, fix only in 7.18 = major upgrade), vitest (dev only); 0 high/critical | open |
-| Security | SEC-09 fixed in round 2 (reprocess scoped to the system:monitor jurisdiction) | fixed |
-| Security | Round 2 closed the IDOR/mass-assignment/race/JWT/rate-limit/media-token/upload/zip/injection/production-header gaps (SEC-10..SEC-16). Still not tested: browser XSS, container images (no Docker), FFmpeg fuzzing, mTLS/CCTNS, distributed share-portal brute force, real-cluster k8s policies | UNVERIFIED |
-| Security | Trivy k8s notes: ksp-ai-config carries inert key-shaped placeholders (make those settings optional for the AI worker); container UIDs/GIDs ≤ 10000 (LOW) — DevOps workstream | open |
-| Security | Residual: FFmpeg demuxer/decoder memory-safety bugs; media tokens are bearer secrets for their TTL; DB superuser can bypass triggers (detected by hash chain, not prevented); Object Lock GOVERNANCE is bypassable by privileged credentials (use COMPLIANCE in production); keys not in HSM | accepted / external |
-| DR | Replicated copies have different S3 version ids → `s3-replicate.ts --repoint` needed after failover; native store replication is the primary DR path | by design |
-| DR | Disposed evidence persists in the DR store until its own lock expires (no DR disposal sweep yet) | open |
-| Capacity | CPU transcoding of the full HLS ladder at state-wide volume needs ~1,100 worker instances — hardware/GPU transcoding decision required (see INFRASTRUCTURE.md) | open (decision) |
-| Environment | Dev host shows intermittent node/tsc/eslint segfaults and one in-memory data corruption → possible RAM/hardware fault; run memtest; re-verify results on another machine | open |
-| Performance | Single-host measurements only (docs/PERFORMANCE.md). Remaining bottlenecks: full-text search count/rank over large match sets (~0.2–0.3 s per state-wide query), facets (~0.2–0.35 s), custody view returns every event unpaginated (1 000 events ≈ 0.6 MB, ~50 rps), login throughput bound by argon2 on the libuv pool (≈ 80/s per API process), finalize concurrency = WORKER_CONCURRENCY | open |
-| Environment | The development host showed hardware-level memory corruption (PostgreSQL SIGSEGVs, non-reproducible hash mismatches, one audit row altered after write — detected by audit_verify at seq 1 024 318 in the perf DB). Do not use this host for production-like data; run memtest | open (host) |
-| E2E | Suite runs in Chrome only; Firefox/Safari/Edge, screen readers, zoom/forced-colours untested (see ACCESSIBILITY.md) | UNVERIFIED |
-| E2E | API runs with NODE_ENV=test semantics during E2E (relaxed rate limits only); production rate limits are not exercised in the browser | by design |
-| Accessibility | Region annotations are pointer-only (no keyboard alternative); remaining items listed in ACCESSIBILITY.md | open |
-| Roles | Default role matrix: EVIDENCE_CUSTODIAN has no `export:approve` (only SUPERVISOR); the E2E brief expected the custodian to approve exports — product decision needed | open (decide) |
-| Auth | TOTP codes were replayable within their validity window — fixed by SEC-12 (migration 0991, single-use TOTP step + atomic recovery-code consumption) | fixed |
-| Auth | During a lockout the 423 "locked" message was returned only for the correct password (password oracle) — fixed: locked accounts answer 423 for any password; hash still computed for uniform timing | fixed |
-| Dev host | During E2E work PostgreSQL parallel workers, Vite/esbuild/rollup and Node repeatedly segfaulted (14+ PG crashes in 30 min; corrupted Vite pre-bundles) under load average 10–30; a host reboot fixed it temporarily. The app now survives DB connection drops (pool/client error listeners) but in-flight requests fail | environment |
-| E2E | E2E TOTP helper reused codes within a 30 s step after TOTP became single-use (SEC-12) — fixed: strictly increasing steps per secret | fixed |
-| Product decision | Should EVIDENCE_CUSTODIAN hold `export:approve`? Default matrix gives it only to SUPERVISOR | open (decision) |
-| Auth | Locked accounts answer 423 for any password (no password oracle); this reveals that a username exists and is locked | accepted trade-off |
+| ENV-1 | Host shows hardware-level instability: node/tsc/eslint/PostgreSQL/Vite segfaults under load, non-reproducible hash mismatches, one audit row altered after write (detected by `audit_verify` in the perf DB). Do not use it for production-like data; run memtest; re-verify results on another machine | open |
+| ENV-2 | Docker socket not accessible; system PostgreSQL (5432) unavailable → project cluster on 5433 | by design for dev |
+| ENV-3 | Heavy FFmpeg/upload suites slow/flaky when several agents run concurrently; green on sequential runs. Single-threaded `eslint .` crashes → lint uses `--concurrency` | monitor |
+| ENV-4 | Editing an applied migration causes checksum errors in a worktree's private DB (rebuild it) | note |
+| ENV-5 | Tools used by `validate-deploy.sh` / backup tests (hadolint, shellcheck, kustomize, kubeconform, actionlint, age, promtool) are not installed on the host; a missing validator prints SKIP and the script still passes. The final audit downloaded them into a scratch dir (promtool still skipped) | note |
+
+## Appendix — resolved
+
+| Issue | Resolution |
+|---|---|
+| Test fixtures leaked in /tmp (~11 GB) and 10-year-locked S3 test objects filled the local store (~17 GB) | per-run temp dir removed; test env `OBJECT_LOCK_DAYS=1`; store cleared 2026-09-25 |
+| React 19 hoisted next to the app's React 18 | React 18 pinned at root + Vite dedupe |
+| Watermark burn-in for shared media not implemented | implemented (`share.watermark` queue, per-share variants) |
+| SEC-09 reprocess not scoped; SEC-10..SEC-16 (IDOR, mass assignment, races, JWT, rate limits, media tokens, uploads, zip, injection, headers) | fixed in security round 2 |
+| TOTP codes replayable within their window | SEC-12, migration 0991 (single-use step, atomic recovery-code consumption) |
+| Lockout 423 only for the correct password (password oracle) | 423 for any password while locked |
+| E2E TOTP helper reused codes within a step | strictly increasing steps per secret |
+| **Final audit:** share `maxViews` could be exceeded by concurrent opens | atomic conditional increment + concurrency test (`share-portal.test.ts`) |
+| **Final audit:** after a lockout expired, one wrong password re-locked the account (failure count never reset) | expired lock restarts the count (login + MFA) + test (`auth.test.ts`) |
+| **Final audit:** `restore.sh` interpolated DB role passwords into SQL text | `roles.sql` uses psql `:'var'` quoting; all callers pass raw values |
+| **Final audit:** `npm run db:migrate` / `db:codegen` failed on a fresh clone before `npm run build` | scripts run from source (`--conditions=ksp-src`) |

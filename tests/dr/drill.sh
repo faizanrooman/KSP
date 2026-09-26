@@ -96,7 +96,9 @@ write_env "$BASE/dr.env" "$DR_S3_ENDPOINT"
 
 start_svc() { # name layout-dir envfile cmd...
   local name="$1" dir="$2" envf="$3"; shift 3
-  (cd "$dir" && KSP_ENV_FILE="$envf" setsid "$@" > "$BASE/logs/$name.log" 2>&1 & echo $! > "$BASE/$name.pid")
+  # Background ONLY the setsid command (not the `cd && …` list): otherwise $! can be an intermediate subshell, stop_svc
+  # kills that shell and the service survives (seen in the final audit: stale primary API answered the DR health check).
+  (cd "$dir" && { KSP_ENV_FILE="$envf" setsid "$@" > "$BASE/logs/$name.log" 2>&1 & echo $! > "$BASE/$name.pid"; })
   PIDS+=("$(cat "$BASE/$name.pid")")
 }
 stop_svc() { local f="$BASE/$1.pid" p; [ -f "$f" ] || return 0; p=$(cat "$f")
@@ -225,6 +227,10 @@ step_end "$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[
 
 # ---------------------------------------------------------------- 9 recover
 step_start start-services-dr
+# The primary services must really be gone, or wait_ready could be answered by a stale process.
+for port in "$API_PORT" "$METRICS_PORT" "$((METRICS_PORT+1))"; do
+  if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then echo "port $port still in use after the disaster step" >&2; exit 1; fi
+done
 start_svc api "$BASE/img-api" "$BASE/dr.env" node apps/api/dist/server.js
 start_svc worker "$BASE/img-worker" "$BASE/dr.env" node apps/worker/dist/main.js
 wait_ready
