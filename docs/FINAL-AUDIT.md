@@ -18,7 +18,8 @@ reports without being re-run or re-read in code._
   [REQUIREMENTS-TRACEABILITY.md](REQUIREMENTS-TRACEABILITY.md).
 * **Verification:** build, typecheck, lint, all 5 Vitest suites (546 tests), the web build, backup tests, deploy
   validation, the DR drill and the 48-test Playwright suite all pass (§3). A fresh clone builds and passes the API
-  suite against a fresh database.
+  suite (446/446) against a fresh database — after one intermittent AI-test failure on the first run (FN-25). The DR
+  drill passed only after a drill bug was fixed.
 * **Found and fixed in this audit (with regression tests where code):** share `maxViews` race; lockout re-triggering
   after expiry; SQL interpolation of passwords in `restore.sh`; **the DR drill could report success against a stale
   primary API** (services were not always stopped); `db:migrate`/`db:codegen` failed on a fresh clone before a build.
@@ -65,11 +66,11 @@ AI models fetched and SHA-256-verified (6/6 ACTIVE). Durations are wall clock on
 | `npm run db:migrate` (worktree, before build) | **failed** (`@ksp/shared/dist` missing) → fixed (`--conditions=ksp-src`), then 18 migrations applied | — |
 | `npm run db:seed` · `npm run fetch-models -w @ksp/ai-worker` | OK · 6 models OK/ACTIVE | — |
 | `npm run build` | pass | 34 s |
-| `npm run typecheck` | pass | 35 s |
+| `npm run typecheck` | pass (re-run on the final code: pass, 31 s) | 35 s |
 | `npm run typecheck:e2e` | pass | 2 s |
-| `npm run lint` | pass — 0 errors, 5 warnings (unused disable directives, 1 hooks dep, 1 `any`) | 9 s |
+| `npm run lint` | pass — 0 errors, 5 warnings (unused disable directives, 1 hooks dep, 1 `any`); re-run on the final code: same | 9 s |
 | `npx vite build` (apps/web) | pass — single 2.6 MB chunk (627 kB gzip) | 7 s |
-| `npm test -w @ksp/api` | **444/444** (46 files) on the base commit; after fixes the changed files `auth.test.ts` 14/14, `share-portal.test.ts` 11/11; fresh-clone full run: see below | 109 s |
+| `npm test -w @ksp/api` | **444/444** (46 files) on the base commit; after the fixes `auth.test.ts` 14/14 and `share-portal.test.ts` 11/11; full suite on the final code 446/446 (fresh clone, below) | 109 s |
 | `npm test -w @ksp/worker` | 55/55 (8 files) | 50 s |
 | `npm test -w @ksp/ai-worker` | 19/19 (3 files, real ONNX inference) | 21 s |
 | `npm test -w @ksp/web` | 23/23 (6 files) | 4 s |
@@ -79,7 +80,7 @@ AI models fetched and SHA-256-verified (6/6 ACTIVE). Durations are wall clock on
 | `tests/dr/drill.sh` (3 videos) | 1st run **failed** — exposed drill bug (primary services survived the "disaster"; stale API answered the DR readiness check). Fixed; re-run **pass**: restore→service ready 3.4 s, fixity of every original from the DR copy OK, `audit_verify` 58 events no break; cleanup complete | 145 s / 30 s |
 | `tests/e2e/scripts/stack.sh start` + `npm run test:e2e` (then `stack.sh stop`) | **48/48 passed** (Chrome headless; axe 0 violations reported by the a11y specs; runtime guard for console errors / failed API calls / storage-URL leaks on every test) | 4.1 min |
 | `npm audit --omit=dev` | 2 moderate (react-router ≤ 7.17: GHSA-wrjc-x8rr-h8h6, GHSA-337j-9hxr-rhxg), 0 high/critical | 1 s |
-| Fresh clone (`git clone` of the branch into `.local/fresh`, `npm ci`, migrate + seed **before** build, build, API suite on new DBs `ksp_fresh`/`ksp_test_fresh`) | FRESH_RESULT | FRESH_DURATION |
+| Fresh clone (`git clone` of the branch into `.local/fresh`, `npm ci`, migrate + seed **before** build, build, API suite on new DBs `ksp_fresh`/`ksp_test_fresh`) | clone, `agent-env`, `npm ci` (5 s), migrate + seed before build (OK — needs this audit's `--conditions=ksp-src` fix), build (35 s) all OK. API suite: 1st run 445/446 — `ai.test.ts` "worker processes the API job" got `framesProcessed` 3 (< 5); the file then passed 2/2 in isolation and the full suite passed **446/446** on the re-run. Recorded as an intermittent (FN-25), consistent with the host caveat | 106 s / 104 s |
 
 The fresh-clone check uses the host toolchain and dev secrets (`.local/{node,bin,secrets,models}` symlinked from the
 main checkout — these are generated per host and deliberately not committed); everything else came from git.
