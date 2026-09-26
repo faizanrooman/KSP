@@ -30,7 +30,9 @@ async function api(token, method, path, body, headers = {}) {
   return text ? JSON.parse(text) : null;
 }
 
+let hashRetries = 0;
 async function uploadOne(username, path, parallelParts) {
+  hashRetries = 0;
   const token = await login(username);
   const me = await getJson('/api/v1/auth/me', token);
   const size = statSync(path).size;
@@ -40,7 +42,16 @@ async function uploadOne(username, path, parallelParts) {
   await Promise.all(Array.from({ length: parallelParts }, async () => {
     for (let n = queue.shift(); n !== undefined; n = queue.shift()) {
       const buf = chunk(path, init.chunkSize, n);
-      await api(token, 'PUT', `/api/v1/uploads/${init.id}/parts/${n}`, buf, { 'content-type': 'application/octet-stream', 'x-chunk-sha256': createHash('sha256').update(buf).digest('hex') });
+      // Retry like the real clients do when the server reports a corrupted chunk (counted: see hashRetries).
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await api(token, 'PUT', `/api/v1/uploads/${init.id}/parts/${n}`, buf, { 'content-type': 'application/octet-stream', 'x-chunk-sha256': createHash('sha256').update(buf).digest('hex') });
+          break;
+        } catch (e) {
+          if (attempt >= 5 || !String(e.message).includes('CHUNK_HASH_MISMATCH')) throw e;
+          hashRetries++;
+        }
+      }
     }
   }));
   const tUp = Date.now();
@@ -63,7 +74,7 @@ async function uploadOne(username, path, parallelParts) {
   }
   const tMedia = Date.now();
   return { username, file: basename(path), sizeMB: +(size / 1048576).toFixed(1), chunks: init.totalChunks, uploadS: (tUp - t0) / 1000, completeS: (tComplete - tUp) / 1000,
-    finalizeS: (tReg - tComplete) / 1000, mediaS: (tMedia - tReg) / 1000, status: view.evidence.status, media, evidenceId: view.evidence.id, uploadMBps: +(size / 1048576 / ((tUp - t0) / 1000)).toFixed(1), ingestMBps: +(size / 1048576 / ((tReg - t0) / 1000)).toFixed(1) };
+    finalizeS: (tReg - tComplete) / 1000, mediaS: (tMedia - tReg) / 1000, status: view.evidence.status, media, hashRetries, evidenceId: view.evidence.id, uploadMBps: +(size / 1048576 / ((tUp - t0) / 1000)).toFixed(1), ingestMBps: +(size / 1048576 / ((tReg - t0) / 1000)).toFixed(1) };
 }
 
 if (mode === 'upload' || mode === 'process') {
