@@ -26,4 +26,22 @@ describe('database pool resilience', () => {
       await pool.end();
     }
   });
+
+  it('survives the server terminating a checked-out client between queries', async () => {
+    const pool = createPool(loadConfig().DATABASE_URL, 2);
+    try {
+      const c = await pool.connect();
+      const pid = (await c.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]!.pid;
+      const killer = new pg.Client({ connectionString: loadConfig().DATABASE_URL });
+      await killer.connect();
+      await killer.query('SELECT pg_terminate_backend($1)', [pid]);
+      await killer.end();
+      await new Promise((r) => setTimeout(r, 300)); // unhandled Client 'error' => process exit before the fix
+      await expect(c.query('SELECT 1')).rejects.toThrow();
+      c.release(new Error('terminated'));
+      expect((await pool.query<{ ok: number }>('SELECT 1 AS ok')).rows[0]!.ok).toBe(1);
+    } finally {
+      await pool.end();
+    }
+  });
 });

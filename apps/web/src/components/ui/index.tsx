@@ -475,13 +475,27 @@ export function ConfirmDialog({
 // ---------------------------------------------------------------------------------------------
 export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: Array<{ id: T; label: ReactNode; count?: number }>; value: T; onChange: (v: T) => void }) {
   return (
-    <div role="tablist" className="mb-4 flex gap-1 overflow-x-auto border-b border-ink-200">
+    <div
+      role="tablist"
+      className="mb-4 flex gap-1 overflow-x-auto border-b border-ink-200"
+      onKeyDown={(e) => {
+        // WAI-ARIA tabs: ←/→ (wrapping), Home/End move between tabs and activate them; Tab leaves the tablist.
+        const i = tabs.findIndex((t) => t.id === value);
+        const next = e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+        if (next < 0 || !tabs[next]) return;
+        e.preventDefault();
+        onChange(tabs[next]!.id);
+        const buttons = e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+        requestAnimationFrame(() => buttons[next]?.focus());
+      }}
+    >
       {tabs.map((t) => (
         <button
           key={t.id}
           role="tab"
           type="button"
           aria-selected={value === t.id}
+          tabIndex={value === t.id ? 0 : -1}
           onClick={() => onChange(t.id)}
           className={clsx('-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium', value === t.id ? 'border-brand-700 text-brand-800' : 'border-transparent text-ink-600 hover:text-ink-900')}
         >

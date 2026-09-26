@@ -22,6 +22,9 @@ export function createPool(connectionString: string, max?: number): pg.Pool {
   // Without a listener Node treats it as an unhandled 'error' event and the whole process exits (E2E finding: the
   // worker died after a Postgres restart and approved exports never built). pg-pool discards the broken client.
   pool.on('error', (err) => console.error(`[db] idle client error (discarded): ${err.message}`));
+  // The same can happen while a client is checked out (between queries of a transaction); pg then emits 'error' on
+  // the Client itself. The in-flight query/transaction still fails normally; only the process crash is prevented.
+  pool.on('connect', (client) => client.on('error', (err) => console.error(`[db] client error: ${err.message}`)));
   return pool;
 }
 

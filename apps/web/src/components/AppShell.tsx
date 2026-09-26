@@ -73,14 +73,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-ink-200 bg-white px-4">
-          <button type="button" className="rounded p-1.5 hover:bg-ink-100 lg:hidden" aria-label="Open menu" onClick={() => setOpen(true)}>
+          <button type="button" className="rounded p-1.5 hover:bg-ink-100 lg:hidden" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}>
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <div className="flex-1 truncate text-sm text-ink-600">{me?.user.homeOrgUnit.name}</div>
           <NotificationBell />
           <Link to="/profile" className="flex items-center gap-2 rounded px-2 py-1 text-sm text-ink-700 hover:bg-ink-100">
             <UserCircle2 className="h-5 w-5" aria-hidden />
-            <span className="hidden sm:inline">
+            <span className="sr-only sm:not-sr-only">
               {me?.user.fullName}
               {me?.user.badgeNumber && <span className="ml-1 text-ink-500">({me.user.badgeNumber})</span>}
             </span>
@@ -94,10 +94,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             }}
           >
             <LogOut className="h-4 w-4" aria-hidden />
-            <span className="hidden sm:inline">Sign out</span>
+            <span className="sr-only sm:not-sr-only">Sign out</span>
           </button>
         </header>
-        <main id="main" className="mx-auto w-full max-w-[1600px] flex-1 p-4 lg:p-6">
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1600px] flex-1 p-4 outline-none lg:p-6">
           {children}
         </main>
       </div>
