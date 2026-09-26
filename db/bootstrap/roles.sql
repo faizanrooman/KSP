@@ -1,5 +1,5 @@
 -- KSP VMS database role bootstrap. Run ONCE per cluster by a DBA / superuser, BEFORE migrations.
---   psql -v app_password="'...'" -v ai_password="'...'" -f db/bootstrap/roles.sql
+--   psql -v app_password='<raw>' -v ai_password='<raw>' -f db/bootstrap/roles.sql   (raw values; psql quotes them via :'var')
 --
 -- Roles:
 --   ksp_owner  owns the schema; used ONLY by the migration runner.
@@ -14,8 +14,8 @@ SELECT 'CREATE ROLE ksp_app LOGIN' WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHER
 SELECT 'CREATE ROLE ksp_ai LOGIN' WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ksp_ai') \gexec
 
 \if :{?app_password}
-ALTER ROLE ksp_app PASSWORD :app_password;
+ALTER ROLE ksp_app PASSWORD :'app_password';
 \endif
 \if :{?ai_password}
-ALTER ROLE ksp_ai PASSWORD :ai_password;
+ALTER ROLE ksp_ai PASSWORD :'ai_password';
 \endif

@@ -1,9 +1,9 @@
 # Project Status
 
-_Last updated: 2026-09-25 (orchestrator)._
+_Last updated: 2026-09-27 (final audit, agent 20)._
 
 ## Overall
-REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and verified end-to-end on the development host; many modules still in progress; not production-ready.**
+REAL IMPLEMENTATION STATUS: **FEATURE-COMPLETE FOR THE 20 SPECIFICATION MODULES ON THE DEVELOPMENT HOST — all automated suites green; deployment artefacts never run; external/legal blockers open. Ready for a staging/UAT deployment once images are built and verified; NOT production-ready.** Verdict and conditions: [FINAL-AUDIT.md](FINAL-AUDIT.md); module-by-module evidence: [REQUIREMENTS-TRACEABILITY.md](REQUIREMENTS-TRACEABILITY.md).
 
 ## Completed (implemented + automatically tested on `main`)
 | Area | Evidence of verification |
@@ -26,26 +26,25 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 | End-to-end browser suite (Playwright, real stack, Chrome headless): 11 scenario specs + axe on 64 page states + keyboard-only + responsive (1280/768); runtime guard (console errors, failed API calls, storage-URL/bucket-name leaks) on every test. 14 UI/API bugs fixed | 48/48 passed in two consecutive runs (4.4 min and 4.3 min); 0 axe violations after fixes (4 serious before); `docs/E2E-TESTS.md`, `docs/ACCESSIBILITY.md` |
 | Security round 2 (IDOR matrix 115 routes × 3 users, JWT/session/MFA attacks, races, media tokens/traversal/Range, upload abuse, zip bombs, injection, production headers/rate limits; Trivy) — 8 more findings fixed (SEC-09…SEC-16) + lockout password oracle | 12 security suites; 0 HIGH/CRITICAL (Trivy/npm audit) |
 | Performance (100k evidence, 500k detections, 1.14M audit events): query-shape fixes, list 84→14 ms (station) / 393→57 ms (state), dashboard 306→33 ms; upload 203 MB/s single file; audit append ≤1.2k/s | `docs/PERFORMANCE.md` (single host, noisy) |
-| E2E browser suite (48 Playwright specs across all 11 scenario areas, real stack) + accessibility (axe on 64 page states: 0 violations; keyboard walkthrough; 1280/768 px) — 14 UI/integration bugs fixed | 48/48 twice on main (≈4 min) |
 | End-to-end integration (orchestrator): station CLI upload → REGISTERED → media READY → HLS playable via token; other-jurisdiction IO gets 404; audit chain intact | manual run 2026-09-25 |
+| Final audit (agent 20): full re-verification on a fresh worktree + fresh-clone check; 4 small bugs fixed (share maxViews race, lockout re-trigger after expiry, restore.sh password quoting, DR drill orphaned services) + migrate/codegen from source | FINAL-AUDIT.md §3 |
 
-Test totals on `main` at last merge: API 444 · worker 55 · ai-worker 19 · web 23 · station client 3 · E2E 48 (592 total) — all passing; build, typecheck (+e2e), lint (0 errors), web build green.
+Test totals (final audit branch, 2026-09-27): API 446 · worker 55 · ai-worker 19 · web 23 · station client 3 · E2E 48 (594 total) — all passing; build, typecheck (+e2e), lint (0 errors, 5 warnings), web build green. `main` at `8ede45c` had 592 (API 444); the audit added 2 regression tests.
 
 ## In Progress
-Final production-readiness audit.
-E2E + accessibility workstream complete (branch pending merge). Next: performance, final audit.
+Nothing. Final audit branch awaiting orchestrator merge.
 
 ## Queued
-Nothing.
+Production-readiness conditions listed in [FINAL-AUDIT.md](FINAL-AUDIT.md) §8.
 
 ## Blocked / external
-CCTNS/FIR/case-diary API contracts (not in spec) · CERT-In VAPT · HSM/DSC signing key · production S3 IAM separation.
+CCTNS/FIR/case-diary API contracts (not in spec) · CERT-In VAPT · HSM/DSC signing key · production S3 IAM separation · legal review (ANPR model licence, face-recognition DPIA, BSA s.63 template / export package) · GPU/transcoding capacity decision · custodian export-approval decision · react-router major upgrade. Tracked in [KNOWN-ISSUES.md](KNOWN-ISSUES.md) (EXT-*).
 
 ## Unverified
-AI model accuracy on real KSP body-worn footage and Indian plates · GPU inference · Docker/compose/k8s (no Docker access on host) · behaviour on AWS S3/MinIO/Ceph (only versitygw tested) · uploads > 5 GiB · Safari native HLS · real 1080p30 long-footage throughput · 99.5% availability and 2-hour restoration targets (not yet tested).
+AI model accuracy on real KSP body-worn footage and Indian plates · GPU inference · Docker/compose/k8s (no Docker access on host) · behaviour on AWS S3/MinIO/Ceph (only versitygw tested) · uploads > 5 GiB · Safari native HLS · real 1080p30 long-footage throughput · 99.5% availability and 2-hour restoration targets at production scale (only a small-data local drill has run).
 
 ## Tests
-See totals above. Commands: `npm run typecheck`; `(cd apps/api && npx vitest run)`; `(cd apps/worker && npx vitest run)`; `(cd apps/web && npx vitest run && npx vite build)`; `(cd tools/station-client && npx vitest run)`.
+See totals above. Commands (exact runs and durations in FINAL-AUDIT.md §3): `npm run build`, `npm run typecheck`, `npm run typecheck:e2e`, `npm run lint`, `npm test -w @ksp/api` (likewise `@ksp/worker`, `@ksp/ai-worker`, `@ksp/web`, `@ksp/station-client`), `(cd apps/web && npx vite build)`, `scripts/backup/test/verify-backup.test.sh`, `tests/dr/drill.sh`, `scripts/ci/validate-deploy.sh`, `tests/e2e/scripts/stack.sh start && npm run test:e2e`.
 
 ## Security
 Implemented: RBAC + jurisdiction scoping (404 for out-of-scope), least-privilege DB roles, CSRF, rate limiting, security headers/CSP, tokenised media, no storage URLs to clients, audit of every evidence touch. Done: two internal assessment rounds (see SECURITY-TEST-REPORT.md), semgrep/gitleaks/npm audit/Trivy fs+config, STRIDE threat model. Not done: CERT-In empanelled VAPT, container image scanning (no Docker).
@@ -64,4 +63,6 @@ CNPG failover/PITR, native object replication, production-scale RTO (2 h target)
 See `docs/KNOWN-ISSUES.md`.
 
 ## Next Actions
-Merge identity/AI/cases when green → launch search+investigation, custody/export/sharing, dashboards/alerts, DevOps/DR → security/E2E/performance → final audit.
+1. Orchestrator: review and merge the final-audit branch.
+2. Build the container images and deploy to a staging cluster (first real run of Dockerfile/k8s/CI); repeat E2E + DR drill there.
+3. Resolve the production conditions in [FINAL-AUDIT.md](FINAL-AUDIT.md) §8 (VAPT, HSM/DSC, CCTNS contracts, legal reviews, S3 IAM, capacity, re-verification off the faulty dev host).

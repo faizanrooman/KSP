@@ -43,8 +43,8 @@ mkdir -p "$WORK"; chmod 700 "$WORK"; trap 'rm -rf "$WORK"' EXIT
 # 1. Roles (cluster-wide, idempotent).
 log "step 1/5: cluster roles"
 pwargs=()
-[ -n "${RESTORE_APP_DB_PASSWORD:-}" ] && pwargs+=(-v "app_password='$RESTORE_APP_DB_PASSWORD'")
-[ -n "${RESTORE_AI_DB_PASSWORD:-}" ] && pwargs+=(-v "ai_password='$RESTORE_AI_DB_PASSWORD'")
+[ -n "${RESTORE_APP_DB_PASSWORD:-}" ] && pwargs+=(-v "app_password=$RESTORE_APP_DB_PASSWORD")
+[ -n "${RESTORE_AI_DB_PASSWORD:-}" ] && pwargs+=(-v "ai_password=$RESTORE_AI_DB_PASSWORD")
 psql "$ADMIN" -qX -v ON_ERROR_STOP=1 "${pwargs[@]}" -f "$REPO_ROOT/db/bootstrap/roles.sql" >/dev/null
 aq "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ksp_backup') THEN CREATE ROLE ksp_backup NOLOGIN; END IF; END \$\$" >/dev/null
 [ -n "${RESTORE_OWNER_DB_PASSWORD:-}" ] && psql "$ADMIN" -qX -v ON_ERROR_STOP=1 -v pw="$RESTORE_OWNER_DB_PASSWORD" <<<"ALTER ROLE ksp_owner LOGIN PASSWORD :'pw'" >/dev/null

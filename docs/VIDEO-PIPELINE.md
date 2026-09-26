@@ -150,5 +150,6 @@ nominal frame rate is used; for VFR originals the frame number is nominal.
   should reference derivatives by key/meta or use ON DELETE SET NULL.
 * Snapshot extraction runs inside the API process (bounded by a 90 s FFmpeg timeout and a 60/min rate limit);
   move to a worker queue if snapshot load grows.
-* Share (external) playback uses the same `/stream` endpoint with `typ:'SHARE'` tokens, but watermark burn-in
-  (`wm` claim) is not implemented here (sharing workstream).
+* Share (external) playback uses the same `/stream` endpoint with `typ:'SHARE'` tokens. Watermark burn-in is done
+  by the sharing module (worker queue `share.watermark`, one watermarked MP4 per share + evidence); see
+  [SECURE-SHARING.md](SECURE-SHARING.md).

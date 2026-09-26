@@ -86,6 +86,15 @@ Data volume: **5 evidence videos (20 s, 640x360), originals 9.7 MB, derivatives 
 An earlier run with 3 videos (2.3 MB originals) gave 3.5 s restore→ready. **This is a small-data local drill.
 The 2-hour restoration target at production scale is UNVERIFIED.**
 
+**Final-audit re-run (2026-09-27, 3 videos, 2.3 MB originals):** the first attempt exposed a drill bug — `start_svc`
+backgrounded the whole `cd && setsid …` list, so the recorded pid could be an intermediate shell; the disaster step
+then left the *primary* API/worker running and the "DR" readiness check was answered by the stale primary API (the
+run only failed because the DR worker could not bind its metrics port). Fixed (`tests/dr/drill.sh` backgrounds only
+`setsid` and refuses to continue if the primary ports are still bound). Re-run: **exit 0, restore→service ready
+3.4 s**, DR fixity of all 3 originals OK, `audit_verify` 58 events, no break. Earlier drill results were obtained
+with the same script, so they may have been affected by the same issue when it occurred; the re-run is the
+authoritative local result.
+
 ## 5. Estimating RTO at production scale (method)
 
 RTO ≈ detection + decision + infrastructure (DR cluster ready) + **DB restore** + object-store switch +

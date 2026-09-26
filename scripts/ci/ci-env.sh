@@ -11,7 +11,7 @@ openssl genpkey -algorithm ed25519 -out "$S/jwt.key" 2>/dev/null
 openssl pkey -in "$S/jwt.key" -pubout -out "$S/jwt.pub"
 openssl req -x509 -newkey rsa:3072 -nodes -keyout "$S/signing.key" -out "$S/signing.crt" -days 2 -subj "/CN=KSP CI signing (NOT FOR COURT USE)" 2>/dev/null
 APP_PW=$(openssl rand -hex 16); AI_PW=$(openssl rand -hex 16)
-psql -d postgres -qX -v ON_ERROR_STOP=1 -v app_password="'$APP_PW'" -v ai_password="'$AI_PW'" -f "$ROOT/db/bootstrap/roles.sql"
+psql -d postgres -qX -v ON_ERROR_STOP=1 -v app_password="$APP_PW" -v ai_password="$AI_PW" -f "$ROOT/db/bootstrap/roles.sql"
 for db in ksp ksp_test; do psql -d postgres -qtAX -c "CREATE DATABASE $db" >/dev/null 2>&1 || true; done
 MIG="postgres://$PGUSER:${PGPASSWORD:-}@$PGHOST:$PGPORT"
 FF="${FFMPEG_DIR:-/usr/local/bin}"

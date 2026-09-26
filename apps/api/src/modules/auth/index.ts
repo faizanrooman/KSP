@@ -116,7 +116,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
       authFailures.inc({ reason: user ? 'bad_password' : 'unknown_user' });
       await appendAudit(db, anon(req, user?.id ?? null, username), { action: 'LOGIN_FAILED', outcome: 'FAILURE', resourceType: 'login', details: { reason: user ? 'BAD_PASSWORD' : 'UNKNOWN_USER' } });
       if (user) {
-        const count = user.failed_login_count + 1;
+        // A lockout that has expired starts a fresh count (otherwise one wrong password re-locks immediately).
+        const expired = !!user.locked_until && user.locked_until <= new Date();
+        const count = (expired ? 0 : user.failed_login_count) + 1;
         const lock = count >= lp.maxFailedAttempts;
         await db.updateTable('users').set({ failed_login_count: count, locked_until: lock ? new Date(Date.now() + lp.lockoutMinutes * 60_000) : user.locked_until }).where('id', '=', user.id).execute();
         if (lock) await appendAudit(db, anon(req, user.id, username), { action: 'ACCOUNT_LOCKED', outcome: 'SUCCESS', resourceType: 'user', resourceId: user.id, details: { failedAttempts: count, minutes: lp.lockoutMinutes } });
@@ -180,7 +182,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
     if (!ok) {
       authFailures.inc({ reason: 'mfa' });
       const settings = await getSettings(db);
-      const count = user.failed_login_count + 1;
+      const expired = !!user.locked_until && user.locked_until <= new Date();
+      const count = (expired ? 0 : user.failed_login_count) + 1;
       const lock = count >= settings.lockoutPolicy.maxFailedAttempts;
       await db.updateTable('users').set({ failed_login_count: count, ...(lock ? { locked_until: new Date(Date.now() + settings.lockoutPolicy.lockoutMinutes * 60_000) } : {}) }).where('id', '=', user.id).execute();
       await appendAudit(db, anon(req, user.id, user.username), { action: 'MFA_CHALLENGE_FAILED', outcome: 'FAILURE', resourceType: 'user', resourceId: user.id });

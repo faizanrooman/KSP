@@ -1,6 +1,6 @@
 # Decisions (ADR log)
 
-Short architecture decision records. Newest last. Full rationale in `ARCHITECTURE-DECISIONS.md` once written.
+Short architecture decision records. Newest last. Rationale is kept inline; the system overview is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 | # | Decision | Why | Consequence |
 |---|---|---|---|

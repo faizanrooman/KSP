@@ -18,7 +18,7 @@ chmod 600 "$S"/*
 
 PGPORT="${PGPORT:-5433}"
 psql -h 127.0.0.1 -p "$PGPORT" -U ksp -d postgres -q -v ON_ERROR_STOP=1 \
-  -v app_password="'$(cat "$S/app.pw")'" -v ai_password="'$(cat "$S/ai.pw")'" -f "$KSP_ROOT/db/bootstrap/roles.sql"
+  -v app_password="$(cat "$S/app.pw")" -v ai_password="$(cat "$S/ai.pw")" -f "$KSP_ROOT/db/bootstrap/roles.sql"
 
 write_env() { # $1 file, $2 database
   cat > "$1" <<ENV
