@@ -44,7 +44,7 @@ const jobBody = z.object({
   watchlistIds: z.array(z.string().uuid()).max(50).optional(),
   keepEveryMs: z.number().int().min(1000).max(600_000).optional(),
   crowdMinPersons: z.number().int().min(2).max(500).optional(),
-});
+}).strict();
 
 /** Tasks each task needs to run (the worker runs dependencies internally without storing their output). */
 const DEPENDENCIES: Record<AiTask, AiTask[][]> = {

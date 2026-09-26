@@ -42,7 +42,7 @@ export const createShareBody = z.object({
   watermark: z.boolean().default(true),
   maxViews: z.number().int().min(1).max(1000).optional(),
   expiresAt: z.coerce.date(),
-});
+}).strict();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Loose<T> = SelectQueryBuilder<any, any, T>;
@@ -257,7 +257,7 @@ export default async function shares(fastify: FastifyInstance) {
   });
 
   app.post('/:id/revoke', {
-    schema: { tags: ['shares'], summary: 'Revoke a share (access stops immediately)', params: idParams, body: z.object({ reason: z.string().trim().min(5).max(2000) }) },
+    schema: { tags: ['shares'], summary: 'Revoke a share (access stops immediately)', params: idParams, body: z.object({ reason: z.string().trim().min(5).max(2000) }).strict() },
   }, async (req) => {
     const p = req.requirePrincipal();
     const r = (await baseSelect(app.db).where('s.id', '=', req.params.id).executeTakeFirst()) as ShareRow | undefined;

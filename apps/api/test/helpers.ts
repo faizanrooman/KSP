@@ -2,7 +2,24 @@ import type { FastifyInstance, InjectOptions } from 'fastify';
 import { CSRF_COOKIE, CSRF_HEADER } from '@ksp/shared';
 import { DEV_PASSWORD } from '@ksp/core/dev-seed';
 import { hashSecret } from '@ksp/core';
+import { authenticator } from 'otplib';
 import { buildApp } from '../src/app.js';
+
+/**
+ * A TOTP code the server will accept now. Codes are single-use per 30 s step (SEC-12), so after enrolment or a
+ * previous login this returns the code for the NEXT unused step (inside the ±1 step window), waiting only if the
+ * next step is already used as well.
+ */
+export async function nextTotp(secret: string, username: string): Promise<string> {
+  const app = await getApp();
+  for (;;) {
+    const u = await app.db.selectFrom('users').select('mfa_last_totp_step').where('username', '=', username).executeTakeFirstOrThrow();
+    const now = Math.floor(Date.now() / 30_000);
+    const step = Math.max(now, Number(u.mfa_last_totp_step ?? -1) + 1);
+    if (step <= now + 1) return authenticator.clone({ epoch: step * 30_000 + 1_000 }).generate(secret);
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
+}
 
 let appPromise: Promise<FastifyInstance> | undefined;
 

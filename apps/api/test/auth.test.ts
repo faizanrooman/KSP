@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { authenticator } from 'otplib';
 import { REFRESH_COOKIE } from '@ksp/shared';
-import { Agent, closeApp, createUser, getApp, login } from './helpers.js';
+import { Agent, closeApp, createUser, getApp, login, nextTotp } from './helpers.js';
 
 afterAll(closeApp);
 
@@ -119,7 +119,7 @@ describe('authentication', () => {
     expect(b.cookies.size).toBe(0);
     const badCode = await b.post('/api/v1/auth/mfa/verify', { mfaToken: step1.body.mfaToken, code: '000000' });
     expect(badCode.status).toBe(401);
-    const step2 = await b.post('/api/v1/auth/mfa/verify', { mfaToken: step1.body.mfaToken, code: authenticator.generate(setup.body.secret) });
+    const step2 = await b.post('/api/v1/auth/mfa/verify', { mfaToken: step1.body.mfaToken, code: await nextTotp(setup.body.secret, u.username) });
     expect(step2.status).toBe(200);
     expect(step2.body.me.user.mfaEnabled).toBe(true);
 

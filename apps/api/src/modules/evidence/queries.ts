@@ -101,7 +101,8 @@ export function mapListItem(p: Principal, r: ListRow) {
 }
 
 function baseList(db: Database, p: Principal, f: ListFilters) {
-  let q = listItemBase(db).where(evidenceVisibleSql(p, 'e'));
+  // Filters reference evidence columns only: no joins here (the page is hydrated separately, see listEvidence).
+  let q = db.selectFrom('evidence as e').where(evidenceVisibleSql(p, 'e', { relationships: 'initplan' }));
   if (f.q) {
     const like = `%${f.q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
     q = q.where(
@@ -132,21 +133,24 @@ export async function listEvidence(db: Database, p: Principal, f: ListFilters, s
   const desc = sort.startsWith('-');
   const key = (desc ? sort.slice(1) : sort) as (typeof LIST_SORTS)[number];
   const dir = desc ? sql.raw('DESC NULLS LAST') : sql.raw('ASC NULLS LAST');
-  const rows = await baseList(db, p, f)
-    .select(LIST_ITEM_COLUMNS)
-    .select([tagsSql.as('tags'), thumbSql.as('thumb_id'), sql<number>`count(*) OVER ()`.as('total')])
+  // Perf (docs/PERFORMANCE.md): page ids + total first over `evidence` alone, then hydrate only the page. Selecting
+  // the joins + per-row tags/thumbnail subqueries together with count(*) OVER () evaluated them for EVERY visible
+  // row (100k for a state user) before the LIMIT.
+  const page0 = await baseList(db, p, f)
+    .select(['e.id', sql<number>`count(*) OVER ()`.as('total')])
     .orderBy(sql`${sql.ref(`e.${key}`)} ${dir}`)
     .orderBy('e.id')
     .limit(pageSize)
     .offset((page - 1) * pageSize)
     .execute();
-  let total = rows[0]?.total ?? 0;
-  if (!rows.length && page > 1) {
+  let total = page0[0]?.total ?? 0;
+  if (!page0.length && page > 1) {
     const c = await baseList(db, p, f).select(sql<number>`count(*)`.as('n')).executeTakeFirst();
     total = Number(c?.n ?? 0);
   }
+  const items = await loadListItems(db, p, page0.map((r) => r.id));
   return {
-    items: rows.map((r) => mapListItem(p, r)),
+    items,
     total: Number(total),
     page,
     pageSize,

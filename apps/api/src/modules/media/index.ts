@@ -21,7 +21,7 @@ import { appendAudit, enqueue } from '@ksp/core';
 import { QUEUES, type MediaProcessPayload } from '@ksp/shared';
 import { loadEvidenceFor } from '../../lib/access.js';
 import { AppError, conflict, forbidden, notFound, unprocessable } from '../../lib/errors.js';
-import { hasPermission } from '../../lib/principal.js';
+import { hasPermission, hasPermissionAt } from '../../lib/principal.js';
 import { authenticateMediaToken, DOWNLOAD_TOKEN_TTL_SECONDS, IMAGE_TOKEN_TTL_SECONDS, imageUrl, issueUserToken, streamUrl, tokenExpiry } from './tokens.js';
 import { contentTypeFor, rewritePlaylist, rewriteVtt, sendObject } from './stream.js';
 import { extractFrame, frameAt } from './snapshot.js';
@@ -352,9 +352,10 @@ export default async function media(fastify: FastifyInstance) {
     if (hasPermission(p, 'evidence:edit_metadata')) {
       ev = await loadEvidenceFor(app.db, p, req.params.id, 'evidence:edit_metadata', req.actor());
     } else if (hasPermission(p, 'system:monitor')) {
-      // Operators monitoring processing queues may retry jobs system-wide without evidence media access.
-      const row = await app.db.selectFrom('evidence').select(['id', 'org_unit_id', 'status']).where('id', '=', req.params.id).executeTakeFirst();
-      if (!row) throw notFound('Evidence');
+      // Operators monitoring processing queues may retry jobs without evidence media access — but only inside the
+      // jurisdiction of their system:monitor grant (SEC-09: out-of-scope ids are indistinguishable from unknown ones).
+      const row = await app.db.selectFrom('evidence').select(['id', 'org_unit_id', 'org_path', 'status']).where('id', '=', req.params.id).executeTakeFirst();
+      if (!row || !hasPermissionAt(p, 'system:monitor', row.org_path)) throw notFound('Evidence');
       ev = row;
     } else {
       throw forbidden();

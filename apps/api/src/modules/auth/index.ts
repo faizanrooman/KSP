@@ -142,20 +142,33 @@ export default async function authRoutes(fastify: FastifyInstance) {
     },
   }, async (req, reply) => {
     const claims = await verifyJwt(req.body.mfaToken, 'mfa');
-    const user = await db.selectFrom('users').select(['id', 'username', 'mfa_secret_enc', 'mfa_recovery_codes', 'status', 'failed_login_count']).where('id', '=', claims.sub).executeTakeFirst();
+    const user = await db.selectFrom('users').select(['id', 'username', 'mfa_secret_enc', 'mfa_recovery_codes', 'status', 'failed_login_count', 'locked_until']).where('id', '=', claims.sub).executeTakeFirst();
     if (!user || user.status !== 'ACTIVE' || !user.mfa_secret_enc) throw unauthenticated();
+    // SEC-11: the lockout applies to the second factor too (otherwise one mfaToken allows unbounded TOTP guessing).
+    if (user.locked_until && user.locked_until > new Date()) {
+      throw new AppError(423, 'ACCOUNT_LOCKED', 'Account is temporarily locked after repeated failed attempts. Try again later or contact an administrator.');
+    }
     let ok = false;
     let usedRecovery = false;
     if (req.body.code) {
-      ok = authenticator.check(req.body.code, decryptSecret(user.mfa_secret_enc));
+      const delta = authenticator.checkDelta(req.body.code, decryptSecret(user.mfa_secret_enc));
+      if (delta !== null) {
+        // SEC-12: single use per time step (RFC 6238 §5.2) — atomic, so concurrent replays cannot both pass.
+        const step = Math.floor(Date.now() / 30_000) + delta;
+        const upd = await db.updateTable('users').set({ mfa_last_totp_step: step }).where('id', '=', user.id)
+          .where((eb) => eb.or([eb('mfa_last_totp_step', 'is', null), eb('mfa_last_totp_step', '<', step)])).executeTakeFirst();
+        ok = Number(upd.numUpdatedRows) === 1;
+      }
     } else if (req.body.recoveryCode) {
       const normalized = req.body.recoveryCode.replace(/[\s-]/g, '').toLowerCase();
       for (let i = 0; i < user.mfa_recovery_codes.length; i++) {
-        if (await verifySecret(user.mfa_recovery_codes[i]!, normalized)) {
-          const remaining = user.mfa_recovery_codes.filter((_, j) => j !== i);
-          await db.updateTable('users').set({ mfa_recovery_codes: remaining }).where('id', '=', user.id).execute();
-          ok = true;
-          usedRecovery = true;
+        const hash = user.mfa_recovery_codes[i]!;
+        if (await verifySecret(hash, normalized)) {
+          // SEC-12: consume atomically (array_remove where still present) so one code cannot open two sessions.
+          const upd = await db.updateTable('users').set({ mfa_recovery_codes: sql`array_remove(mfa_recovery_codes, ${hash}::text)` })
+            .where('id', '=', user.id).where(sql<boolean>`${hash}::text = ANY(mfa_recovery_codes)`).executeTakeFirst();
+          ok = Number(upd.numUpdatedRows) === 1;
+          usedRecovery = ok;
           break;
         }
       }
@@ -266,11 +279,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const u = await db.selectFrom('users').select(['mfa_pending_secret_enc']).where('id', '=', p.userId).executeTakeFirstOrThrow();
     if (!u.mfa_pending_secret_enc) throw badRequest('No MFA enrolment in progress');
     const secret = decryptSecret(u.mfa_pending_secret_enc);
-    if (!authenticator.check(req.body.code, secret)) throw new AppError(400, 'INVALID_CODE', 'Invalid verification code');
+    const delta = authenticator.checkDelta(req.body.code, secret);
+    if (delta === null) throw new AppError(400, 'INVALID_CODE', 'Invalid verification code');
     const codes = Array.from({ length: 10 }, () => randomToken(8).replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toLowerCase());
     const hashes = await Promise.all(codes.map((c) => hashSecret(c)));
     await db.transaction().execute(async (tx) => {
-      await tx.updateTable('users').set({ mfa_enabled: true, mfa_secret_enc: encryptSecret(secret), mfa_pending_secret_enc: null, mfa_recovery_codes: hashes, mfa_enrolled_at: new Date() }).where('id', '=', p.userId!).execute();
+      // The enrolment code is consumed too (SEC-12): it cannot be replayed at the next login.
+      await tx.updateTable('users').set({ mfa_enabled: true, mfa_secret_enc: encryptSecret(secret), mfa_pending_secret_enc: null, mfa_recovery_codes: hashes, mfa_enrolled_at: new Date(), mfa_last_totp_step: Math.floor(Date.now() / 30_000) + delta }).where('id', '=', p.userId!).execute();
       if (p.sessionId) await tx.updateTable('sessions').set({ mfa_verified: true }).where('id', '=', p.sessionId).execute();
       await appendAudit(tx, req.actor(), { action: 'MFA_ENROLLED', resourceType: 'user', resourceId: p.userId! });
     });

@@ -192,7 +192,7 @@ export default async function uploads(fastify: FastifyInstance) {
     schema: {
       tags: ['uploads'],
       summary: 'Create an upload batch for a station',
-      body: z.object({ orgUnitId: uuid, label: z.string().trim().max(200).optional(), clientInfo: z.record(z.union([z.string().max(500), z.number(), z.boolean()])).optional() }),
+      body: z.object({ orgUnitId: uuid, label: z.string().trim().max(200).optional(), clientInfo: z.record(z.union([z.string().max(500), z.number(), z.boolean()])).optional() }).strict(),
     },
   }, async (req, reply) => {
     const p = req.requirePrincipal();
@@ -320,7 +320,7 @@ export default async function uploads(fastify: FastifyInstance) {
     return ev;
   }
 
-  const decisionSchema = { params: z.object({ evidenceId: uuid }), body: z.object({ reason: z.string().trim().min(5).max(2000) }) };
+  const decisionSchema = { params: z.object({ evidenceId: uuid }), body: z.object({ reason: z.string().trim().min(5).max(2000) }).strict() };
 
   app.post('/quarantine/:evidenceId/release', {
     preHandler: app.authorize('evidence:quarantine_manage'),
@@ -355,6 +355,8 @@ export default async function uploads(fastify: FastifyInstance) {
   // ---- sessions ---------------------------------------------------------------------------------
   app.post('/', {
     preHandler: app.authorize('evidence:upload'),
+    // Per client IP (a station client initiates one session per file; 120/min is far above real ingest rates).
+    config: { rateLimit: { max: app.cfg.NODE_ENV === 'test' ? 10_000 : 120, timeWindow: '1 minute' } },
     schema: {
       tags: ['uploads'],
       summary: 'Initiate a resumable upload session',
@@ -367,7 +369,7 @@ export default async function uploads(fastify: FastifyInstance) {
         sha256: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(),
         chunkSize: z.number().int().positive().optional(),
         metadata: metadataSchema.optional(),
-      }),
+      }).strict(),
     },
   }, async (req, reply) => {
     const p = req.requirePrincipal();
@@ -404,15 +406,23 @@ export default async function uploads(fastify: FastifyInstance) {
     const md = b.metadata ?? {};
     let officerId: string | null = null;
     let deviceId: string | null = null;
+    // SEC-13: the declared officer / device must belong to the uploader's upload jurisdiction (or, for officers, to a
+    // unit above the target station). Otherwise any uploader could attribute footage to — and, via evidence:read_own,
+    // make it visible to — any officer statewide, and probe badge numbers/serials across districts. Out-of-scope is
+    // indistinguishable from unknown.
+    const uploadScope = scopePaths(p, 'evidence:upload');
+    const inScope = (col: string) => sql<boolean>`(${sql.ref(col)} <@ ${sql.val(uploadScope)}::ltree[])`;
     if (md.officerId || md.officerBadge) {
-      let oq = app.db.selectFrom('users').select(['id']).where('status', '=', 'ACTIVE');
-      oq = md.officerId ? oq.where('id', '=', md.officerId) : oq.where(sql<boolean>`lower(badge_number) = lower(${md.officerBadge!})`);
+      let oq = app.db.selectFrom('users as u').innerJoin('org_units as ho', 'ho.id', 'u.home_org_unit_id').select(['u.id']).where('u.status', '=', 'ACTIVE')
+        .where((eb) => eb.or([inScope('ho.path'), eb(sql<string>`${org.path}::ltree`, '<@', eb.ref('ho.path'))]));
+      oq = md.officerId ? oq.where('u.id', '=', md.officerId) : oq.where(sql<boolean>`lower(u.badge_number) = lower(${md.officerBadge!})`);
       const officer = await oq.executeTakeFirst();
       if (!officer) throw new AppError(400, 'UNKNOWN_OFFICER', `No active officer found for ${md.officerId ? 'id' : 'badge'} "${md.officerId ?? md.officerBadge}"`);
       officerId = officer.id;
     }
     if (md.deviceSerial) {
-      const device = await app.db.selectFrom('devices').select(['id', 'assigned_officer_id', 'status']).where(sql<boolean>`lower(serial_number) = lower(${md.deviceSerial})`).executeTakeFirst();
+      const device = await app.db.selectFrom('devices as d').innerJoin('org_units as dorg', 'dorg.id', 'd.org_unit_id').select(['d.id', 'd.assigned_officer_id', 'd.status'])
+        .where(sql<boolean>`lower(d.serial_number) = lower(${md.deviceSerial})`).where(inScope('dorg.path')).executeTakeFirst();
       if (!device) throw new AppError(400, 'UNKNOWN_DEVICE', `No registered device with serial "${md.deviceSerial}"`);
       deviceId = device.id;
       officerId ??= device.assigned_officer_id;
@@ -556,7 +566,11 @@ export default async function uploads(fastify: FastifyInstance) {
     if (s.expires_at < new Date() && s.status !== 'COMPLETING') throw gone('Upload session has expired; start a new upload');
 
     const parts = await app.db.transaction().execute(async (tx) => {
-      await tx.selectFrom('upload_sessions').select('id').where('id', '=', s.id).forUpdate().executeTakeFirstOrThrow();
+      // Re-check the state under the row lock: a concurrent complete may have finished meanwhile (SEC-10: without
+      // this, a racing request reset COMPLETED -> COMPLETING and registered a second evidence row).
+      const cur = await tx.selectFrom('upload_sessions').select(['status']).where('id', '=', s.id).forUpdate().executeTakeFirstOrThrow();
+      if (cur.status === 'COMPLETED') return null;
+      if (!['INITIATED', 'UPLOADING', 'COMPLETING'].includes(cur.status)) throw conflict(`Upload is ${cur.status}`, { status: cur.status });
       const rows = await tx.selectFrom('upload_parts').select(['part_number', 'size_bytes', 'etag']).where('session_id', '=', s.id).orderBy('part_number').execute();
       const have = new Set(rows.map((r) => r.part_number));
       const missing: number[] = [];
@@ -572,6 +586,7 @@ export default async function uploads(fastify: FastifyInstance) {
       await tx.updateTable('upload_sessions').set({ status: 'COMPLETING' }).where('id', '=', s.id).execute();
       return rows;
     });
+    if (!parts) return viewFor(p, s.id, false);
 
     try {
       await app.storage.completeMultipart(s.staging_bucket, s.staging_key, s.s3_upload_id!, parts.map((x) => ({ partNumber: x.part_number, etag: x.etag })));
@@ -596,7 +611,7 @@ export default async function uploads(fastify: FastifyInstance) {
     const lon = typeof md.longitude === 'number' ? md.longitude : null;
     const evidenceId = await app.db.transaction().execute(async (tx) => {
       const cur = await tx.selectFrom('upload_sessions').select(['status', 'evidence_id']).where('id', '=', s.id).forUpdate().executeTakeFirstOrThrow();
-      if (cur.status === 'COMPLETED' && cur.evidence_id) return cur.evidence_id;
+      if (cur.evidence_id) return cur.evidence_id;
       const ev = await tx
         .insertInto('evidence')
         .values({

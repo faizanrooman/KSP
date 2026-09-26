@@ -28,7 +28,7 @@ REAL IMPLEMENTATION STATUS: **IN PROGRESS — core evidence path implemented and
 Test totals on `main` at last merge: API 364 · worker 55 · ai-worker 19 · web 15 · station client 3 (456 total) — all passing; root build, typecheck, lint (0 errors) and web build green.
 
 ## In Progress
-Nothing running. Next: E2E browser tests, performance, accessibility, final audit.
+Security round 2 (SEC-10..SEC-18, docs/SECURITY-TEST-REPORT.md) and single-host performance measurements (docs/PERFORMANCE.md) done on the secperf branch. Next: E2E browser tests, accessibility, final audit.
 
 ## Queued
 E2E, performance, accessibility · Final documentation & production audit.

@@ -48,8 +48,8 @@ export const createExportBody = z.object({
     includeCustodyReport: z.boolean().default(true),
     includeFactSheet: z.boolean().default(true),
     watermarkText: optText(120),
-  }).default({}),
-}).refine((b) => b.options.includeOriginal || b.options.includeWatermarked, { message: 'Include the originals and/or watermarked copies', path: ['options'] });
+  }).strict().default({}),
+}).strict().refine((b) => b.options.includeOriginal || b.options.includeWatermarked, { message: 'Include the originals and/or watermarked copies', path: ['options'] });
 
 type ExportRow = {
   id: string; export_number: string; created_by: string; org_unit_id: string; case_id: string | null; purpose: string; court_name: string | null; court_case_number: string | null;
@@ -255,7 +255,7 @@ export default async function exportsModule(fastify: FastifyInstance) {
   });
 
   // ---------------------------------------------------------------------------------------------
-  const decisionBody = z.object({ note: z.string().trim().max(2000).optional() }).default({});
+  const decisionBody = z.object({ note: z.string().trim().max(2000).optional() }).strict().default({});
 
   app.post('/:id/approve', {
     preHandler: app.authorize('export:approve'),
@@ -294,7 +294,7 @@ export default async function exportsModule(fastify: FastifyInstance) {
 
   app.post('/:id/reject', {
     preHandler: app.authorize('export:approve'),
-    schema: { tags: ['exports'], summary: 'Reject an export request (reason required)', params: idParams, body: z.object({ note: z.string().trim().min(5).max(2000) }) },
+    schema: { tags: ['exports'], summary: 'Reject an export request (reason required)', params: idParams, body: z.object({ note: z.string().trim().min(5).max(2000) }).strict() },
   }, async (req) => {
     const p = req.requirePrincipal();
     const r = (await baseSelect(app.db).where('x.id', '=', req.params.id).executeTakeFirst()) as ExportRow | undefined;
@@ -312,7 +312,7 @@ export default async function exportsModule(fastify: FastifyInstance) {
 
   app.post('/:id/revoke', {
     preHandler: anyOf('export:create', 'export:approve'),
-    schema: { tags: ['exports'], summary: 'Revoke an export; the package is deleted and can no longer be downloaded', params: idParams, body: z.object({ reason: z.string().trim().min(5).max(2000) }) },
+    schema: { tags: ['exports'], summary: 'Revoke an export; the package is deleted and can no longer be downloaded', params: idParams, body: z.object({ reason: z.string().trim().min(5).max(2000) }).strict() },
   }, async (req) => {
     const p = req.requirePrincipal();
     const r = await loadExport(p, req.params.id);
