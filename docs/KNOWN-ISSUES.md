@@ -36,7 +36,7 @@ Owner is a role, not a person.
 | OPS-7 | Base image digests resolved 2026-09-25; must be refreshed monthly (no Renovate/Dependabot yet) | LOW | open | DevOps |
 | OPS-8 | Backup manifests are not signed (dump hashes live inside the manifest); `restore.sh` places manifest `headSeq` into SQL unquoted | LOW | open | DevOps: sign manifest with the backup key |
 | OPS-9 | Trivy k8s notes: `ksp-ai-config` carries inert key-shaped placeholders; container UIDs/GIDs ≤ 10000 | LOW | open | DevOps |
-| OPS-10 | `DATA_ENCRYPTION_KEY` has no key versioning; rotation needs re-encryption of MFA secrets (not implemented); must be restored with the DB | MEDIUM | open | Backend |
+| OPS-10 | `DATA_ENCRYPTION_KEY` had no key versioning / re-encryption | MEDIUM | fixed | `DATA_ENCRYPTION_KEYS` keyring (`id:base64,…`, first = current; `DATA_ENCRYPTION_KEY` still works as id `default`); ciphertext `v2.<keyId>.…` with the id as GCM AAD, legacy `v1` still decrypts; `npm run keys:rotate-data -w @ksp/core` re-encrypts MFA secrets + pending secrets in batches, idempotent, `KEY_ROTATED` audit (OPERATIONS.md). Keys must still be restored with the DB. Tests `security-crypto.test.ts` |
 
 ## Security (residual / hardening)
 

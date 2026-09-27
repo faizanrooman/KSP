@@ -58,7 +58,16 @@ const schema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().default(900),
   REFRESH_TOKEN_TTL_HOURS: z.coerce.number().int().default(12),
   /** 32-byte base64 key: AES-256-GCM for secrets at rest in the DB (MFA secrets). */
-  DATA_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, 'must be 32 bytes base64'),
+  DATA_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, 'must be 32 bytes base64').optional(),
+  /**
+   * Versioned keyring (OPS-10): comma-separated `id:base64` entries, the FIRST is the current (encrypting) key;
+   * the others only decrypt. When set, DATA_ENCRYPTION_KEY (if also set) is kept as a decrypt-only key with id
+   * `default`. Rotate with `npm run keys:rotate-data -w @ksp/core`.
+   */
+  DATA_ENCRYPTION_KEYS: z.string().optional().refine((v) => v === undefined || v.trim() === '' || v.split(',').every((e) => {
+    const m = /^([A-Za-z0-9_-]{1,32}):(.+)$/.exec(e.trim());
+    return !!m && Buffer.from(m[2]!, 'base64').length === 32;
+  }), 'must be a comma-separated list of <id>:<32-byte base64> entries'),
   /** HMAC secret for short-lived media/playback tokens. */
   MEDIA_TOKEN_SECRET: z.string().min(32),
   MEDIA_TOKEN_TTL_SECONDS: z.coerce.number().int().default(300),
