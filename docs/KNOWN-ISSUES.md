@@ -75,7 +75,7 @@ Owner is a role, not a person.
 | FN-14 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | LOW | accepted |
 | FN-15 | API clients | argon2 on every Basic-auth request (no cache); IPv6 allow-list entries must be exact addresses | LOW | open |
 | FN-16 | AI | Accuracy figures are upstream; no evaluation on KSP footage; plate OCR not validated on Indian plates; GPU inference untested; small-face track fragmentation during pans | MEDIUM | UNVERIFIED |
-| FN-17 | Accessibility | Region annotations are pointer-only; E2E/axe in Chrome only (Firefox/Safari/Edge, screen readers, zoom/forced colours untested) — ACCESSIBILITY.md | MEDIUM | open / UNVERIFIED |
+| FN-17 | Accessibility | E2E/axe in Chrome only (Firefox/Safari/Edge, screen readers, zoom/forced colours untested) — ACCESSIBILITY.md. (Keyboard region editor done, see appendix) | MEDIUM | UNVERIFIED |
 | FN-18 | Web | Integrations, API-client, retention and disposal screens axe-scanned only, not driven by E2E | LOW | open |
 | FN-19 | Performance | Single-host measurements only (PERFORMANCE.md); custody view unpaginated (1 000 events ≈ 0.6 MB); login ≈ 80/s per API process (argon2); audit append ≤ 1.2k/s | MEDIUM | open |
 | FN-20 | Storage | Uploads > 5 GiB, AWS S3 / MinIO / Ceph behaviour, Safari native HLS, real 1080p30 long-footage throughput untested | MEDIUM | UNVERIFIED |
@@ -111,3 +111,4 @@ Owner is a role, not a person.
 | **Final audit:** `restore.sh` interpolated DB role passwords into SQL text | `roles.sql` uses psql `:'var'` quoting; all callers pass raw values |
 | **Final audit:** `npm run db:migrate` / `db:codegen` failed on a fresh clone before `npm run build` | scripts run from source (`--conditions=ksp-src`) |
 | FN-9 PDFs used standard fonts (Kannada / non-Latin not rendered) | bundled Noto Sans + Noto Sans Kannada (OFL, SHA-256 pinned), HarfBuzz shaping, /ActualText; tests compare glyph runs with HarfBuzz, pdftotext round-trip and a 300 dpi raster (CHAIN-OF-CUSTODY.md). Other non-Latin scripts still print `?` |
+| FN-17 region annotations were pointer-only | keyboard region editor in AnnotationStudio (focusable frame: arrows move, Shift+arrows resize, Enter sets, Escape; X/Y/W/H % inputs; polite announcements); `91-keyboard` E2E + axe on the editor; unit tests for the geometry |

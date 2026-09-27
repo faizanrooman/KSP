@@ -59,7 +59,7 @@ header, or the final DOM of each page. (It found physical bucket names in the da
 | `10-admin` | Create user → one-time password shown once → first login forced change → grant role → disable → login refused; roles matrix; org unit; device; settings change + restore; alerts acknowledge; report run + CSV download; system health (roles, not bucket names); dashboards |
 | `11-authz` | Other-station IO: evidence URL → not-found (404, never 403), not in search; field-officer nav; direct admin URLs → access denied; unknown route → not found |
 | `90-a11y` | axe-core WCAG 2.1 A/AA (+ best-practice, reported only) on ~50 page states incl. every evidence/case/workspace tab and the share portal; fails on serious/critical WCAG violations |
-| `91-keyboard` | Keyboard-only: login, skip link, nav, list row, tabs (arrows), player controls/shortcuts, review queue shortcuts, dialog focus trap/restore, typing reasons does not fire shortcuts |
+| `91-keyboard` | Keyboard-only: login, skip link, nav, list row, tabs (arrows), player controls/shortcuts, review queue shortcuts, dialog focus trap/restore, typing reasons does not fire shortcuts; region annotation created/moved/resized with arrow keys + numeric input, live-region announcements, axe on the editor |
 | `92-responsive` | 1280 px and 768 px: no horizontal page scroll on 11 main pages, menu button below 1024 px, screenshots |
 
 ## Results

@@ -8,7 +8,7 @@ automated + scripted assessment — **not** a conformance certification or an au
 | Check | Where | Scope |
 |---|---|---|
 | axe-core 4.x (`@axe-core/playwright`), rules tagged `wcag2a, wcag2aa, wcag21a, wcag21aa` **+ best-practice** | `tests/e2e/specs/90-a11y.spec.ts` | 64 page states per run (login, share portal, dashboards for 3 roles, evidence list, evidence detail + all 9 tabs, full-page player, upload, upload history, search, cases, case detail + 6 tabs, FIRs, workspaces, workspace detail + 6 tabs, exports list/new/verify/detail, shares list/detail, notifications, profile, review queue, quarantine, disposal approvals, alerts, alert rules, reports, system health, users, user new/detail, roles, role detail, org units, devices, settings, integrations, API clients, AI models, retention policies, watchlists, audit log, ledger, access-denied page), with real data created earlier in the run. Serious/critical **WCAG** violations fail the test; best-practice results are reported. |
-| Keyboard-only walkthrough (no pointer) | `91-keyboard.spec.ts` | Login (autofocus, Tab, Enter, TOTP), skip link → `main`, sidebar nav, evidence search + row (Enter), tabs (roving tabindex, arrows), player (Play button, `k`, `←/→` frame step, `]` rate, `+`/`0` zoom, `?` help + Escape), review queue (`j/k`, `h` history dialog with focus trap, `r` reason dialog focus). Every stop asserts a visible focus indicator. |
+| Keyboard-only walkthrough (no pointer) | `91-keyboard.spec.ts` | Login (autofocus, Tab, Enter, TOTP), skip link → `main`, sidebar nav, evidence search + row (Enter), tabs (roving tabindex, arrows), player (Play button, `k`, `←/→` frame step, `]` rate, `+`/`0` zoom, `?` help + Escape), review queue (`j/k`, `h` history dialog with focus trap, `r` reason dialog focus), **region annotation** (Shift+Tab to the focusable frame, first arrow creates a 20 % box, arrows move, Shift+arrows resize — announced in a polite live region, the player's frame-step shortcut does not fire — Enter sets it and focuses the description, width typed into the numeric “Region width (%)” input, saved region checked through the API; axe on the open editor). Every stop asserts a visible focus indicator. |
 | Keyboard parts of feature specs | `03`, `04`, `06`, `09`, `10` | Evidence rows open with Enter; review shortcuts; user picker combobox (↓, Enter, focus kept on “Change”); reason dialogs focus their textarea. |
 | Responsive | `92-responsive.spec.ts` | 1280 × 1000 and 768 × 1000: no horizontal page scroll on 11 main pages; below 1024 px the sidebar is behind “Open menu” (aria-expanded) and closes after navigation. Screenshots in `tests/e2e/artifacts/responsive/`. |
 | Component regression tests | `apps/web/src/components/ui/ui.test.tsx` | Modal focus rules, Field label/description association, named regions, headings, ProgressBar semantics. |
@@ -57,13 +57,13 @@ Found by the keyboard walkthrough and scenario specs — axe cannot see these:
   `role=group`/`img`.
 * **Narrow screens**: header “Sign out”/profile text was `hidden` below 640 px (buttons lost their names) — now `sr-only`.
 * **Progress**: the AI job progress bar received a percentage instead of a fraction, so `aria-valuenow` was always 100.
+* **Region annotations** (2.1.1): the frame is a focusable `application` (“region editor”) while a region draft is open — arrows move, Shift+arrows resize (1 % steps), Enter sets, Escape stops drawing — plus X/Y/W/H numeric inputs in percent; every change is announced (`role=status`, polite).
 * **Contrast**: `text-ink-400` text (≈2.9:1) → `ink-500` across the app; placeholder colour; success button `emerald-700`.
 
 ## Remaining issues (open)
 
 | Issue | WCAG | Notes |
 |---|---|---|
-| Region annotations can only be drawn with a pointer (drag on the frame) | 2.1.1 Keyboard | Bookmarks, notes and highlights are keyboard-operable; a numeric/arrow-key region editor is needed. |
 | Timeline lanes (workspace) are a pointer position → time mapping; keyboard users have ←/→ on the lane but no announcement of the time under the cursor | 2.1.1 / 4.1.2 | Chronology list offers the same “Open” actions by keyboard. |
 | Seek-bar hover previews (thumbnails) are pointer-only | — (supplementary) | Seek slider itself is keyboard operable with `aria-valuetext`. |
 | Charts (dashboard) rely on text summaries for non-visual users; no data-table alternative per chart | 1.1.1 | Summaries exist; a “view as table” toggle would be better. |

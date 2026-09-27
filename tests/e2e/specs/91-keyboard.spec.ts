@@ -6,6 +6,7 @@ import type { Page } from '@playwright/test';
 import { totp } from '../lib/auth';
 import { DEV_PASSWORD } from '../lib/env';
 import { expect, test } from '../lib/fixtures';
+import { apiGet } from '../lib/api';
 import { getState } from '../lib/state';
 
 async function active(page: Page) {
@@ -136,4 +137,75 @@ test('keyboard: review queue — shortcuts, reason dialog focus, Escape restores
   await expect(page.getByRole('dialog', { name: 'Review history' })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dlg).toHaveCount(0);
+});
+
+/** Press Tab (or Shift+Tab) until `target` is focused. */
+async function focusByTab(page: Page, target: import('@playwright/test').Locator, what: string, back = false, max = 80) {
+  for (let i = 0; i < max; i++) {
+    await page.keyboard.press(back ? 'Shift+Tab' : 'Tab');
+    if (await target.evaluate((el) => el === document.activeElement)) {
+      expect((await active(page)).ring, `visible focus indicator on ${what}`).toBeTruthy();
+      return;
+    }
+  }
+  throw new Error(`could not reach ${what} with ${back ? 'Shift+Tab' : 'Tab'}`);
+}
+
+test('keyboard: region annotation without a pointer — create, move, resize, Enter, numeric edit, save (FN-17)', async ({ page }, testInfo) => {
+  test.skip(!getState('workspaceId'), 'needs 07-workspace');
+  await keyboardLogin(page, 'io.meera');
+  await page.goto(`/workspaces/${getState('workspaceId')}`);
+  await tabTo(page, (a) => a.role === 'tab', 'workspace tab list');
+  const reviewTab = page.getByRole('tab', { name: 'Review & annotate' });
+  for (let i = 0; i < 8 && (await reviewTab.getAttribute('aria-selected')) !== 'true'; i++) await page.keyboard.press('ArrowRight');
+  await expect(reviewTab).toHaveAttribute('aria-selected', 'true');
+  const video = page.locator('video').first();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), { timeout: 60_000 }).toBeGreaterThanOrEqual(2);
+
+  await focusByTab(page, page.getByRole('button', { name: 'Region', exact: true }), 'Region button');
+  await page.keyboard.press('Enter');
+  const frame = page.getByRole('application', { name: /Region editor/ });
+  await expect(frame).toHaveAttribute('aria-keyshortcuts', /Shift\+ArrowDown/);
+  await focusByTab(page, frame, 'region editor frame', true);
+
+  const t0 = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
+  const status = page.getByRole('status').filter({ hasText: /Region created|Moved|Resized|Region set/ });
+  await page.keyboard.press('ArrowRight'); // first arrow creates the default box
+  await expect(status).toHaveText('Region created: left 40%, top 40%, width 20%, height 20%');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowUp');
+  await expect(status).toHaveText('Moved: left 43%, top 39%, width 20%, height 20%');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('Shift+ArrowLeft');
+  await expect(status).toHaveText('Resized: left 43%, top 39%, width 19%, height 22%');
+  // The player's own arrow-key shortcuts (frame step) must not fire while editing the region.
+  expect(await video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(t0);
+  await expect(page.getByLabel('Region left (%)')).toHaveValue('43');
+  await expect(page.getByLabel('Region height (%)')).toHaveValue('22');
+
+  // axe on the open region editor (overlay + numeric inputs)
+  const { axe, seriousOrCritical } = await import('../lib/a11y');
+  expect(seriousOrCritical(await axe(page, 'workspace region editor (keyboard)', testInfo))).toEqual([]);
+
+  await page.keyboard.press('Enter'); // sets the region and moves on to the description
+  await expect(status).toHaveText('Region set: left 43%, top 39%, width 19%, height 22%');
+  await expect(page.getByLabel('Description (optional)')).toBeFocused();
+  await page.keyboard.type('Keyboard region');
+
+  // Numeric alternative: width 30 %.
+  await focusByTab(page, page.getByLabel('Region width (%)'), 'region width input');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.type('30');
+  await expect(page.getByText('Region set (30% × 22%)')).toBeVisible();
+
+  await focusByTab(page, page.getByRole('button', { name: 'Save annotation' }), 'Save annotation');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: 'Annotation saved' })).toBeVisible();
+  type Ann = { body: string | null; region: { x: number; y: number; w: number; h: number } | null };
+  const saved: Ann[] = [];
+  for (const id of [getState<string>('evidenceA')!, getState<string>('evidenceB')!]) {
+    saved.push(...(await apiGet<{ items: Ann[] }>(page, `/workspaces/annotations?evidenceId=${id}&workspaceId=${getState('workspaceId')}`)).items);
+  }
+  expect(saved.find((a) => a.body === 'Keyboard region')?.region).toEqual({ x: 0.43, y: 0.39, w: 0.3, h: 0.22 });
 });
