@@ -18,6 +18,8 @@ export interface FileResult {
   evidenceNumber?: string | null;
   detail?: string;
   resumed?: boolean;
+  /** The file had already been uploaded by an earlier run (nothing sent this time). */
+  alreadyUploaded?: boolean;
   partsSent: number;
 }
 
@@ -146,14 +148,19 @@ async function pool<T>(items: T[], n: number, fn: (item: T) => Promise<void>): P
   }));
 }
 
-function outcomeOf(v: UploadSessionView): Pick<FileResult, 'status' | 'detail' | 'evidenceId' | 'evidenceNumber'> {
+/**
+ * The result fields derived from the server's current view. Every field is always present (possibly undefined) so
+ * that Object.assign replaces a previous value — a registered file never keeps an old "awaiting validation" detail
+ * (FN-22).
+ */
+export function outcomeOf(v: UploadSessionView): Required<Pick<FileResult, 'status'>> & Pick<FileResult, 'detail' | 'evidenceId' | 'evidenceNumber'> {
   const ev = v.evidence;
-  if (v.status !== 'COMPLETED') return { status: 'FAILED', detail: `upload ${v.status}${v.error ? `: ${v.error}` : ''}` };
-  if (!ev) return { status: 'UPLOADED', detail: 'awaiting validation' };
-  if (ev.status === 'REGISTERED') return { status: 'REGISTERED', evidenceId: ev.id, evidenceNumber: ev.evidenceNumber };
-  if (ev.status === 'QUARANTINED') return { status: 'QUARANTINED', evidenceId: ev.id, detail: ev.statusReason ?? undefined };
-  if (ev.status === 'REJECTED') return { status: 'REJECTED', evidenceId: ev.id, detail: ev.statusReason ?? undefined };
-  return { status: 'PROCESSING', evidenceId: ev.id, detail: `evidence ${ev.status}` };
+  if (v.status !== 'COMPLETED') return { status: 'FAILED', detail: `upload ${v.status}${v.error ? `: ${v.error}` : ''}`, evidenceId: undefined, evidenceNumber: undefined };
+  if (!ev) return { status: 'UPLOADED', detail: 'awaiting validation', evidenceId: undefined, evidenceNumber: undefined };
+  if (ev.status === 'REGISTERED') return { status: 'REGISTERED', evidenceId: ev.id, evidenceNumber: ev.evidenceNumber, detail: undefined };
+  if (ev.status === 'QUARANTINED') return { status: 'QUARANTINED', evidenceId: ev.id, evidenceNumber: undefined, detail: ev.statusReason ?? undefined };
+  if (ev.status === 'REJECTED') return { status: 'REJECTED', evidenceId: ev.id, evidenceNumber: undefined, detail: ev.statusReason ?? undefined };
+  return { status: 'PROCESSING', evidenceId: ev.id, evidenceNumber: undefined, detail: `evidence ${ev.status}` };
 }
 
 export async function uploadFiles(client: KspClient, files: string[], opts: UploadOptions): Promise<FileResult[]> {
@@ -178,9 +185,9 @@ export async function uploadFiles(client: KspClient, files: string[], opts: Uplo
           if (!(err instanceof ApiError && err.status === 404)) throw err;
         }
         if (session && session.status === 'COMPLETED') {
-          Object.assign(r, { sessionId: session.id, ...outcomeOf(session), status: outcomeOf(session).status });
+          Object.assign(r, { sessionId: session.id, ...outcomeOf(session) });
           if (entry.completed) {
-            r.detail = r.detail ?? 'already uploaded';
+            r.alreadyUploaded = true;
             log(`= ${basename(file)}: already uploaded (${r.status})`);
             return;
           }
@@ -258,7 +265,20 @@ export async function uploadFiles(client: KspClient, files: string[], opts: Uplo
       }
     }
   }
+  // Final refresh so the summary shows the server's CURRENT status of every uploaded file (FN-22), also with --no-wait.
+  for (const r of results.filter((x) => x.sessionId && x.status !== 'FAILED')) {
+    try {
+      Object.assign(r, outcomeOf(await client.get<UploadSessionView>(`/uploads/${r.sessionId}`)));
+    } catch (err) {
+      log(`  status check failed for ${basename(r.path)}: ${(err as Error).message}`);
+    }
+  }
   return results.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** Detail column: the current server detail, marked when nothing had to be uploaded this run. */
+export function detailOf(r: FileResult): string {
+  return [r.detail, r.alreadyUploaded ? 'already uploaded' : null].filter(Boolean).join(' · ');
 }
 
 export function formatBytes(n: number): string {
@@ -273,7 +293,7 @@ export function formatBytes(n: number): string {
 }
 
 export function summaryTable(results: FileResult[]): string {
-  const rows = [['File', 'Size', 'Status', 'Evidence #', 'Detail'], ...results.map((r) => [basename(r.path), formatBytes(r.size), r.status + (r.resumed ? ' (resumed)' : ''), r.evidenceNumber ?? '', (r.detail ?? '').slice(0, 80)])];
+  const rows = [['File', 'Size', 'Status', 'Evidence #', 'Detail'], ...results.map((r) => [basename(r.path), formatBytes(r.size), r.status + (r.resumed ? ' (resumed)' : ''), r.evidenceNumber ?? '', detailOf(r).slice(0, 80)])];
   const w = rows[0]!.map((_, c) => Math.max(...rows.map((row) => row[c]!.length)));
   const line = (row: string[]) => row.map((v, c) => v.padEnd(w[c]!)).join('  ').trimEnd();
   return [line(rows[0]!), w.map((x) => '-'.repeat(x)).join('  '), ...rows.slice(1).map(line)].join('\n');
