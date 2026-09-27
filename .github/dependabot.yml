@@ -1,0 +1,24 @@
+# Automated dependency and base-image digest updates (OPS-7). Security updates are raised immediately by GitHub;
+# the weekly schedule keeps pinned versions and image digests fresh. Every PR runs the full CI (incl. E2E).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday, time: "03:30", timezone: Asia/Kolkata }
+    open-pull-requests-limit: 10
+    groups:
+      aws-sdk: { patterns: ["@aws-sdk/*"] }
+      fastify: { patterns: ["fastify", "@fastify/*", "fastify-*"] }
+      testing: { patterns: ["vitest", "@vitest/*", "@playwright/test", "@axe-core/*", "@testing-library/*"] }
+    ignore:
+      # Major upgrades are deliberate, reviewed changes (see docs/DECISIONS.md).
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: docker
+    directory: /deploy/docker
+    schedule: { interval: weekly, day: monday, time: "03:30", timezone: Asia/Kolkata }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday, time: "03:30", timezone: Asia/Kolkata }

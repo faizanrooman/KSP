@@ -1,4 +1,5 @@
 import fp from 'fastify-plugin';
+import { BlockList, isIP } from 'node:net';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ACCESS_COOKIE, CSRF_COOKIE, CSRF_HEADER, type Permission } from '@ksp/shared';
 import { appendAudit, type AuditActor } from '@ksp/core';
@@ -148,12 +149,22 @@ export default fp(async (app) => {
 
 /** IPv4 CIDR membership (IPv6 exact match). */
 export function ipInCidr(ip: string, cidr: string): boolean {
-  const [range, bitsStr] = cidr.split('/');
+  // IPv4 and IPv6 subnets (and exact addresses) via node:net BlockList; IPv4-mapped IPv6 clients (::ffff:a.b.c.d)
+  // match IPv4 entries. Invalid entries/addresses never match.
+  const [range, bitsStr] = cidr.trim().split('/');
   if (!range) return false;
-  const clean = ip.replace(/^::ffff:/, '');
-  if (!range.includes('.') || !clean.includes('.')) return clean === range;
-  const bits = Number(bitsStr ?? 32);
-  const toInt = (v: string) => v.split('.').reduce((a, o) => (a << 8) + Number(o), 0) >>> 0;
-  const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
-  return (toInt(clean) & mask) === (toInt(range) & mask);
+  const clean = ip.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i, '');
+  const family = isIP(range);
+  const ipFamily = isIP(clean);
+  if (!family || !ipFamily || family !== ipFamily) return false;
+  const type = family === 6 ? 'ipv6' : 'ipv4';
+  const bits = bitsStr === undefined ? (family === 6 ? 128 : 32) : Number(bitsStr);
+  if (!Number.isInteger(bits) || bits < 0 || bits > (family === 6 ? 128 : 32)) return false;
+  try {
+    const list = new BlockList();
+    list.addSubnet(range, bits, type);
+    return list.check(clean, type);
+  } catch {
+    return false;
+  }
 }
