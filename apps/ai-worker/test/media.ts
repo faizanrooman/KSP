@@ -3,7 +3,7 @@
  * cached next to the model directory. Turned into short videos with FFmpeg; attached as PROXY_MP4 derivatives
  * exactly where the video pipeline puts them (derived bucket, evidence/<id>/proxy/proxy.mp4).
  */
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -71,18 +71,40 @@ export async function tryEnsureImages(): Promise<{ images: Record<TestImage, str
   }
 }
 
-/** Build an H.264 1280x720 25 fps video showing each image for `seconds` (letterboxed). Cached by spec. */
+/** Container duration (ms) of a video, or null when it cannot be probed (missing / truncated / being written). */
+async function durationMs(file: string): Promise<number | null> {
+  try {
+    const d = Number((await probe(file)).format.duration);
+    return Number.isFinite(d) ? Math.round(d * 1000) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build an H.264 1280x720 25 fps video showing each image for `seconds` (letterboxed). Cached by spec in the media
+ * dir, which is SHARED by every checkout on the host (next to the model directory) — several test runs may build
+ * the same clip at once. Each build therefore writes its own temp file and renames it into place atomically, and a
+ * cached clip is only reused when its probed duration matches. (FN-25: a fixed temp name let one run rename
+ * another run's half-written file into place; a reader then saw a 3 s clip and the AI job processed 3 frames.)
+ */
 export async function slideshow(images: string[], seconds: number | number[], name: string): Promise<string> {
   const dir = mediaDir();
   const out = join(dir, `${name}.mp4`);
-  if (existsSync(out)) return out;
   const secs = images.map((_, i) => (Array.isArray(seconds) ? seconds[i]! : seconds));
+  const expected = secs.reduce((a, b) => a + b, 0) * 1000;
+  const ok = (ms: number | null) => ms !== null && Math.abs(ms - expected) <= 250;
+  if (existsSync(out) && ok(await durationMs(out))) return out;
   const args: string[] = [];
   images.forEach((img, i) => args.push('-loop', '1', '-t', String(secs[i]), '-i', img));
   const chains = images.map((_, i) => `[${i}:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=25,format=yuv420p[v${i}]`);
   const filter = `${chains.join(';')};${images.map((_, i) => `[v${i}]`).join('')}concat=n=${images.length}:v=1:a=0[out]`;
-  await ffmpeg([...args, '-filter_complex', filter, '-map', '[out]', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-movflags', '+faststart', `${out}.tmp.mp4`]);
-  await rename(`${out}.tmp.mp4`, out);
+  await mkdir(dir, { recursive: true });
+  const tmp = join(dir, `.${name}.${process.pid}.${randomUUID()}.tmp.mp4`);
+  await ffmpeg([...args, '-filter_complex', filter, '-map', '[out]', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-movflags', '+faststart', tmp]);
+  const got = await durationMs(tmp);
+  if (!ok(got)) throw new Error(`slideshow ${name}: built clip is ${got} ms, expected ${expected} ms`);
+  await rename(tmp, out); // atomic replace: concurrent readers keep the complete file they opened
   return out;
 }
 

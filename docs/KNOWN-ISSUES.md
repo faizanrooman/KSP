@@ -80,7 +80,6 @@ Owner is a role, not a person.
 | FN-21 | Storage | versitygw ignores Object Lock on CopyObject and refuses conditional writes to tombstoned keys — code uses multipart copy and never reuses keys | LOW | mitigated |
 | FN-22 | Station CLI | Summary "Detail" column can show a stale status | LOW | open (cosmetic) |
 | FN-23 | E2E | API runs with `NODE_ENV=test` semantics during E2E (relaxed rate limits) | LOW | by design |
-| FN-25 | Tests | Intermittent: `apps/api/test/ai.test.ts` end-to-end AI job once processed 3 frames instead of ≥ 5 (fresh-clone run, final audit); passed on 3 re-runs. Investigate frame sampling under load before blaming the host | LOW | monitor |
 
 ## Development host (ENV)
 
@@ -114,3 +113,4 @@ Owner is a role, not a person.
 | FN-19 custody view unpaginated (1 000 events ≈ 0.6 MB per request) | keyset pages of 200 (`after`/`before`/`filter`), whole-chain verification in SQL, “Load more”; PDF complete (batched, 20 000 cap removed); 590 → 119 KiB, 57 → 116 rps |
 | FN-13 search totals via `count(*) OVER ()` | exact up to 10 000 then `totalApprox` (“10,000+”); tag/AI facets via bounded LATERAL lookups (facets 170–210 → 89–126 ms state-wide) |
 | EXT-11 / SEC-08 / SEC-18 react-router 6.30 advisories (GHSA-wrjc-x8rr-h8h6, GHSA-337j-9hxr-rhxg) | upgraded to `react-router` 7.18.4 (declarative mode; imports moved from `react-router-dom`); `npm audit --omit=dev`: 0 vulnerabilities |
+| FN-25 intermittent `ai.test.ts` job with 3 frames instead of ≥ 5 | root cause: the AI test-media cache (`.local/ai-test-media`, next to the shared model dir) is shared by every checkout on the host, and `slideshow()` reused any existing clip and built through a fixed temp name — two concurrent runs could rename a half-written clip into place (reproduced: a reader got a truncated / moov-less file). Fix: per-process temp file + atomic rename, cached clip reused only when its probed duration matches, 6 s fallback clip; the test now asserts `sourceDurationMs` ≥ 5.75 s and `framesProcessed ≥ framesTotal − 1` (FFmpeg `fps` rounding of the last frame). 10/10 consecutive runs green |
