@@ -63,6 +63,33 @@ UI. Timestamps (not frame numbers) are the authoritative link back to the origin
 * Temp files live in `WORK_DIR/media-<id>-<rand>/` and are always removed. The original is never written;
   tests assert its SHA-256 is unchanged after processing.
 
+### Profiles (MEDIA_PROFILE) {#profiles}
+
+The HLS ladder is ~73 % of the transcoding CPU (see the capacity table in
+[INFRASTRUCTURE.md](INFRASTRUCTURE.md#transcoding-capacity)), so the deployment chooses (EXT-9):
+
+| `MEDIA_PROFILE` | At ingest | Playback |
+|---|---|---|
+| `full` (default) | proxy MP4 + HLS ladder + poster/thumbnail + sprites | HLS (adaptive) or proxy MP4 |
+| `proxy-only` | proxy MP4 + poster/thumbnail + sprites | proxy MP4 with HTTP Range (seeking, frame stepping, snapshots and sync-play all work on the MP4) |
+| `on-demand-hls` | as `proxy-only` | the first `GET /media/evidence/:id/playback` of a READY item without HLS enqueues `media.hls` and answers `hlsStatus: "PREPARING"` (the MP4 plays at once; the player shows "Preparing adaptive stream…"); the worker's `buildHlsOnDemand` builds the ladder from the original under a fresh generation prefix `evidence/<id>/h<gen>/hls/`, inserts the HLS row (`meta.onDemand=true`) and audits `MEDIA_PROCESSING_STARTED/COMPLETED` (`onDemand: true`); later playbacks get `hlsStatus: "READY"` + `hlsUrl`. The request is a custody event `MEDIA_STREAM_REQUESTED` (once per request window: a request in the last 2 h without a job row counts as queued). A failed build answers `FAILED` for an hour, then a playback re-queues it. `processing_jobs.kind = MEDIA_HLS`. Idempotent (existing HLS → SKIPPED) and race-safe (row insert under `FOR UPDATE`; a loser deletes its objects). |
+
+`GET /media/evidence/:id/playback` returns `mediaProfile` and `hlsStatus` (`READY` / `PREPARING` / `FAILED` /
+`NOT_BUILT`). Switching profile affects new ingests; existing HLS derivatives stay.
+
+### Encoders (MEDIA_ENCODER) {#encoders}
+
+`libx264` (default) or a hardware H.264 encoder: `h264_nvenc` (NVIDIA), `h264_qsv` (Intel Quick Sync), `h264_vaapi`
+(VA-API, device `MEDIA_HW_DEVICE`, default `/dev/dri/renderD128`). The worker probes the choice once per process
+(`apps/worker/src/jobs/media/encoder.ts`): the encoder must be listed by `ffmpeg -encoders` **and** a two-frame test
+encode on the device must succeed; otherwise it falls back to libx264 and logs the reason (warn). Output settings are
+kept equivalent: CFR, GOP = floor(fps) (keyframe ≤ 1 s), no scene-cut keyframes, no B-frames on hardware encoders,
+~CRF 23 constant quality (`-cq 23` / `-global_quality 23` / `-qp 23`), nv12 + `hwupload` for VA-API. Proxy metadata
+records `encoder` and `encoderFallback`; `MEDIA_PROCESSING_COMPLETED` records `encoder` and `mediaProfile`.
+**UNVERIFIED on real GPUs**: the development host's FFmpeg has no NVENC/QSV/VA-API encoders — only the probe, the
+fallback and the argument sets are tested (`apps/api/test/media-profiles.test.ts`). The static FFmpeg in the worker
+image (`mwader/static-ffmpeg`) has no hardware encoders either; a GPU worker image needs an FFmpeg build with them.
+
 ### Measured processing time (this dev host, shared with other agents' workloads)
 | Fixture | Duration | Wall time |
 |---|---|---|
@@ -74,9 +101,10 @@ UI. Timestamps (not frame numbers) are the authoritative link back to the origin
 | VFR 30->15 fps | 6.0 s | 0.2–0.7 s |
 | 160x90 5 fps "huge duration" | 20 min | 18–30 s (e.g. proxy 8.5 s, HLS 9.1 s, sprite 0.4 s) |
 
-Ranges reflect host load. Real body-camera footage (1080p30, 20–60 min) is dominated by x264 time; plan
-roughly 3–6x faster than real time per worker at `WORKER_CONCURRENCY=2` on 4 cores — **UNVERIFIED** (no
-real-resolution long clip was benchmarked).
+Ranges reflect host load. A 5-minute 1080p30 benchmark (`npm run media:benchmark -w @ksp/worker -- --file <clip>`,
+2026-09-27) is in [INFRASTRUCTURE.md § Transcoding capacity](INFRASTRUCTURE.md#transcoding-capacity): proxy 1.2–1.9
+CPU-s and HLS ladder 3.2–5.0 CPU-s per footage-second with libx264 on this host. Real body-camera footage was not
+available — synthetic clips bracket it (clean `testsrc2` vs. with heavy temporal noise).
 
 ## 2. API (`/api/v1/media`)
 
