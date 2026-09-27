@@ -22,6 +22,9 @@ export interface ShareSummary {
   revokeReason: string | null;
   itemCount: number;
   canRevoke: boolean;
+  canUnlock?: boolean;
+  canExtend?: boolean;
+  canReissue?: boolean;
 }
 
 export interface ShareDetail extends ShareSummary {
@@ -34,6 +37,7 @@ export interface CreatedShare {
   link?: string;
   token?: string;
   accessCode?: string;
+  delivery?: { link: 'SENT' | 'FAILED' | 'NOT_REQUESTED'; accessCode: 'SENT' | 'FAILED' | 'NOT_REQUESTED' };
 }
 
 export interface Paged<T> {

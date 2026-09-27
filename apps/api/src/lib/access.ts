@@ -7,7 +7,8 @@
  *   1. the user holds evidence:read through a grant covering evidence.org_path (jurisdiction);
  *   2. the user holds evidence:read_own and uploaded or recorded it;
  *   3. the user holds cases:read and is IO / supervisor / member of an active case the evidence is linked to;
- *   4. an ACTIVE, unexpired internal share targets the user.
+ *   4. an ACTIVE, unexpired internal share targets the user and is not used up (maxViews: view_count < max_views,
+ *      or the last counted open is < 30 min old so the viewing session in progress can finish — lib/share-views.ts).
  * An ACTION (play, download, snapshot, ...) additionally requires that permission — either through a grant
  * covering evidence.org_path, or (for relationship-based visibility 2–4) held anywhere by the user.
  * Downloads via shares additionally require share.allow_download.
@@ -25,7 +26,7 @@ import type { AuditActor } from '@ksp/core';
  * lists / dashboard aggregates, but it misleads the planner when the query ALSO has a selective semi-join (AI search
  * picked a 100k-row nested loop), so the default stays correlated EXISTS. Semantics are identical.
  */
-export function evidenceVisibleSql(p: Principal, alias = 'evidence', opts: { jurisdiction?: boolean; relationships?: 'exists' | 'initplan' } = {}): RawBuilder<boolean> {
+export function evidenceVisibleSql(p: Principal, alias = 'evidence', opts: { jurisdiction?: boolean; relationships?: 'exists' | 'initplan'; shares?: boolean } = {}): RawBuilder<boolean> {
   const e = sql.raw(`"${alias.replace(/"/g, '')}"`);
   const readPaths = opts.jurisdiction === false ? [] : scopePaths(p, 'evidence:read');
   const parts: RawBuilder<unknown>[] = [];
@@ -38,19 +39,24 @@ export function evidenceVisibleSql(p: Principal, alias = 'evidence', opts: { jur
     const caseRel = sql`ce.unlinked_at IS NULL AND c.status <> 'ARCHIVED'
           AND (c.investigating_officer_id = ${uid}::uuid OR c.supervisor_id = ${uid}::uuid
                OR EXISTS (SELECT 1 FROM case_members cm WHERE cm.case_id = c.id AND cm.user_id = ${uid}::uuid))`;
-    const shareRel = sql`s.recipient_user_id = ${uid}::uuid AND s.status = 'ACTIVE' AND s.expires_at > now()`;
+    const shareRel = sql`s.recipient_user_id = ${uid}::uuid AND s.status = 'ACTIVE' AND s.expires_at > now() AND ${SHARE_NOT_USED_UP}`;
     if (hasPermission(p, 'cases:read')) {
       parts.push(initplan
         ? sql`${e}.id = ANY(ARRAY(SELECT ce.evidence_id FROM case_evidence ce JOIN cases c ON c.id = ce.case_id WHERE ${caseRel}))`
         : sql`EXISTS (SELECT 1 FROM case_evidence ce JOIN cases c ON c.id = ce.case_id WHERE ce.evidence_id = ${e}.id AND ${caseRel})`);
     }
-    parts.push(initplan
-      ? sql`${e}.id = ANY(ARRAY(SELECT si.evidence_id FROM share_items si JOIN shares s ON s.id = si.share_id WHERE ${shareRel}))`
-      : sql`EXISTS (SELECT 1 FROM share_items si JOIN shares s ON s.id = si.share_id WHERE si.evidence_id = ${e}.id AND ${shareRel})`);
+    if (opts.shares !== false) {
+      parts.push(initplan
+        ? sql`${e}.id = ANY(ARRAY(SELECT si.evidence_id FROM share_items si JOIN shares s ON s.id = si.share_id WHERE ${shareRel}))`
+        : sql`EXISTS (SELECT 1 FROM share_items si JOIN shares s ON s.id = si.share_id WHERE si.evidence_id = ${e}.id AND ${shareRel})`);
+    }
   }
   if (!parts.length) return sql<boolean>`false`;
   return sql<boolean>`(${sql.join(parts, sql` OR `)})`;
 }
+
+/** Internal-share maxViews: still usable, or its last counted open is inside the 30-minute viewing window. */
+const SHARE_NOT_USED_UP = sql<boolean>`(s.max_views IS NULL OR s.view_count < s.max_views OR s.last_accessed_at > now() - interval '30 minutes')`;
 
 export interface EvidenceAccessRow {
   id: string;
@@ -106,6 +112,7 @@ export async function loadEvidenceFor(
         .where('s.status', '=', 'ACTIVE')
         .where('s.allow_download', '=', true)
         .where('s.expires_at', '>', new Date())
+        .where(SHARE_NOT_USED_UP)
         .executeTakeFirst();
       allowed = !!share;
       viaShareDownload = allowed;

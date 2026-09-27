@@ -14,7 +14,7 @@ import { startWorker } from '../../../apps/worker/src/main.js';
 import type { WorkerContext } from '../../../apps/worker/src/lib/context.js';
 import { main, type CliIO } from '../src/cli.js';
 import { KspClient } from '../src/client.js';
-import { collectFiles, uploadFiles } from '../src/uploader.js';
+import { collectFiles, outcomeOf, summaryTable, uploadFiles, type FileResult } from '../src/uploader.js';
 
 const PASSWORD = 'Ksp@Dev-Passw0rd!';
 const dir = join(process.env.KSP_TEST_TMP ?? tmpdir(), `ksp-station-client-${process.pid}`);
@@ -70,6 +70,8 @@ describe('ksp-upload', () => {
     }
     expect(output).toMatch(/Evidence #/);
     expect(output).toMatch(/2 registered, 0 quarantined/);
+    // FN-22: the summary shows the fresh server status — no stale "awaiting validation" for registered files
+    expect(output).not.toMatch(/awaiting validation/);
     const ev = await app.db.selectFrom('evidence').select(['title', 'category', 'officer_id']).where('id', '=', results.find((r) => r.path.endsWith('clip-a.mp4'))!.evidenceId!).executeTakeFirstOrThrow();
     expect(ev.title).toBe('Sidecar title A');
     expect(ev.category).toBe('TRAFFIC');
@@ -82,6 +84,15 @@ describe('ksp-upload', () => {
     const second = await main(['--server', server, '--username', 'op.cubbon', '--station', 'ps_cubbonpark', '--state', statePath, '--no-wait', join(dir, 'batch')], io(again));
     expect(second.results.every((r) => r.partsSent === 0 && r.status === 'REGISTERED')).toBe(true);
     expect(again.join('\n')).toMatch(/already uploaded/);
+  });
+
+  it('FN-22: a result updated from UPLOADED to REGISTERED loses the stale detail; summary marks already-uploaded files', () => {
+    const r: FileResult = { path: '/x/a.mp4', size: 10, status: 'UPLOADED', detail: 'awaiting validation', partsSent: 1 };
+    Object.assign(r, outcomeOf({ id: 's', status: 'COMPLETED', evidence: { id: 'e', status: 'REGISTERED', evidenceNumber: 'KSP-X-2026-000001', statusReason: null } } as never));
+    expect(r).toMatchObject({ status: 'REGISTERED', evidenceNumber: 'KSP-X-2026-000001', detail: undefined });
+    const table = summaryTable([r, { ...r, path: '/x/b.mp4', alreadyUploaded: true }]);
+    expect(table).not.toMatch(/awaiting validation/);
+    expect(table).toMatch(/b\.mp4.*already uploaded/);
   });
 
   it('resumes an interrupted multi-chunk upload from the server part list', async () => {

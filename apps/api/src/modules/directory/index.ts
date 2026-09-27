@@ -30,7 +30,7 @@ export default async function directory(fastify: FastifyInstance) {
     },
   }, async (req) => {
     const p = req.requirePrincipal();
-    if (!['users:read', 'cases:manage', 'share:create', 'devices:manage', 'cases:read'].some((perm) => hasPermission(p, perm as never))) throw forbidden();
+    if (!['users:read', 'cases:manage', 'share:create', 'devices:manage', 'cases:read', 'reports:generate'].some((perm) => hasPermission(p, perm as never))) throw forbidden();
     const { q, orgUnitId, limit } = req.query;
     let query = app.db
       .selectFrom('users as u')

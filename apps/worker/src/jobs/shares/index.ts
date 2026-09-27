@@ -9,7 +9,7 @@ import { createReadStream } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { sql } from 'kysely';
-import { appendAudit, hashStream, systemActor, type AppConfig, type Database, type Storage } from '@ksp/core';
+import { appendAudit, deleteShareVariants, hashStream, systemActor, type AppConfig, type Database, type Storage } from '@ksp/core';
 import { burnWatermark } from '@ksp/core/custody';
 import { QUEUES, SCHEDULES, type ShareWatermarkPayload } from '@ksp/shared';
 import type { WorkerContext } from '../../lib/context.js';
@@ -102,18 +102,15 @@ export async function runSharesExpire(deps: { db: Database; storage: Storage }):
       }
     });
   }
-  // Watermarked variants are only useful while the share is ACTIVE.
-  const { rows: stale } = await sql<{ id: string; bucket: string; object_key: string }>`
-    SELECT d.id, d.bucket, d.object_key FROM evidence_derivatives d
+  // Watermarked variants are only useful while the share is ACTIVE (revoke deletes them at once; this sweep covers
+  // expiry, lockout and any deletion that failed). An unlocked/extended share regenerates them on demand.
+  const { rows: stale } = await sql<{ share_id: string; status: string }>`
+    SELECT DISTINCT s.id AS share_id, s.status FROM evidence_derivatives d
       JOIN shares s ON s.id = (d.meta->>'shareId')::uuid
-     WHERE d.kind = 'WATERMARKED' AND s.status <> 'ACTIVE'
-     LIMIT 500`.execute(db);
+     WHERE d.kind = 'WATERMARKED' AND (s.status <> 'ACTIVE' OR s.expires_at <= now())
+     LIMIT 200`.execute(db);
   let deleted = 0;
-  for (const d of stale) {
-    await storage.delete(d.bucket, d.object_key).catch(() => undefined);
-    await db.deleteFrom('evidence_derivatives').where('id', '=', d.id).execute();
-    deleted++;
-  }
+  for (const s of stale) deleted += (await deleteShareVariants(db, storage, s.share_id, SHARE_ACTOR, `share ${s.status === 'ACTIVE' ? 'EXPIRED' : s.status}`)).deleted;
   return { expired: due.length, variantsDeleted: deleted };
 }
 

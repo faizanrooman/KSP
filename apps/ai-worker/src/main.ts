@@ -5,11 +5,12 @@
 import { hostname } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
-import { createDb, loadConfig, logger, Storage } from '@ksp/core';
+import { createDb, loadConfig, logger, sql, Storage } from '@ksp/core';
 import { AI_JOBS_CHANNEL } from '@ksp/shared';
 import type { AiContext } from './context.js';
 import { claimJob, runJob } from './pipeline.js';
 import { embedPendingWatchlistEntries, reapStaleJobs } from './watchlist.js';
+import { aiStats, jobStarted, recordJob, startAiHeartbeat, startMetricsServer } from './metrics.js';
 
 process.env.KSP_SERVICE ??= 'ksp-ai-worker';
 
@@ -29,15 +30,32 @@ export async function drainJobs(ctx: AiContext, max = Infinity): Promise<number>
   while (n < max) {
     const job = await claimJob(ctx);
     if (!job) break;
-    await runJob(ctx, job);
+    const t0 = Date.now();
+    jobStarted(job.queue_wait_seconds);
+    let outcome = 'FAILED';
+    try {
+      outcome = await runJob(ctx, job);
+    } finally {
+      const frames = await ctx.db.selectFrom('ai_jobs').select(sql<number>`coalesce((stats->>'framesProcessed')::int, 0)`.as('f')).where('id', '=', job.id).executeTakeFirst().catch(() => undefined);
+      recordJob(outcome, (Date.now() - t0) / 1000, frames?.f ?? 0);
+    }
     n++;
   }
   return n;
 }
 
-export async function startAiWorker(): Promise<() => Promise<void>> {
+export interface StartAiWorkerOptions {
+  /** Prometheus port (default METRICS_PORT + 2); `false` disables the endpoint. */
+  metricsPort?: number | false;
+  heartbeatIntervalMs?: number;
+}
+
+export async function startAiWorker(opts: StartAiWorkerOptions = {}): Promise<(() => Promise<void>) & { metricsPort?: number }> {
   const ctx = createAiContext();
   const concurrency = Math.max(1, Number(process.env.AI_WORKER_CONCURRENCY ?? 1));
+  const heartbeat = startAiHeartbeat(ctx.db, () => ({ concurrency, running: aiStats.running }), ctx.log, undefined, opts.heartbeatIntervalMs);
+  const metricsPort = opts.metricsPort === false ? undefined : opts.metricsPort ?? ctx.cfg.METRICS_PORT + 2;
+  const metrics = metricsPort === undefined ? undefined : await startMetricsServer(metricsPort, ctx.cfg.METRICS_HOST);
   const waiters = new Set<() => void>();
   const wakeAll = () => { for (const w of [...waiters]) w(); };
   let stopping = false;
@@ -71,14 +89,18 @@ export async function startAiWorker(): Promise<() => Promise<void>> {
   const reaper = setInterval(() => void reapStaleJobs(ctx).catch(() => undefined), 60_000);
   const loops = Array.from({ length: concurrency }, (_, i) => loop(i));
   ctx.log.info({ concurrency }, 'ai worker started (role ksp_ai)');
-  return async () => {
+  const stop = async () => {
     stopping = true;
+    heartbeat.stop();
+    await new Promise<void>((r) => (metrics ? metrics.close(() => r()) : r()));
     clearInterval(reaper);
     wakeAll();
     await listener.end().catch(() => undefined);
     await Promise.race([Promise.all(loops), new Promise((r) => setTimeout(r, 5000))]);
     await ctx.destroy();
   };
+  const addr = metrics?.address();
+  return Object.assign(stop, { metricsPort: addr && typeof addr === 'object' ? addr.port : undefined });
 }
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];

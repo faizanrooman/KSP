@@ -9,9 +9,13 @@
  *     ├─► THUMBNAIL  evidence/<id>/thumbnail/thumb.jpg        320 px wide
  *     └─► SPRITE     evidence/<id>/sprite/sprite_NNN.jpg (10x10 tiles, 160 px) + evidence/<id>/sprite/thumbnails.vtt
  *
- * The original is never written to. Idempotent: pipeline derivatives are rebuilt from scratch on every
- * non-skipped run (a READY item is skipped unless `force`). User-created SNAPSHOT derivatives are never
- * touched. See docs/VIDEO-PIPELINE.md.
+ * The original is never written to. Idempotent: a READY item is skipped unless `force`. User-created SNAPSHOT
+ * derivatives are never touched. See docs/VIDEO-PIPELINE.md.
+ *
+ * Rebuilds (FN-7): when pipeline derivatives already exist, the new set is written under a fresh generation prefix
+ * evidence/<id>/r<gen>/<kind-dir>/…, the old set stays playable (media_status stays READY) until the new set is
+ * complete, rows are switched in ONE transaction, and only then are the old objects deleted. A failed rebuild
+ * deletes the new generation and leaves the old derivatives in place.
  */
 import { createReadStream } from 'node:fs';
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -109,15 +113,21 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
 
   const tracker = await ProcessingTracker.start(db, { kind: 'MEDIA_PROCESS', evidenceId, queueJobId: meta.queueJobId });
   const started = Date.now();
+  const previous = await db.selectFrom('evidence_derivatives').select(['id', 'kind', 'bucket', 'object_key']).where('evidence_id', '=', evidenceId).where('kind', 'in', [...PIPELINE_KINDS]).execute();
+  const rebuild = previous.length > 0;
+  const generation = rebuild ? `r${Date.now().toString(36)}${randomUUID().slice(0, 4)}` : null;
+  const base = generation ? `${generation}/` : '';
+  // A rebuild keeps the current derivatives playable (READY) until the new generation replaces them.
+  const keepPlayable = rebuild && ev.media_status === 'READY';
   await db.transaction().execute(async (tx) => {
-    await tx.updateTable('evidence').set({ media_status: 'PROCESSING', media_error: null }).where('id', '=', evidenceId).execute();
-    await appendAudit(tx, ACTOR, { action: 'MEDIA_PROCESSING_STARTED', resourceType: 'evidence', resourceId: evidenceId, evidenceId, orgUnitId: ev.org_unit_id, details: { force, processingJobId: tracker.id } });
+    if (!keepPlayable) await tx.updateTable('evidence').set({ media_status: 'PROCESSING', media_error: null }).where('id', '=', evidenceId).execute();
+    await appendAudit(tx, ACTOR, { action: 'MEDIA_PROCESSING_STARTED', resourceType: 'evidence', resourceId: evidenceId, evidenceId, orgUnitId: ev.org_unit_id, details: { force, processingJobId: tracker.id, rebuild, generation } });
   });
 
   const work = join(cfg.WORK_DIR, `media-${evidenceId}-${randomUUID().slice(0, 8)}`);
   try {
     await mkdir(work, { recursive: true });
-    await clearPipelineDerivatives(deps, evidenceId);
+    if (!rebuild) await clearPipelineDerivatives(deps, evidenceId); // stale objects of a crashed first attempt
 
     const expectedMs = Number(ev.duration_ms ?? 0);
     const url = await storage.internalUrl(ev.storage_bucket, ev.storage_key, Math.min(7 * 86400, Math.max(3600, Math.ceil(timeoutFor(expectedMs, 12) / 1000))), ev.storage_version_id ?? undefined);
@@ -150,7 +160,7 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
     await runFfmpeg(proxyArgs(url, src, rate, pdim, proxyPath), src.durationMs, 4, progress(0.02, 0.43));
     const proxyProbe = await probe(proxyPath);
     const proxyDur = Math.round(Number(proxyProbe.format.duration ?? src.durationMs / 1000) * 1000);
-    outputs.push(await uploadFile(deps, evidenceId, proxyPath, 'proxy/proxy.mp4', 'PROXY_MP4', 'video/mp4', pdim, {
+    outputs.push(await uploadFile(deps, evidenceId, proxyPath, `${base}proxy/proxy.mp4`, 'PROXY_MP4', 'video/mp4', pdim, {
       fps: rate.fps, rate: rate.rate, gop: rate.gop, keyframeIntervalSec: rate.gop / rate.fps, crf: 23, preset: 'veryfast', videoCodec: 'h264', pixFmt: 'yuv420p',
       audio: !!src.audio, faststart: true, durationMs: proxyDur, sourceVfr: src.vfr, sourceFps: src.rFps, sourceAvgFps: src.avgFps, rotation: src.rotation,
     }));
@@ -161,18 +171,18 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
     const ladder = planLadder(src);
     for (const r of ladder) await mkdir(join(hlsDir, r.name), { recursive: true });
     await runFfmpeg(hlsArgs(url, src, rate, ladder, hlsDir), src.durationMs, 6, progress(0.45, 0.43));
-    outputs.push(await uploadHls(deps, evidenceId, hlsDir, ladder, rate));
+    outputs.push(await uploadHls(deps, evidenceId, hlsDir, ladder, rate, base));
 
     phase('hlsMs');
     // 3. Poster + thumbnail (from the proxy)
     const at = Math.max(0, (proxyDur * 0.1) / 1000);
     const posterPath = join(work, 'poster.jpg');
     await runFfmpeg(['-ss', at.toFixed(3), '-i', proxyPath, '-frames:v', '1', '-q:v', '2', posterPath], 0, 0);
-    outputs.push(await uploadFile(deps, evidenceId, posterPath, 'poster/poster.jpg', 'POSTER', 'image/jpeg', pdim, { timeMs: Math.round(at * 1000) }));
+    outputs.push(await uploadFile(deps, evidenceId, posterPath, `${base}poster/poster.jpg`, 'POSTER', 'image/jpeg', pdim, { timeMs: Math.round(at * 1000) }));
     const tdim = fitWidth(pdim.width, pdim.height, THUMB_WIDTH);
     const thumbPath = join(work, 'thumb.jpg');
     await runFfmpeg(['-ss', at.toFixed(3), '-i', proxyPath, '-frames:v', '1', '-vf', `scale=${tdim.width}:${tdim.height}`, '-q:v', '3', thumbPath], 0, 0);
-    outputs.push(await uploadFile(deps, evidenceId, thumbPath, 'thumbnail/thumb.jpg', 'THUMBNAIL', 'image/jpeg', tdim, { timeMs: Math.round(at * 1000) }));
+    outputs.push(await uploadFile(deps, evidenceId, thumbPath, `${base}thumbnail/thumb.jpg`, 'THUMBNAIL', 'image/jpeg', tdim, { timeMs: Math.round(at * 1000) }));
     await tracker.progress(0.9);
     phase('stillsMs');
 
@@ -187,37 +197,51 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
     const sheets = (await readdir(spriteDir)).filter((f) => /^sprite_\d{3}\.jpg$/.test(f)).sort();
     if (!sheets.length) throw new UnsupportedMediaError('No frames could be decoded for the sprite sheet');
     for (let i = 0; i < sheets.length; i++) {
-      outputs.push(await uploadFile(deps, evidenceId, join(spriteDir, spriteSheetName(i)), `sprite/${spriteSheetName(i)}`, 'SPRITE', 'image/jpeg',
+      outputs.push(await uploadFile(deps, evidenceId, join(spriteDir, spriteSheetName(i)), `${base}sprite/${spriteSheetName(i)}`, 'SPRITE', 'image/jpeg',
         { width: sp.tileWidth * sp.columns, height: sp.tileHeight * sp.rows }, { role: 'sheet', index: i, ...spriteMeta(sp) }));
     }
     const vttPath = join(spriteDir, 'thumbnails.vtt');
     await writeFile(vttPath, buildSpriteVtt(sp, proxyDur, sheets.length));
-    outputs.push(await uploadFile(deps, evidenceId, vttPath, 'sprite/thumbnails.vtt', 'SPRITE', 'text/vtt', null, { role: 'vtt', sheets: sheets.length, ...spriteMeta(sp) }));
+    outputs.push(await uploadFile(deps, evidenceId, vttPath, `${base}sprite/thumbnails.vtt`, 'SPRITE', 'text/vtt', null, { role: 'vtt', sheets: sheets.length, ...spriteMeta(sp) }));
 
     phase('spriteMs');
     const elapsedMs = Date.now() - started;
+    // Atomic switch: the old rows disappear and the new generation's rows appear in one transaction.
     await db.transaction().execute(async (tx) => {
-      await tx.insertInto('evidence_derivatives').values(outputs.map((o) => ({ ...o, evidence_id: evidenceId, meta: JSON.stringify(o.meta) }))).execute();
+      if (previous.length) await tx.deleteFrom('evidence_derivatives').where('id', 'in', previous.map((d) => d.id)).execute();
+      await tx.insertInto('evidence_derivatives').values(outputs.map((o) => ({ ...o, evidence_id: evidenceId, meta: JSON.stringify({ ...o.meta, generation }) }))).execute();
       await tx.updateTable('evidence').set({ media_status: 'READY', media_error: null }).where('id', '=', evidenceId).execute();
       await appendAudit(tx, ACTOR, {
         action: 'MEDIA_PROCESSING_COMPLETED', resourceType: 'evidence', resourceId: evidenceId, evidenceId, orgUnitId: ev.org_unit_id,
-        details: { force, derivatives: outputs.length, kinds: [...new Set(outputs.map((o) => o.kind))], durationMs: proxyDur, elapsedMs, renditions: ladder.map((r) => r.name), phases, processingJobId: tracker.id },
+        details: { force, derivatives: outputs.length, kinds: [...new Set(outputs.map((o) => o.kind))], durationMs: proxyDur, elapsedMs, renditions: ladder.map((r) => r.name), phases, processingJobId: tracker.id, rebuild, generation, replaced: previous.length },
       });
     });
+    // Old objects are deleted only after the switch (best effort; the rows are already gone).
+    for (const d of previous) {
+      try {
+        if (d.kind === 'HLS') await storage.deletePrefix(d.bucket, d.object_key);
+        else await storage.delete(d.bucket, d.object_key);
+      } catch (err) {
+        log.warn({ evidenceId, key: d.object_key, err: (err as Error).message }, 'could not delete superseded derivative');
+      }
+    }
     await tracker.complete({ derivatives: outputs.length, elapsedMs, durationMs: proxyDur, phases, realtimeFactor: Math.round((proxyDur / Math.max(1, elapsedMs)) * 100) / 100 });
     log.info({ evidenceId, elapsedMs, durationMs: proxyDur }, 'media processed');
     return { status: 'READY', derivatives: outputs.length, elapsedMs, durationMs: proxyDur, phases };
   } catch (err) {
-    await clearPipelineDerivatives(deps, evidenceId).catch(() => undefined);
+    // A failed rebuild removes only its own generation; the previous derivatives stay (and stay playable).
+    if (generation) await storage.deletePrefix(storage.bucket('derived'), `evidence/${evidenceId}/${generation}/`).catch(() => undefined);
+    else await clearPipelineDerivatives(deps, evidenceId).catch(() => undefined);
     const unsupported = err instanceof UnsupportedMediaError;
     const message = (err as Error).message.slice(0, 2000);
     const final = unsupported || !!meta.finalAttempt;
-    const status = unsupported ? 'UNSUPPORTED' : final ? 'FAILED' : 'PENDING';
+    const status = keepPlayable ? 'READY' : unsupported ? 'UNSUPPORTED' : final ? 'FAILED' : 'PENDING';
+    const note = keepPlayable ? `Reprocessing failed${final ? '' : ' (will retry)'}; previous derivatives kept: ${message}` : final ? message : `Processing attempt failed, will retry: ${message}`;
     await db.transaction().execute(async (tx) => {
-      await tx.updateTable('evidence').set({ media_status: status, media_error: final ? message : `Processing attempt failed, will retry: ${message}`.slice(0, 2000) }).where('id', '=', evidenceId).execute();
+      await tx.updateTable('evidence').set({ media_status: status, media_error: note.slice(0, 2000) }).where('id', '=', evidenceId).execute();
       await appendAudit(tx, ACTOR, {
         action: 'MEDIA_PROCESSING_FAILED', outcome: 'FAILURE', resourceType: 'evidence', resourceId: evidenceId, evidenceId, orgUnitId: ev.org_unit_id,
-        details: { force, unsupported, final, error: message.slice(0, 500), processingJobId: tracker.id },
+        details: { force, unsupported, final, error: message.slice(0, 500), processingJobId: tracker.id, rebuild, generation, previousKept: keepPlayable },
       });
     });
     await tracker.fail(err);
@@ -339,8 +363,8 @@ async function uploadFile(
 
 const HLS_MIME: Record<string, string> = { m3u8: 'application/vnd.apple.mpegurl', ts: 'video/mp2t' };
 
-async function uploadHls(deps: MediaDeps, evidenceId: string, dir: string, ladder: ReturnType<typeof planLadder>, rate: { fps: number; gop: number }): Promise<DerivativeRow> {
-  const prefix = `evidence/${evidenceId}/hls/`;
+async function uploadHls(deps: MediaDeps, evidenceId: string, dir: string, ladder: ReturnType<typeof planLadder>, rate: { fps: number; gop: number }, base = ''): Promise<DerivativeRow> {
+  const prefix = `evidence/${evidenceId}/${base}hls/`;
   let total = 0;
   let segments = 0;
   const renditions: Array<Record<string, unknown>> = [];
@@ -369,9 +393,14 @@ async function uploadHls(deps: MediaDeps, evidenceId: string, dir: string, ladde
   };
 }
 
-/** Remove pipeline derivatives (rows + objects under evidence/<id>/<kind-dir>/ in the DERIVED bucket only). */
+/** Remove pipeline derivatives (rows + objects under evidence/<id>/<kind-dir>/ and any rebuild generation in the DERIVED bucket only). */
 export async function clearPipelineDerivatives(deps: MediaDeps, evidenceId: string): Promise<void> {
   const bucket = deps.storage.bucket('derived');
   for (const d of PIPELINE_DIRS) await deps.storage.deletePrefix(bucket, `evidence/${evidenceId}/${d}/`);
+  const rows = await deps.db.selectFrom('evidence_derivatives').select(['kind', 'bucket', 'object_key']).where('evidence_id', '=', evidenceId).where('kind', 'in', [...PIPELINE_KINDS]).execute();
+  for (const r of rows) {
+    if (r.kind === 'HLS') await deps.storage.deletePrefix(r.bucket, r.object_key);
+    else await deps.storage.delete(r.bucket, r.object_key).catch(() => undefined);
+  }
   await deps.db.deleteFrom('evidence_derivatives').where('evidence_id', '=', evidenceId).where('kind', 'in', [...PIPELINE_KINDS]).execute();
 }

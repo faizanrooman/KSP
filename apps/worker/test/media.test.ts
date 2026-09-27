@@ -186,7 +186,28 @@ describe('media pipeline', { timeout: 300_000 }, () => {
     expect(ds2.length).toBe(ds.length + 1);
     expect(ds2.some((d) => d.kind === 'SNAPSHOT')).toBe(true);
     expect(await storage.head(derived, `evidence/${ev.id}/snapshot/keep.png`)).not.toBeNull();
-    expect((await storage.list(derived, `evidence/${ev.id}/proxy/`)).length).toBe(1);
+    // FN-7: rebuilt under a new generation prefix, switched atomically, old objects deleted afterwards
+    const proxy2 = ds2.find((d) => d.kind === 'PROXY_MP4')!;
+    const gen = /^evidence\/[0-9a-f-]{36}\/(r[0-9a-z]+)\/proxy\/proxy\.mp4$/.exec(proxy2.object_key)?.[1];
+    expect(gen).toBeTruthy();
+    expect(ds2.filter((d) => d.kind !== 'SNAPSHOT').every((d) => d.object_key.startsWith(`evidence/${ev.id}/${gen}/`))).toBe(true);
+    expect(await storage.head(derived, proxy2.object_key)).not.toBeNull();
+    expect(await storage.list(derived, `evidence/${ev.id}/proxy/`)).toHaveLength(0);
+    expect(await storage.list(derived, `evidence/${ev.id}/hls/`)).toHaveLength(0);
+    expect(await storage.list(derived, `evidence/${ev.id}/sprite/`)).toHaveLength(0);
+    const done = await db.selectFrom('audit_events').select('details').where('evidence_id', '=', ev.id).where('action', '=', 'MEDIA_PROCESSING_COMPLETED').orderBy('seq', 'desc').executeTakeFirstOrThrow();
+    expect(done.details).toMatchObject({ rebuild: true, generation: gen, replaced: ds.length });
+
+    // A failing rebuild leaves the current generation in place and playable (READY)
+    const broken = { ...deps, cfg: { ...deps.cfg, WORK_DIR: '/dev/null/ksp-cannot-write-here' } };
+    await expect(processMedia(broken, { evidenceId: ev.id, force: true })).rejects.toThrow();
+    const ds3 = await derivatives(ev.id);
+    expect(ds3.map((d) => d.id).sort()).toEqual(ds2.map((d) => d.id).sort());
+    const st = await db.selectFrom('evidence').select(['media_status', 'media_error']).where('id', '=', ev.id).executeTakeFirstOrThrow();
+    expect(st.media_status).toBe('READY');
+    expect(st.media_error).toMatch(/Reprocessing failed.*previous derivatives kept/);
+    const leftovers = (await storage.list(derived, `evidence/${ev.id}/r`)).filter((o) => !o.key.startsWith(`evidence/${ev.id}/${gen}/`));
+    expect(leftovers).toEqual([]);
   });
 
   it.each([

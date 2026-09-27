@@ -44,6 +44,14 @@ describe('settings', () => {
     expect(await bad('storagePolicy', { ...DEFAULT_SETTINGS.storagePolicy, warnThresholdPercent: 90, criticalThresholdPercent: 80 })).toBe(400);
     expect(await bad('uploadPolicy', { ...DEFAULT_SETTINGS.uploadPolicy, chunkSizeBytes: 1024 })).toBe(400);
     expect(await bad('shareExportPolicy', { ...DEFAULT_SETTINGS.shareExportPolicy, maxShareDays: 'x' })).toBe(400);
+    expect(await bad('alertDeliveryPolicy', { ...DEFAULT_SETTINGS.alertDeliveryPolicy, warningRecipients: ['nope'] })).toBe(400);
+    expect(await bad('alertDeliveryPolicy', { ...DEFAULT_SETTINGS.alertDeliveryPolicy, maxAttempts: 0 })).toBe(400);
+    expect(await bad('integrityPolicy', { ...DEFAULT_SETTINGS.integrityPolicy, fullCycleDays: 0 })).toBe(400);
+    expect(await bad('integrityPolicy', { ...DEFAULT_SETTINGS.integrityPolicy, minPerNight: 500, maxPerNight: 100 })).toBe(400);
+    const ok = await root.agent.put(`${S}/alertDeliveryPolicy`, { ...DEFAULT_SETTINGS.alertDeliveryPolicy, criticalRecipients: ['DGP-Office@ksp.example'] });
+    expect(ok.status).toBe(200);
+    expect(ok.body.settings.alertDeliveryPolicy.criticalRecipients).toEqual(['dgp-office@ksp.example']);
+    expect((await root.agent.delete(`${S}/alertDeliveryPolicy`)).status).toBe(200);
   });
 
   it('updates a key (audited old/new) and the change takes effect immediately', async () => {

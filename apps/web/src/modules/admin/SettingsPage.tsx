@@ -12,7 +12,7 @@ interface SettingsResponse {
   keys: Array<{ key: SettingKey; overridden: boolean; updatedAt: string | null; updatedBy: { id: string; fullName: string } | null }>;
 }
 
-type FieldDef = { name: string; label: string; kind: 'int' | 'bool' | 'bytes' | 'roles'; min?: number; max?: number; hint?: string };
+type FieldDef = { name: string; label: string; kind: 'int' | 'bool' | 'bytes' | 'roles' | 'list'; min?: number; max?: number; hint?: string };
 const MiB = 1024 ** 2;
 const GROUPS: Array<{ key: SettingKey; title: string; description: string; fields: FieldDef[] }> = [
   {
@@ -70,7 +70,33 @@ const GROUPS: Array<{ key: SettingKey; title: string; description: string; field
       { name: 'excessiveDownloadsPerHour', label: 'Excessive downloads alert (per hour)', kind: 'int', min: 1, max: 10000 },
     ],
   },
+  {
+    key: 'alertDeliveryPolicy', title: 'Alert delivery', description: 'E-mail recipients and retries for external alert deliveries (e-mail, webhook).',
+    fields: [
+      { name: 'maxAttempts', label: 'Delivery attempts', kind: 'int', min: 1, max: 20, hint: '1 = no retry' },
+      { name: 'baseDelaySeconds', label: 'First retry after (seconds)', kind: 'int', min: 5, max: 3600, hint: 'doubles for every further attempt' },
+      { name: 'emailAlertManagers', label: 'E-mail alert managers in scope', kind: 'bool' },
+      { name: 'warningRecipients', label: 'Extra recipients: warning and critical', kind: 'list', hint: 'comma-separated e-mail addresses' },
+      { name: 'criticalRecipients', label: 'Extra recipients: critical only', kind: 'list', hint: 'comma-separated e-mail addresses' },
+    ],
+  },
+  {
+    key: 'integrityPolicy', title: 'Integrity (fixity) sweep', description: 'Every stored original and recorded secondary copy is re-hashed once per cycle.',
+    fields: [
+      { name: 'fullCycleDays', label: 'Full verification cycle (days)', kind: 'int', min: 1, max: 3650 },
+      { name: 'maxBytesPerNight', label: 'Byte budget per night (MiB)', kind: 'bytes', min: 0, hint: '0 = unlimited' },
+      { name: 'minPerNight', label: 'Minimum items per night', kind: 'int', min: 1, max: 1000000 },
+      { name: 'maxPerNight', label: 'Maximum items per night', kind: 'int', min: 1, max: 10000000 },
+    ],
+  },
 ];
+
+/** Comma/space separated list editor that keeps the raw text while typing. */
+function ListInput({ id, value, onChange }: { id: string; value: string[]; onChange: (v: string[]) => void }) {
+  const [text, setText] = useState(value.join(', '));
+  useEffect(() => { if (text.split(/[\s,;]+/).filter(Boolean).join(',') !== value.join(',')) setText(value.join(', ')); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <Input id={id} value={text} onChange={(e) => { setText(e.target.value); onChange(e.target.value.split(/[\s,;]+/).filter(Boolean)); }} />;
+}
 
 function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: SettingsResponse }) {
   const initial = data.settings[group.key] as unknown as Record<string, unknown>;
@@ -115,6 +141,13 @@ function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: Sett
                     </div>
                   )}
                 </fieldset>
+              );
+            }
+            if (fd.kind === 'list') {
+              return (
+                <Field key={fd.name} label={fd.label} htmlFor={id} hint={fd.hint}>
+                  <ListInput id={id} value={(val as string[]) ?? []} onChange={(list) => setV({ ...v, [fd.name]: list })} />
+                </Field>
               );
             }
             const shown = fd.kind === 'bytes' ? Math.round(Number(val) / MiB) : Number(val);

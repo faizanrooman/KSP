@@ -159,10 +159,12 @@ export interface AlertCursors {
 
 export interface AlertDeliveries {
   alert_id: string;
+  attempt: Generated<number>;
   channel: string;
   created_at: Generated<Timestamp>;
   detail: string | null;
   id: Generated<Int8>;
+  next_attempt_at: Timestamp | null;
   recipients: number | null;
   status: string;
 }
@@ -170,6 +172,7 @@ export interface AlertDeliveries {
 export interface AlertRules {
   code: string;
   config: Generated<Json>;
+  email_recipients: Generated<string[]>;
   enabled: Generated<boolean>;
   id: Generated<string>;
   name: string;
@@ -393,6 +396,24 @@ export interface DisposalRequests {
   status: Generated<string>;
 }
 
+export interface DrObjectCopies {
+  attempts: Generated<number>;
+  bucket: string;
+  deleted_at: Timestamp | null;
+  evidence_id: string | null;
+  id: Generated<Int8>;
+  kind: string;
+  last_error: string | null;
+  last_verified_at: Timestamp | null;
+  object_key: string;
+  replicated_at: Generated<Timestamp>;
+  sha256: string | null;
+  size_bytes: Int8 | null;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  version_id: string | null;
+}
+
 export interface Evidence {
   archived_at: Timestamp | null;
   audio_codec: string | null;
@@ -400,6 +421,7 @@ export interface Evidence {
   category: string | null;
   container_format: string | null;
   created_at: Generated<Timestamp>;
+  declared_recorded_at: Timestamp | null;
   description: string | null;
   device_id: string | null;
   device_metadata: Generated<Json>;
@@ -430,6 +452,8 @@ export interface Evidence {
   original_filename: string;
   probe: Json | null;
   recorded_at: Timestamp | null;
+  recorded_at_discrepancy_seconds: number | null;
+  recorded_at_source: string | null;
   recorded_end_at: Timestamp | null;
   registered_at: Timestamp | null;
   retain_until: Timestamp | null;
@@ -500,6 +524,7 @@ export interface EvidenceStorageCopies {
   created_at: Generated<Timestamp>;
   evidence_id: string;
   id: Generated<Int8>;
+  last_verified_at: Timestamp | null;
   object_key: string;
   object_lock_until: Timestamp | null;
   sha256: string;
@@ -626,12 +651,15 @@ export interface IntegrationSystems {
 export interface IntegrityChecks {
   actual_sha256: string | null;
   checked_at: Generated<Timestamp>;
+  copy_kind: Generated<string>;
+  dr_copy_id: Int8 | null;
   error: string | null;
   evidence_id: string;
   expected_sha256: string;
   id: Generated<Int8>;
   ok: boolean;
   requested_by: string | null;
+  storage_copy_id: Int8 | null;
   trigger: string;
 }
 
@@ -697,6 +725,20 @@ export interface ProcessingJobs {
   upload_session_id: string | null;
 }
 
+export interface QuarantineReleases {
+  actor: Json;
+  created_at: Generated<Timestamp>;
+  error: string | null;
+  evidence_id: string;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  outcome: string | null;
+  reason: string;
+  requested_by: string;
+  started_at: Timestamp | null;
+  status: Generated<string>;
+}
+
 export interface RateLimitCounters {
   count: Generated<number>;
   expires_at: Timestamp;
@@ -726,15 +768,41 @@ export interface ReportRuns {
   finished_at: Timestamp | null;
   format: string;
   id: Generated<string>;
+  notified_at: Timestamp | null;
   object_key: string | null;
   org_unit_id: string | null;
   params: Generated<Json>;
+  recipient_ids: Generated<string[]>;
   report_type: string;
   row_count: number | null;
+  schedule_id: string | null;
+  scheduled_for: Timestamp | null;
   sha256: string | null;
   size_bytes: Int8 | null;
   started_at: Timestamp | null;
   status: Generated<string>;
+}
+
+export interface ReportSchedules {
+  created_at: Generated<Timestamp>;
+  cron: string;
+  email_recipients: Generated<boolean>;
+  enabled: Generated<boolean>;
+  format: string;
+  frequency: string;
+  id: Generated<string>;
+  last_error: string | null;
+  last_run_at: Timestamp | null;
+  last_run_id: string | null;
+  lookback_days: Generated<number>;
+  name: string;
+  next_run_at: Timestamp | null;
+  owner_id: string;
+  params: Generated<Json>;
+  recipient_ids: Generated<string[]>;
+  report_type: string;
+  timezone: Generated<string>;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface RetentionPolicies {
@@ -831,6 +899,19 @@ export interface Shares {
   watermark: Generated<boolean>;
 }
 
+export interface SnapshotRequests {
+  actor: Json;
+  created_at: Generated<Timestamp>;
+  derivative_id: string | null;
+  error: string | null;
+  evidence_id: string;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  params: Json;
+  requested_by: string;
+  status: Generated<string>;
+}
+
 export interface StorageSnapshots {
   bucket: string;
   capacity_bytes: Int8 | null;
@@ -854,6 +935,8 @@ export interface SystemSettings {
 export interface TimelineEvents {
   created_at: Generated<Timestamp>;
   created_by: string;
+  deleted_at: Timestamp | null;
+  deleted_by: string | null;
   description: string | null;
   evidence_id: string | null;
   id: Generated<string>;
@@ -1016,6 +1099,7 @@ export interface DB {
   cases: Cases;
   devices: Devices;
   disposal_requests: DisposalRequests;
+  dr_object_copies: DrObjectCopies;
   evidence: Evidence;
   evidence_derivatives: EvidenceDerivatives;
   evidence_legal_hold_events: EvidenceLegalHoldEvents;
@@ -1034,9 +1118,11 @@ export interface DB {
   org_units: OrgUnits;
   password_history: PasswordHistory;
   processing_jobs: ProcessingJobs;
+  quarantine_releases: QuarantineReleases;
   rate_limit_counters: RateLimitCounters;
   refresh_tokens: RefreshTokens;
   report_runs: ReportRuns;
+  report_schedules: ReportSchedules;
   retention_policies: RetentionPolicies;
   roles: Roles;
   saved_searches: SavedSearches;
@@ -1044,6 +1130,7 @@ export interface DB {
   share_access_log: ShareAccessLog;
   share_items: ShareItems;
   shares: Shares;
+  snapshot_requests: SnapshotRequests;
   storage_snapshots: StorageSnapshots;
   system_settings: SystemSettings;
   timeline_events: TimelineEvents;

@@ -295,6 +295,30 @@ describe('snapshots', () => {
     expect(dl.statusCode).toBe(200);
     expect(dl.headers['content-disposition']).toMatch(/^attachment; filename=".*snapshot_f\d+_.*\.png"$/);
   });
+
+  it('FN-8: extraction runs as a worker job (snapshot_requests); requester-only status endpoint; queued → completed', async () => {
+    const r = await meera.post(`/api/v1/media/evidence/${frames.id}/snapshots`, { timeMs: 1000 });
+    expect(r.status).toBe(201);
+    const req = await app.db.selectFrom('snapshot_requests').selectAll().where('derivative_id', '=', r.body.id).executeTakeFirstOrThrow();
+    expect(req).toMatchObject({ status: 'COMPLETED', evidence_id: frames.id });
+    const audit = await app.db.selectFrom('audit_events').select(['actor_id', 'actor_type', 'details']).where('resource_id', '=', r.body.id).where('action', '=', 'EVIDENCE_SNAPSHOT_CREATED').executeTakeFirstOrThrow();
+    expect(audit).toMatchObject({ actor_type: 'USER', actor_id: meeraId, details: { snapshotRequestId: req.id, frameNumber: 25 } });
+    const st = await meera.get(`/api/v1/media/snapshot-requests/${req.id}`);
+    expect(st.body).toMatchObject({ status: 'COMPLETED', snapshot: { id: r.body.id, frameNumber: 25 } });
+    expect((await supervisor.get(`/api/v1/media/snapshot-requests/${req.id}`)).status).toBe(404); // not the requester
+    expect((await anon().get(`/api/v1/media/snapshot-requests/${req.id}`)).status).toBe(401);
+    // A request the worker has not picked up yet reports QUEUED; the job then completes it.
+    const proxy = await app.db.selectFrom('evidence_derivatives').selectAll().where('evidence_id', '=', frames.id).where('kind', '=', 'PROXY_MP4').executeTakeFirstOrThrow();
+    const q = await app.db.insertInto('snapshot_requests').values({ evidence_id: frames.id, requested_by: meeraId, actor: JSON.stringify({ type: 'USER', id: meeraId, name: 'Meera' }), params: JSON.stringify({ timeMs: 2000, source: 'proxy', frame: 50, fps: 25, bucket: proxy.bucket, key: proxy.object_key, versionId: null }) }).returning('id').executeTakeFirstOrThrow();
+    expect((await meera.get(`/api/v1/media/snapshot-requests/${q.id}`)).body).toMatchObject({ status: 'QUEUED', snapshot: null });
+    const { runSnapshotExtract } = await import('../../worker/src/jobs/media/snapshot.js');
+    expect(await runSnapshotExtract({ db: app.db, storage: app.storage, cfg: app.cfg }, q.id)).toMatchObject({ status: 'COMPLETED' });
+    expect((await meera.get(`/api/v1/media/snapshot-requests/${q.id}`)).body).toMatchObject({ status: 'COMPLETED', snapshot: { frameNumber: 50 } });
+    // An undecodable position fails deterministically (not retried)
+    const bad = await app.db.insertInto('snapshot_requests').values({ evidence_id: frames.id, requested_by: meeraId, actor: JSON.stringify({ type: 'USER', id: meeraId, name: 'Meera' }), params: JSON.stringify({ timeMs: 0, source: 'proxy', frame: 0, fps: 25, bucket: proxy.bucket, key: `${proxy.object_key}.missing`, versionId: null }) }).returning('id').executeTakeFirstOrThrow();
+    expect(await runSnapshotExtract({ db: app.db, storage: app.storage, cfg: app.cfg }, bad.id)).toMatchObject({ status: 'FAILED' });
+    expect((await meera.get(`/api/v1/media/snapshot-requests/${bad.id}`)).body).toMatchObject({ status: 'FAILED', error: 'Frame could not be extracted at this position' });
+  });
 });
 
 describe('reprocess', () => {
@@ -306,12 +330,22 @@ describe('reprocess', () => {
     const r = await meera.post(`/api/v1/media/evidence/${ev.id}/reprocess`, { reason: 'test' });
     expect(r.status).toBe(202);
     expect(r.body.queued).toBe(true);
-    expect((await app.db.selectFrom('evidence').select('media_status').where('id', '=', ev.id).executeTakeFirstOrThrow()).media_status).toBe('PENDING');
+    // FN-7: an already processed item stays READY (playable) until the rebuilt generation replaces it
+    expect((await app.db.selectFrom('evidence').select('media_status').where('id', '=', ev.id).executeTakeFirstOrThrow()).media_status).toBe('READY');
     expect(await auditCount(ev.id, 'MEDIA_REPROCESS_REQUESTED')).toBe(1);
     const job = await app.db.selectFrom(sqlTable('pgboss.job')).select(['data']).where('name', '=', 'media.process').execute();
     expect(job.some((j) => (j.data as { evidenceId: string; force: boolean }).evidenceId === ev.id && (j.data as { force: boolean }).force)).toBe(true);
+    // FN-7: a second request while the job is queued is refused, not stacked
+    const dup = await admin.post(`/api/v1/media/evidence/${ev.id}/reprocess`);
+    expect(dup.status).toBe(409);
+    expect(await auditCount(ev.id, 'MEDIA_REPROCESS_REQUESTED')).toBe(1);
+    // ... also while the pipeline is running
+    const other = await processed('h264');
+    await app.db.updateTable('evidence').set({ media_status: 'PROCESSING' }).where('id', '=', other.id).execute();
+    expect((await meera.post(`/api/v1/media/evidence/${other.id}/reprocess`)).status).toBe(409);
+    await app.db.updateTable('evidence').set({ media_status: 'READY' }).where('id', '=', other.id).execute();
     // system monitor (no evidence media access) may also retry processing
-    expect((await admin.post(`/api/v1/media/evidence/${ev.id}/reprocess`)).status).toBe(202);
+    expect((await admin.post(`/api/v1/media/evidence/${other.id}/reprocess`)).status).toBe(202);
   });
 });
 

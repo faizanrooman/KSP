@@ -72,6 +72,10 @@ export interface EvidenceDetail extends EvidenceSummary {
   storageTier: string;
   objectLockUntil: string | null;
   recordedEndAt: string | null;
+  declaredRecordedAt?: string | null;
+  recordedAtSource?: 'CONTAINER_TAG' | 'DECLARED' | null;
+  recordedAtDiscrepancySeconds?: number | null;
+  recordedAtFlagged?: boolean;
   containerFormat: string | null;
   videoCodec: string | null;
   audioCodec: string | null;

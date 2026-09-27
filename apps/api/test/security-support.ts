@@ -79,6 +79,9 @@ export async function buildWorld(app: FastifyInstance): Promise<World> {
   ids.savedSearch = must('saved search', await owner.post('/api/v1/search/saved', { name: `${MARK} saved`, criteria: { text: MARK } })).body.id;
 
   ids.reportRun = must('report', await kavya.post('/api/v1/reports/runs', { reportType: 'EVIDENCE_INVENTORY', orgUnitId: cubbon })).body.id;
+  ids.reportSchedule = must('report schedule', await kavya.post('/api/v1/reports/schedules', { name: `${MARK} schedule`, reportType: 'EVIDENCE_INVENTORY', frequency: 'DAILY', orgUnitId: cubbon })).body.id;
+  ids.snapshotRequest = (await app.db.selectFrom('snapshot_requests').select('id').where('derivative_id', '=', ids.snapshot).executeTakeFirstOrThrow()).id;
+  ids.quarantineRelease = (await app.db.insertInto('quarantine_releases').values({ evidence_id: ev.id, requested_by: meeraId, reason: `${MARK} release`, actor: JSON.stringify({ type: 'USER', id: meeraId, name: 'Meera' }), status: 'COMPLETED' }).returning('id').executeTakeFirstOrThrow()).id;
   ids.alert = (await raiseAlert(app.db, { ruleCode: 'UPLOAD_FAILED', severity: 'WARNING', title: `${MARK} alert`, message: MARK, orgUnitId: cubbon, dedupeKey: `IDOR:${MARK}` })).id!;
   await dispatchPendingAlerts(app.db);
   ids.notification = (await app.db.selectFrom('notifications').select('id').where('user_id', '=', ids.kavya).orderBy('created_at', 'desc').executeTakeFirstOrThrow()).id;

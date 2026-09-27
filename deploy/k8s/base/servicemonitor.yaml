@@ -19,6 +19,17 @@ spec:
   endpoints:
     - { port: metrics, interval: 30s, path: / }
 ---
+# The AI worker has no Service (no inbound traffic except scrapes), so it is scraped per pod.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: ksp-ai-worker
+  labels: { release: prometheus }
+spec:
+  selector: { matchLabels: { app.kubernetes.io/name: ksp-ai-worker } }
+  podMetricsEndpoints:
+    - { port: metrics, interval: 30s, path: /metrics }
+---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -38,6 +49,16 @@ spec:
           for: 5m
           labels: { severity: critical }
           annotations: { summary: "No worker is up — ingestion/transcoding stopped", runbook: "docs/RUNBOOK.md#queue-backlog" }
+        - alert: KspAiWorkerDown
+          expr: sum(up{job=~".*ksp-ai-worker.*"}) == 0 or absent(up{job=~".*ksp-ai-worker.*"})
+          for: 5m
+          labels: { severity: warning }
+          annotations: { summary: "No AI worker is up — AI analysis stopped", runbook: "docs/RUNBOOK.md#ai-worker-down" }
+        - alert: KspAiWorkerHeartbeatStale
+          expr: time() - max(ksp_ai_worker_heartbeat_timestamp_seconds) > 120
+          for: 2m
+          labels: { severity: warning }
+          annotations: { summary: "AI worker heartbeat stale (cannot write to PostgreSQL?)", runbook: "docs/RUNBOOK.md#ai-worker-down" }
         - alert: KspApiHighErrorRate
           expr: |
             sum(rate(ksp_api_http_request_duration_seconds_count{status=~"5.."}[5m]))

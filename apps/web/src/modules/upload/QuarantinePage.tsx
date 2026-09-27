@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { QUARANTINE_REASONS, type Page } from '@ksp/shared';
 import { api } from '@/lib/api';
 import { formatBytes, formatDateTime, formatDuration, shortHash } from '@/lib/format';
 import { useUrlState } from '@/lib/hooks';
-import { Badge, Button, Card, ConfirmDialog, DataTable, EmptyState, Field, PageHeader, Pagination, Select, useToast, type Column } from '@/components/ui';
+import { Alert, Badge, Button, Card, ConfirmDialog, DataTable, EmptyState, Field, PageHeader, Pagination, Select, Spinner, useToast, type Column } from '@/components/ui';
 
 interface QuarantineItem {
   id: string;
@@ -28,23 +28,45 @@ interface QuarantineItem {
 
 const DEFAULTS = { reason: '', page: '1' };
 
+interface ReleaseStatus { requestId: string; evidenceId: string; status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED'; error: string | null; evidenceNumber: string | null }
+
+/** Polls one asynchronous release (the worker re-hashes and registers the file) until it finishes. */
+function PendingRelease({ requestId, filename, onDone }: { requestId: string; filename: string; onDone: (r: ReleaseStatus) => void }) {
+  const q = useQuery({
+    queryKey: ['uploads', 'release', requestId],
+    queryFn: () => api.get<ReleaseStatus>(`/uploads/quarantine/releases/${requestId}`),
+    refetchInterval: (qq) => (qq.state.data && ['COMPLETED', 'FAILED'].includes(qq.state.data.status) ? false : 2000),
+  });
+  const s = q.data;
+  useEffect(() => { if (s && ['COMPLETED', 'FAILED'].includes(s.status)) onDone(s); }, [s?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (s?.status === 'FAILED') return <Alert tone="red" title={`Release of ${filename} failed`}>{s.error}</Alert>;
+  if (s?.status === 'COMPLETED') return <Alert tone="green">{filename} released and registered{s.evidenceNumber ? ` as ${s.evidenceNumber}` : ''}.</Alert>;
+  return <Alert tone="blue"><span className="inline-flex items-center gap-2"><Spinner /> Releasing {filename}: {s?.status === 'RUNNING' ? 'verifying the hash and moving it to immutable storage…' : 'queued…'}</span></Alert>;
+}
+
 export function QuarantinePage() {
   const [q, setQ] = useUrlState(DEFAULTS);
   const page = Number(q.page) || 1;
   const qc = useQueryClient();
   const toast = useToast();
   const [action, setAction] = useState<{ kind: 'release' | 'reject'; item: QuarantineItem } | null>(null);
+  const [pending, setPending] = useState<Array<{ requestId: string; evidenceId: string; filename: string }>>([]);
   const list = useQuery({
     queryKey: ['uploads', 'quarantine', q],
     queryFn: () => api.get<Page<QuarantineItem>>('/uploads/quarantine', { reason: q.reason, page, pageSize: 25 }),
   });
   const decide = useMutation({
     mutationFn: ({ kind, id, reason }: { kind: 'release' | 'reject'; id: string; reason: string }) =>
-      api.post<{ id: string; status: string; evidenceNumber?: string | null }>(`/uploads/quarantine/${id}/${kind}`, { reason }),
+      api.post<{ id: string; status: string; requestId?: string }>(`/uploads/quarantine/${id}/${kind}`, { reason }),
     onSuccess: (r, v) => {
-      toast.success(v.kind === 'release' ? `Released and registered${r.evidenceNumber ? ` as ${r.evidenceNumber}` : ''}` : 'Rejected; record kept, staged file deleted');
+      if (v.kind === 'release' && r.requestId) {
+        setPending((p) => [...p, { requestId: r.requestId!, evidenceId: r.id, filename: action?.item.originalFilename ?? r.id }]);
+        toast.success('Release queued — the file is verified and registered in the background');
+      } else {
+        toast.success('Rejected; record kept, staged file deleted');
+        void qc.invalidateQueries({ queryKey: ['uploads'] });
+      }
       setAction(null);
-      void qc.invalidateQueries({ queryKey: ['uploads'] });
     },
   });
 
@@ -80,8 +102,8 @@ export function QuarantinePage() {
       header: <span className="sr-only">Actions</span>,
       render: (r) => (
         <div className="flex gap-1.5">
-          <Button size="sm" variant="success" onClick={() => setAction({ kind: 'release', item: r })}>Release</Button>
-          <Button size="sm" variant="danger" onClick={() => setAction({ kind: 'reject', item: r })}>Reject</Button>
+          <Button size="sm" variant="success" disabled={pending.some((x) => x.evidenceId === r.id)} onClick={() => setAction({ kind: 'release', item: r })}>Release</Button>
+          <Button size="sm" variant="danger" disabled={pending.some((x) => x.evidenceId === r.id)} onClick={() => setAction({ kind: 'reject', item: r })}>Reject</Button>
         </div>
       ),
     },
@@ -93,6 +115,11 @@ export function QuarantinePage() {
         title="Quarantine"
         subtitle="Uploads that failed validation (hash mismatch, corrupt or unsupported media, not a video, duplicate). Release registers the file as evidence; reject keeps the record but deletes the staged file. Every decision is recorded in the chain of custody."
       />
+      {pending.length > 0 && (
+        <div className="space-y-2" aria-live="polite">
+          {pending.map((x) => <PendingRelease key={x.requestId} requestId={x.requestId} filename={x.filename} onDone={() => void qc.invalidateQueries({ queryKey: ['uploads', 'quarantine'] })} />)}
+        </div>
+      )}
       <Card>
         <div className="mb-4 grid gap-3 sm:grid-cols-3">
           <Field label="Reason" htmlFor="q-reason">

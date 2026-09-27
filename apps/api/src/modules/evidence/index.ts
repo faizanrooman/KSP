@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { appendAudit } from '@ksp/core';
 import { EVIDENCE_STATUSES, MEDIA_STATUSES, STORAGE_TIERS } from '@ksp/shared';
 import { loadEvidenceFor } from '../../lib/access.js';
+import { recordInternalShareOpen } from '../../lib/share-views.js';
 import { hasPermission } from '../../lib/principal.js';
 import { conflict, forbidden, notFound, validationFailed } from '../../lib/errors.js';
 import { LIST_SORTS, listEvidence, loadDetail } from './queries.js';
@@ -103,6 +104,7 @@ export default async function evidence(fastify: FastifyInstance) {
   app.get('/:id', { schema: { tags: ['evidence'], summary: 'Evidence detail (records an EVIDENCE_VIEWED custody event)', params: idParams } }, async (req) => {
     const p = req.requirePrincipal();
     const ev = await loadEvidenceFor(app.db, p, req.params.id, 'evidence:read', req.actor());
+    await recordInternalShareOpen(app.db, p, ev, req.actor(), { ip: req.ip, userAgent: req.headers['user-agent'] ?? null, via: 'detail' });
     const { row, body } = await loadDetail(app.db, p, ev.id);
     const permissions = await evidencePermissions(app.db, p, { id: row.id, org_path: row.org_path, status: row.status, legal_hold: row.legal_hold });
     await appendAudit(app.db, req.actor(), { action: 'EVIDENCE_VIEWED', resourceType: 'evidence', resourceId: ev.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id });

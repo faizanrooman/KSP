@@ -82,7 +82,18 @@ export function useSnapshots(evidenceId: string, enabled = true) {
 export function useCreateSnapshot(evidenceId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { timeMs: number; source?: 'proxy' | 'original' }) => api.post<Snapshot>(`/media/evidence/${evidenceId}/snapshots`, { timeMs: v.timeMs, source: v.source ?? 'proxy' }),
+    mutationFn: async (v: { timeMs: number; source?: 'proxy' | 'original' }): Promise<Snapshot> => {
+      const r = await api.post<Snapshot | { requestId: string; status: string }>(`/media/evidence/${evidenceId}/snapshots`, { timeMs: v.timeMs, source: v.source ?? 'proxy' });
+      if (!('requestId' in r)) return r;
+      // FN-8: the worker is busy — the API answered 202; poll the request until the frame is extracted.
+      for (let i = 0; i < 120; i++) {
+        await new Promise((res) => setTimeout(res, 1000));
+        const s = await api.get<{ status: string; error: string | null; snapshot: Snapshot | null }>(`/media/snapshot-requests/${r.requestId}`);
+        if (s.status === 'COMPLETED' && s.snapshot) return s.snapshot;
+        if (s.status === 'FAILED') throw new Error(s.error ?? 'Frame could not be extracted at this position');
+      }
+      throw new Error('The snapshot is still being extracted; it will appear in the list when ready');
+    },
     onSuccess: () => void qc.invalidateQueries({ queryKey: snapshotsKey(evidenceId) }),
   });
 }

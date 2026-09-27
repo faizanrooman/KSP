@@ -80,6 +80,9 @@ export const AUDIT_ACTIONS = {
   EVIDENCE_TIER_CHANGED: { category: 'CUSTODY', custody: true },
   /** DR failover: storage_version_id re-pointed to the verified (same SHA-256) copy in the DR object store. */
   EVIDENCE_STORAGE_REPOINTED: { category: 'CUSTODY', custody: true },
+  /** dr.dispose-sweep deleted the DR-store copy of a DISPOSED item (or failed to: outcome FAILURE). */
+  EVIDENCE_DR_COPY_DELETED: { category: 'CUSTODY', custody: true },
+  EVIDENCE_DR_COPY_DELETE_FAILED: { category: 'CUSTODY', custody: true },
   EVIDENCE_LEGAL_HOLD_SET: { category: 'CUSTODY', custody: true },
   EVIDENCE_LEGAL_HOLD_RELEASED: { category: 'CUSTODY', custody: true },
   EVIDENCE_RETENTION_ASSIGNED: { category: 'CUSTODY', custody: true },
@@ -173,6 +176,14 @@ export const AUDIT_ACTIONS = {
   SHARE_LOCKED: { category: 'SHARE', custody: true },
   /** Watermarked playback variant generated for an external share. */
   SHARE_WATERMARK_GENERATED: { category: 'SHARE', custody: true },
+  /** The per-share watermarked variant was deleted (share revoked / expired / locked). */
+  SHARE_WATERMARK_DELETED: { category: 'SHARE', custody: true },
+  SHARE_UNLOCKED: { category: 'SHARE', custody: true },
+  SHARE_EXTENDED: { category: 'SHARE', custody: true },
+  /** The external link was re-issued (old link invalid) and/or the access code rotated. */
+  SHARE_LINK_REISSUED: { category: 'SHARE', custody: true },
+  /** Link (or, opt-in, access code) e-mailed to the external recipient; outcome FAILURE when the relay refused. */
+  SHARE_LINK_SENT: { category: 'SHARE', custody: true },
   /** Export package deleted after its retention period (cron). */
   EXPORT_EXPIRED: { category: 'EXPORT', custody: true },
   // Audit / reports / system
@@ -185,6 +196,10 @@ export const AUDIT_ACTIONS = {
   REPORT_REQUESTED: { category: 'REPORT', custody: false },
   REPORT_FAILED: { category: 'REPORT', custody: false },
   REPORT_DOWNLOADED: { category: 'REPORT', custody: false },
+  REPORT_SCHEDULE_CREATED: { category: 'REPORT', custody: false },
+  REPORT_SCHEDULE_UPDATED: { category: 'REPORT', custody: false },
+  REPORT_SCHEDULE_DELETED: { category: 'REPORT', custody: false },
+  REPORT_SCHEDULE_SKIPPED: { category: 'REPORT', custody: false },
   ALERT_ACKNOWLEDGED: { category: 'SYSTEM', custody: false },
   ALERT_RESOLVED: { category: 'SYSTEM', custody: false },
   ALERT_RULE_UPDATED: { category: 'ADMIN', custody: false },
