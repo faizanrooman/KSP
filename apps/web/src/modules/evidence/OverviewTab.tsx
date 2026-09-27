@@ -154,7 +154,18 @@ export function OverviewTab({ evidence }: { evidence: EvidenceSummary }) {
               { label: 'Original file', value: ev.originalFilename, mono: true },
               { label: 'MIME type', value: ev.mimeType },
               { label: 'Size', value: formatBytes(ev.sizeBytes) },
-              { label: 'Recorded start', value: formatDateTime(ev.recordedAt) },
+              {
+                label: 'Recorded start',
+                value: (
+                  <span>
+                    {formatDateTime(ev.recordedAt)}
+                    {ev.recordedAtSource && <span className="ml-1 text-xs text-ink-500">({ev.recordedAtSource === 'CONTAINER_TAG' ? 'camera clock in file' : 'declared at upload'})</span>}
+                    {ev.recordedAtFlagged && (
+                      <span className="ml-1"><Badge tone="amber">Time discrepancy</Badge> <span className="text-xs text-ink-700">declared {formatDateTime(ev.declaredRecordedAt ?? null)} — differs by {Math.round((ev.recordedAtDiscrepancySeconds ?? 0) / 60)} min</span></span>
+                    )}
+                  </span>
+                ),
+              },
               { label: 'Recorded end', value: formatDateTime(ev.recordedEndAt) },
               { label: 'Duration', value: formatDuration(ev.durationMs) },
               { label: 'Container', value: ev.containerFormat },

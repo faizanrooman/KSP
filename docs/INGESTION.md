@@ -68,8 +68,12 @@ the destination key is content-addressed, the counter/registration update runs u
    **`UNSUPPORTED_CODEC`**; duration > 0 and a clean decode (`ffmpeg -v error -xerror`) of the first and
    last 5 s (whole stream when ≤ 10 s) → else **`CORRUPT`**. Extension and declared MIME are never trusted.
 3. Metadata (`EVIDENCE_METADATA_EXTRACTED`): `duration_ms, container_format, video_codec, audio_codec,
-   width, height, frame_rate (avg), bit_rate, mime_type` (from the container), `recorded_at` = declared,
-   else container `creation_time` (epoch defaults ignored), `recorded_end_at`, GPS from ISO-6709 tags
+   width, height, frame_rate (avg), bit_rate, mime_type` (from the container), `recorded_at` = container
+   `creation_time` (camera clock in the file; epoch defaults ignored), else the declared `recordedAt` (FN-5);
+   the declared value is kept in `declared_recorded_at`, `recorded_at_source` = CONTAINER_TAG | DECLARED, and
+   `recorded_at_discrepancy_seconds` = |declared − container|; > 300 s is flagged in the metadata audit event
+   (`recordedAtDiscrepancyFlag`) and as a "Time discrepancy" badge on the evidence overview (all immutable after
+   registration, DB trigger); `recorded_end_at`, GPS from ISO-6709 tags
    (`com.apple.quicktime.location.ISO6709`, `location`, `location-eng`, …) → `gps_source CONTAINER_TAG`,
    else declared → `DECLARED`, else station coordinates → `STATION`; `device_metadata` = make/model/
    serial/firmware/encoder/software tags; `probe` = full ffprobe JSON. Stored for quarantined items too.
@@ -104,14 +108,19 @@ aborted, `UPLOAD_ABORTED {reason: EXPIRED}`; completed sessions whose evidence i
 | Method & path | Request | Response |
 |---|---|---|
 | `GET /uploads/quarantine` | `?orgUnitId&reason&page&pageSize` | `{items[{id,title,originalFilename,sizeBytes,sha256,statusReason,reasonCode,reasonMessage,duplicateOf,orgUnitName,uploadedBy,containerFormat,videoCodec,durationMs,createdAt,quarantinedAt}], total, page, pageSize}` |
-| `POST /uploads/quarantine/:evidenceId/release` | `{reason}` (5–2000 chars) | `{id, status:'REGISTERED', evidenceNumber, outcome}` |
+| `POST /uploads/quarantine/:evidenceId/release` | `{reason}` (5–2000 chars) | **202** `{requestId, id, status:'QUEUED', statusUrl}`; 409 while a release of the item is pending |
+| `GET /uploads/quarantine/releases/:requestId` | — | `{status: QUEUED|RUNNING|COMPLETED|FAILED, outcome, error, evidenceStatus, evidenceNumber}` (requester or quarantine manager in scope; else 404) |
 | `POST /uploads/quarantine/:evidenceId/reject` | `{reason}` | `{id, status:'REJECTED'}` |
 
 * Lists apply `orgScopeSql(evidence:quarantine_manage)` **and** `evidenceVisibleSql`. Decisions go through
   `loadEvidenceFor` (invisible → 404) and additionally require the permission at the evidence's org path.
 * Separation of duties: the uploader cannot release or reject their own upload (403 `SEPARATION_OF_DUTIES`).
-* Release registers through the same `registerEvidence()` path (synchronously in the request); the
-  `EVIDENCE_QUARANTINE_RELEASED` event with the reason commits in the registration transaction.
+* Release is **asynchronous** (FN-4): the API validates the decision (scope, SoD, status), records a
+  `quarantine_releases` row with the releasing user's audit actor snapshot and queues `ingest.release`; the worker
+  re-hashes if needed (multi-GB files no longer block an HTTP request), stores and registers through the same
+  `registerEvidence()` path — the `EVIDENCE_QUARANTINE_RELEASED` event (actor = releasing user) commits in the
+  registration transaction. Permanent failures mark the request FAILED with the reason; transient errors are
+  retried by pg-boss. The Quarantine page polls the request and shows progress / result.
 * Reject: status `REJECTED`, staged object deleted, storage fields cleared, record kept,
   `EVIDENCE_REJECTED` with reason. Non-quarantined items → 409.
 

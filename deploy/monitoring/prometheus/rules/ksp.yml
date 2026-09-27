@@ -24,6 +24,29 @@ groups:
         annotations:
           summary: "No worker is up — ingestion/transcoding stopped"
           runbook: "docs/RUNBOOK.md#queue-backlog"
+      - alert: KspAiWorkerDown
+        expr: sum(up{job="ksp-ai-worker"}) == 0 or absent(up{job="ksp-ai-worker"})
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "No AI worker is up — AI analysis jobs are not being processed"
+          runbook: "docs/RUNBOOK.md#ai-worker-down"
+      - alert: KspAiWorkerHeartbeatStale
+        # The AI worker writes worker_heartbeats every 30 s; the gauge is only updated after a successful DB write,
+        # so a live process that cannot reach PostgreSQL also fires this.
+        expr: time() - max(ksp_ai_worker_heartbeat_timestamp_seconds) > 120
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "AI worker heartbeat is {{ $value | humanizeDuration }} old"
+          runbook: "docs/RUNBOOK.md#ai-worker-down"
+      - alert: KspAiQueueWaitHigh
+        expr: histogram_quantile(0.9, sum(rate(ksp_ai_queue_claim_latency_seconds_bucket[30m])) by (le)) > 1800
+        for: 30m
+        labels: { severity: warning }
+        annotations:
+          summary: "90th percentile AI queue wait above 30 minutes — add AI worker capacity"
+          runbook: "docs/RUNBOOK.md#ai-worker-down"
   - name: ksp-api-slo
     rules:
       - record: ksp:api_http_5xx_ratio:rate5m

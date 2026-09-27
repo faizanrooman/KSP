@@ -20,6 +20,10 @@ export const QUEUE_DEFAULTS: Record<QueueName, { retryLimit: number; expireInSec
   [QUEUES.TIER_MIGRATE]: { retryLimit: 5, expireInSeconds: 12 * 3600 },
   [QUEUES.AI_TRAINING_EXPORT]: { retryLimit: 2, expireInSeconds: 3600 },
   [QUEUES.SHARE_WATERMARK]: { retryLimit: 3, expireInSeconds: 6 * 3600 },
+  // Delivery retries are scheduled explicitly (one job per attempt); the queue retry only covers crashes.
+  [QUEUES.ALERT_DELIVER]: { retryLimit: 1, expireInSeconds: 600 },
+  [QUEUES.QUARANTINE_RELEASE]: { retryLimit: 3, expireInSeconds: 6 * 3600 },
+  [QUEUES.SNAPSHOT_EXTRACT]: { retryLimit: 1, expireInSeconds: 600 },
 };
 
 export async function getQueue(connectionString?: string): Promise<PgBoss> {

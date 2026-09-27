@@ -93,8 +93,10 @@ cleared. See [AI-MODEL-LIFECYCLE.md](AI-MODEL-LIFECYCLE.md).
 ## Alerts, reports, health (**Alert rules**, **Reports**, **System health**)
 
 * Alert rules: 10 built-in rules (integrity failure, audit chain broken, storage thresholds, failed processing,
-  brute force, excessive downloads…) with thresholds and channels. Channels: in-app and webhook (HMAC-signed);
-  e-mail is **not implemented** (FN-1).
+  brute force, excessive downloads…) with thresholds and channels. Channels: in-app, webhook (HMAC-signed) and
+  e-mail (SMTP, `ALERT_SMTP_URL`); failed external deliveries are retried with exponential backoff
+  (Settings → Alert delivery: attempts, first delay, extra recipients per severity; per-rule recipients on the
+  Alert rules page).
 * Reports: 9 types, CSV/JSON/PDF, jurisdiction-scoped, hashed; recurring schedules not implemented.
 * System health: API/worker heartbeats, queue depth, storage, DB. Prometheus metrics on the internal metrics port
   (see [MONITORING.md](MONITORING.md)).

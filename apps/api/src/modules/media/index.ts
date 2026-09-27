@@ -6,7 +6,9 @@
  *   GET  /media/image/:derivativeId        (token, scope image, ref = derivative id) thumbnails/posters/snapshots/sprites
  *   GET  /media/evidence/:id/original      short-lived download URL for the ORIGINAL
  *   GET  /media/download/:evidenceId       (token, scope download) streams the original (custody audited)
- *   POST /media/evidence/:id/snapshots     exact-frame PNG snapshot
+ *   POST /media/evidence/:id/snapshots     exact-frame PNG snapshot — extracted by the worker (media.snapshot); the API
+ *                                          waits up to SNAPSHOT_WAIT_SECONDS (default 20) → 201, else 202 + requestId
+ *   GET  /media/snapshot-requests/:id      status of a queued snapshot (requester only) → snapshot when COMPLETED
  *   GET  /media/evidence/:id/snapshots     list snapshots
  *   POST /media/evidence/:id/reprocess     re-run the media pipeline (force)
  *
@@ -16,15 +18,18 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { createHash, randomUUID } from 'node:crypto';
 import { appendAudit, enqueue } from '@ksp/core';
-import { QUEUES, type MediaProcessPayload } from '@ksp/shared';
+import { QUEUES, type MediaProcessPayload, type SnapshotExtractPayload } from '@ksp/shared';
 import { loadEvidenceFor } from '../../lib/access.js';
+import { recordInternalShareOpen } from '../../lib/share-views.js';
 import { AppError, conflict, forbidden, notFound, unprocessable } from '../../lib/errors.js';
 import { hasPermission, hasPermissionAt } from '../../lib/principal.js';
 import { authenticateMediaToken, DOWNLOAD_TOKEN_TTL_SECONDS, IMAGE_TOKEN_TTL_SECONDS, imageUrl, issueUserToken, streamUrl, tokenExpiry } from './tokens.js';
 import { contentTypeFor, rewritePlaylist, rewriteVtt, sendObject } from './stream.js';
-import { extractFrame, frameAt } from './snapshot.js';
+import { frameAt } from './snapshot.js';
+
+/** How long POST /snapshots waits for the worker before answering 202 (FN-8). */
+const SNAPSHOT_WAIT_MS = Math.max(0, Number(process.env.SNAPSHOT_WAIT_SECONDS ?? 20)) * 1000;
 
 export const prefix = '/media';
 
@@ -54,6 +59,7 @@ export default async function media(fastify: FastifyInstance) {
   }, async (req) => {
     const p = req.requirePrincipal();
     const ev = await loadEvidenceFor(app.db, p, req.params.id, 'evidence:play', req.actor());
+    await recordInternalShareOpen(app.db, p, ev, req.actor(), { ip: req.ip, userAgent: req.headers['user-agent'] ?? null, via: 'playback' });
     const row = await app.db
       .selectFrom('evidence')
       .select(['id', 'media_status', 'media_error', 'duration_ms', 'frame_rate', 'width', 'height', 'status'])
@@ -277,7 +283,7 @@ export default async function media(fastify: FastifyInstance) {
       .executeTakeFirstOrThrow();
     if (!PLAYABLE_STATUSES.includes(row.status)) throw conflict('Evidence is not available');
     const { timeMs, source } = req.body;
-    let input: string;
+    let location: { bucket: string; key: string; versionId: string | null };
     let fps: number;
     let durationMs: number;
     if (source === 'proxy') {
@@ -286,44 +292,54 @@ export default async function media(fastify: FastifyInstance) {
       const m = proxy.meta as { fps?: number; durationMs?: number };
       fps = m.fps ?? Number(row.frame_rate ?? 25);
       durationMs = m.durationMs ?? Number(row.duration_ms ?? 0);
-      input = await app.storage.internalUrl(proxy.bucket, proxy.object_key, 600);
+      location = { bucket: proxy.bucket, key: proxy.object_key, versionId: null };
     } else {
       if (!row.storage_bucket || !row.storage_key || !row.frame_rate) throw conflict('Original is not available for frame extraction');
       fps = Number(row.frame_rate);
       durationMs = Number(row.duration_ms ?? 0);
-      input = await app.storage.internalUrl(row.storage_bucket, row.storage_key, 600, row.storage_version_id ?? undefined);
+      location = { bucket: row.storage_bucket, key: row.storage_key, versionId: row.storage_version_id };
     }
     if (!(fps > 0)) throw unprocessable('Frame rate unknown');
     if (durationMs && timeMs > durationMs) throw unprocessable('timeMs is beyond the end of the media');
     const lastFrame = durationMs ? Math.max(0, Math.ceil((durationMs * fps) / 1000 - 1e-6) - 1) : Number.MAX_SAFE_INTEGER;
     const frame = Math.min(frameAt(timeMs, fps), lastFrame);
-    let snap;
-    try {
-      snap = await extractFrame({ input, frame, fps, workDir: app.cfg.WORK_DIR });
-    } catch (err) {
-      req.log.warn({ err }, 'snapshot extraction failed');
-      throw unprocessable('Frame could not be extracted at this position');
+    if (!p.userId) throw forbidden('Snapshots require an interactive user');
+    // FN-8: FFmpeg runs in the worker. Queue, then wait briefly so the UI keeps its synchronous flow.
+    const reqRow = await app.db.insertInto('snapshot_requests')
+      .values({ evidence_id: ev.id, requested_by: p.userId, actor: JSON.stringify(req.actor()), params: JSON.stringify({ timeMs, source, frame, fps, ...location }) })
+      .returning('id').executeTakeFirstOrThrow();
+    await enqueue<SnapshotExtractPayload>(QUEUES.SNAPSHOT_EXTRACT, { snapshotRequestId: reqRow.id });
+    const deadline = Date.now() + SNAPSHOT_WAIT_MS;
+    for (;;) {
+      const s = await app.db.selectFrom('snapshot_requests').select(['status', 'derivative_id', 'error']).where('id', '=', reqRow.id).executeTakeFirstOrThrow();
+      if (s.status === 'COMPLETED' && s.derivative_id) {
+        const token = issueUserToken(p, ev.id, 'image', { ttlSeconds: IMAGE_TOKEN_TTL_SECONDS, ref: s.derivative_id });
+        return reply.status(201).send(snapshotDto(await snapshotRow(s.derivative_id), token));
+      }
+      if (s.status === 'FAILED') throw unprocessable(s.error ?? 'Frame could not be extracted at this position');
+      if (Date.now() >= deadline) break;
+      await new Promise((r) => setTimeout(r, 150));
     }
-    const sha256 = createHash('sha256').update(snap.png).digest('hex');
-    const id = randomUUID();
-    const bucket = app.storage.bucket('derived');
-    const key = `evidence/${ev.id}/snapshot/${id}.png`;
-    await app.storage.put(bucket, key, snap.png, { contentType: 'image/png', metadata: { sha256 } });
-    const meta = { timeMs, frameNumber: frame, frameTimeMs: Math.round((frame / fps) * 1000 * 1000) / 1000, fps, source, sha256 };
-    const saved = await app.db.transaction().execute(async (tx) => {
-      const d = await tx
-        .insertInto('evidence_derivatives')
-        .values({ id, evidence_id: ev.id, kind: 'SNAPSHOT', bucket, object_key: key, mime_type: 'image/png', size_bytes: snap.png.length, sha256, width: snap.width, height: snap.height, meta: JSON.stringify(meta), created_by: p.userId })
-        .returningAll()
-        .executeTakeFirstOrThrow();
-      await appendAudit(tx, req.actor(), { action: 'EVIDENCE_SNAPSHOT_CREATED', resourceType: 'evidence_derivative', resourceId: id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: meta });
-      return d;
-    }).catch(async (err) => {
-      await app.storage.delete(bucket, key).catch(() => undefined);
-      throw err;
-    });
-    const token = issueUserToken(p, ev.id, 'image', { ttlSeconds: IMAGE_TOKEN_TTL_SECONDS, ref: id });
-    return reply.status(201).send(snapshotDto({ ...saved, creator_name: p.username ?? null }, token));
+    return reply.status(202).send({ requestId: reqRow.id, status: 'QUEUED', statusUrl: `/api/v1/media/snapshot-requests/${reqRow.id}` });
+  });
+
+  const snapshotRow = (id: string) =>
+    app.db.selectFrom('evidence_derivatives as d').leftJoin('users as u', 'u.id', 'd.created_by')
+      .select(['d.id', 'd.meta', 'd.sha256', 'd.width', 'd.height', 'd.size_bytes', 'd.created_at', 'd.created_by', 'u.full_name as creator_name'])
+      .where('d.id', '=', id).executeTakeFirstOrThrow();
+
+  app.get('/snapshot-requests/:id', {
+    schema: { tags: ['media'], summary: 'Status of a queued snapshot extraction (requester only)', params: idParams },
+  }, async (req) => {
+    const p = req.requirePrincipal();
+    const r = await app.db.selectFrom('snapshot_requests').selectAll().where('id', '=', req.params.id).where('requested_by', '=', p.userId ?? '00000000-0000-0000-0000-000000000000').executeTakeFirst();
+    if (!r) throw notFound('Snapshot request');
+    // Still subject to the evidence rules (access may have been withdrawn since the request).
+    await loadEvidenceFor(app.db, p, r.evidence_id, 'evidence:snapshot', req.actor());
+    const snapshot = r.status === 'COMPLETED' && r.derivative_id
+      ? snapshotDto(await snapshotRow(r.derivative_id), issueUserToken(p, r.evidence_id, 'image', { ttlSeconds: IMAGE_TOKEN_TTL_SECONDS, ref: r.derivative_id }))
+      : null;
+    return { requestId: r.id, evidenceId: r.evidence_id, status: r.status, error: r.status === 'FAILED' ? r.error : null, snapshot };
   });
 
   app.get('/evidence/:id/snapshots', {
@@ -361,11 +377,22 @@ export default async function media(fastify: FastifyInstance) {
       throw forbidden();
     }
     if (!PLAYABLE_STATUSES.includes(ev.status)) throw conflict('Only registered evidence can be processed');
-    await app.db.transaction().execute(async (tx) => {
-      await tx.updateTable('evidence').set({ media_status: 'PENDING', media_error: null }).where('id', '=', ev.id).where('media_status', '<>', 'PROCESSING').execute();
-      await appendAudit(tx, req.actor(), { action: 'MEDIA_REPROCESS_REQUESTED', resourceType: 'evidence', resourceId: ev.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { reason: req.body?.reason ?? null } });
+    const hasDerivatives = !!(await app.db.selectFrom('evidence_derivatives').select('id').where('evidence_id', '=', ev.id).where('kind', '=', 'PROXY_MP4').executeTakeFirst());
+    const jobId = await app.db.transaction().execute(async (tx) => {
+      // FN-7: never stack a second pipeline on one that is queued or running (serialised per item).
+      await sql`SELECT pg_advisory_xact_lock(hashtextextended(${`reprocess:${ev.id}`}, 0))`.execute(tx);
+      const busy = await tx.selectFrom('evidence as e')
+        .select(['e.media_status', sql<boolean>`EXISTS (SELECT 1 FROM processing_jobs pj WHERE pj.evidence_id = e.id AND pj.kind = 'MEDIA_PROCESS' AND pj.status IN ('QUEUED','RUNNING'))`.as('job')])
+        .where('e.id', '=', ev.id).executeTakeFirstOrThrow();
+      if (busy.media_status === 'PROCESSING' || busy.job) throw conflict('Media processing is already queued or running for this item');
+      // With existing derivatives the item stays READY (still playable) until the rebuilt set replaces it.
+      if (!hasDerivatives) await tx.updateTable('evidence').set({ media_status: 'PENDING', media_error: null }).where('id', '=', ev.id).where('media_status', '<>', 'PROCESSING').execute();
+      await appendAudit(tx, req.actor(), { action: 'MEDIA_REPROCESS_REQUESTED', resourceType: 'evidence', resourceId: ev.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { reason: req.body?.reason ?? null, rebuild: hasDerivatives } });
+      const id = await enqueue<MediaProcessPayload>(QUEUES.MEDIA_PROCESS, { evidenceId: ev.id, force: true });
+      // Tracked from the moment it is queued (the worker's ProcessingTracker reuses this row by queue job id).
+      if (id) await tx.insertInto('processing_jobs').values({ kind: 'MEDIA_PROCESS', evidence_id: ev.id, queue_job_id: id, status: 'QUEUED' }).execute();
+      return id;
     });
-    const jobId = await enqueue<MediaProcessPayload>(QUEUES.MEDIA_PROCESS, { evidenceId: ev.id, force: true });
     return reply.status(202).send({ queued: true, jobId });
   });
 }

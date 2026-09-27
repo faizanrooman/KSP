@@ -35,7 +35,7 @@ Permission: `workspace:use` (guard in `preValidation` → 403 before validation)
 | `GET /workspaces/bookmarks?evidenceId&workspaceId?` · `POST /workspaces/bookmarks {evidenceId, workspaceId?, timeMs, label}` · `DELETE /workspaces/bookmarks/:id` | evidence:read (+ editor in the workspace) | custody `BOOKMARK_CREATED/DELETED` |
 | `GET /workspaces/annotations?evidenceId&workspaceId?&includeDeleted` · `POST /workspaces/annotations {evidenceId, workspaceId?, kind, startMs, endMs?, body?, region?, color?}` · `PATCH /workspaces/annotations/:id` · `DELETE /workspaces/annotations/:id {reason?}` | evidence:read (+ editor) | custody `ANNOTATION_CREATED/UPDATED(before/after)/DELETED` |
 | `GET /workspaces/:id/timeline` | viewer | reconstruction (below) |
-| `POST /workspaces/:id/timeline/events {title, description?, occurredAt, evidenceId?, timeMs?}` · `PATCH …/events/:eventId` · `DELETE …/events/:eventId` | editor | `TIMELINE_EVENT_CHANGED` (evidenceId when linked); linked evidence must be readable and an item |
+| `POST /workspaces/:id/timeline/events {title, description?, occurredAt, evidenceId?, timeMs?}` · `PATCH …/events/:eventId` · `DELETE …/events/:eventId` | editor | `TIMELINE_EVENT_CHANGED` (evidenceId when linked); linked evidence must be readable and an item; DELETE is a **soft delete** (`deleted_at`/`deleted_by`, row kept; DELETE revoked from `ksp_app`, migration 1057) |
 | `GET /workspaces/relations?evidenceId` · `POST /workspaces/relations {evidenceA, evidenceB, relation, note?}` · `DELETE /workspaces/relations/:id` | both items readable | custody `EVIDENCE_RELATION_CHANGED` on **both** items |
 
 Related-evidence suggestions are served by the search module: `GET /search/evidence/:id/related` (see SEARCH.md).

@@ -8,7 +8,8 @@
     "start": "node dist/main.js",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dr:dispose-sweep": "tsx --conditions=ksp-src src/bin/dr-dispose-sweep.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1140.0",
@@ -25,6 +26,8 @@
   "devDependencies": {
     "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.23.1",
-    "@types/yazl": "^3.3.1"
+    "@types/smtp-server": "^3.5.13",
+    "@types/yazl": "^3.3.1",
+    "smtp-server": "^3.19.13"
   }
 }

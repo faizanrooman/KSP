@@ -18,6 +18,7 @@ import { anprDetector, baseDetector, faceRecognitionDetector, FilteredDetector, 
 import type { GalleryEntry } from './models/sface.js';
 import type { PlateWatch } from './models/anpr.js';
 import { IouTracker, type Emitted } from './tracker.js';
+import { aiMetrics } from './metrics.js';
 
 export interface ClaimedJob {
   id: string;
@@ -26,6 +27,8 @@ export interface ClaimedJob {
   input: AiJobInput;
   params: Partial<AiJobParams>;
   model_ids: string[];
+  /** Seconds the job waited in QUEUED before this claim. */
+  queue_wait_seconds?: number;
 }
 
 export class JobError extends Error {
@@ -46,7 +49,7 @@ export async function claimJob(ctx: AiContext): Promise<ClaimedJob | null> {
       UPDATE ai_jobs SET status = 'RUNNING', started_at = now(), progress = 0,
              stats = jsonb_build_object('heartbeatAt', now(), 'worker', ${ctx.workerName}::text)
        WHERE id = (SELECT id FROM ai_jobs WHERE status = 'QUEUED' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1)
-      RETURNING id, evidence_id, tasks, input, params, model_ids`.execute(tx);
+      RETURNING id, evidence_id, tasks, input, params, model_ids, extract(epoch FROM now() - created_at)::float8 AS queue_wait_seconds`.execute(tx);
     const job = rows[0];
     if (!job) return null;
     await appendAudit(tx, actorOf(ctx), {
@@ -192,7 +195,9 @@ export async function runJob(ctx: AiContext, job: ClaimedJob, opts: { signal?: A
     for await (const frame of sampleFrames(local, { fps, width: size.width, height: size.height, signal: abort.signal })) {
       const t0 = Date.now();
       for (const r of runs) {
+        const ti = performance.now();
         const dets = await r.detector.detect(frame.image, r.threshold);
+        aiMetrics.inference.observe({ model: r.model.code, task: r.task }, (performance.now() - ti) / 1000);
         stats.rawDetections = (stats.rawDetections ?? 0) + dets.length;
         if (r === clsSource) observeClassification(cls, dets, frame.image, frame.timeMs, rules);
         if (!r.store) continue;
@@ -200,6 +205,7 @@ export async function runJob(ctx: AiContext, job: ClaimedJob, opts: { signal?: A
       }
       inferMs += Date.now() - t0;
       stats.framesProcessed = frame.index + 1;
+      aiMetrics.frames.inc();
       if (Date.now() - lastBeat > 1500) {
         lastBeat = Date.now();
         stats.msPerFrame = Math.round(inferMs / stats.framesProcessed);

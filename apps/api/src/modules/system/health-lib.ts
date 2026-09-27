@@ -4,7 +4,7 @@
  */
 import { HeadBucketCommand } from '@aws-sdk/client-s3';
 import { sql } from 'kysely';
-import { HEARTBEAT_STALE_SECONDS, queueStats, type BucketRole, type QueueStat } from '@ksp/core';
+import { HEARTBEAT_STALE_SECONDS, integrityCoverage, queueStats, type BucketRole, type QueueStat } from '@ksp/core';
 import type { FastifyInstance } from 'fastify';
 import { getSettings } from '../../lib/settings.js';
 
@@ -56,6 +56,8 @@ export async function storageHealth(app: FastifyInstance) {
   return { ok: buckets.every((b) => b.ok), ms: Math.max(...buckets.map((b) => b.ms)), buckets };
 }
 
+export const AI_WORKER_SERVICE = 'ksp-ai-worker';
+
 export async function workerHeartbeats(app: FastifyInstance) {
   const rows = await app.db
     .selectFrom('worker_heartbeats')
@@ -69,7 +71,14 @@ export async function workerHeartbeats(app: FastifyInstance) {
     ageSeconds: Math.round(r.age), alive: r.age <= HEARTBEAT_STALE_SECONDS, info: r.info as Record<string, unknown>,
   }));
   const services = [...new Set(items.map((i) => i.service))].map((s) => ({ service: s, alive: items.filter((i) => i.service === s && i.alive).length, stale: items.filter((i) => i.service === s && !i.alive).length }));
-  return { staleAfterSeconds: HEARTBEAT_STALE_SECONDS, items, services, alive: items.filter((i) => i.alive).length };
+  const ai = items.filter((i) => i.service === AI_WORKER_SERVICE);
+  const aiQueue = await app.db.selectFrom('ai_jobs').select([sql<number>`count(*)::int`.as('n'), sql<number | null>`extract(epoch FROM now() - min(created_at))::float8`.as('oldest')]).where('status', '=', 'QUEUED').executeTakeFirstOrThrow();
+  const aiWorker = {
+    alive: ai.filter((i) => i.alive).length, stale: ai.filter((i) => !i.alive).length, lastSeenAt: ai[0]?.lastSeenAt ?? null,
+    queuedJobs: aiQueue.n, oldestQueuedSeconds: aiQueue.oldest === null ? null : Math.round(aiQueue.oldest),
+  };
+  // `alive` counts pg-boss workers only (the AI worker is reported separately so it cannot mask a dead worker).
+  return { staleAfterSeconds: HEARTBEAT_STALE_SECONDS, items, services, alive: items.filter((i) => i.alive && i.service !== AI_WORKER_SERVICE).length, aiWorker };
 }
 
 export function summariseQueues(qs: QueueStat[]) {
@@ -155,7 +164,7 @@ export function channelStatus() {
   return {
     inApp: 'ENABLED',
     webhook: process.env.ALERT_WEBHOOK_URL ? 'CONFIGURED' : 'NOT_CONFIGURED',
-    email: process.env.ALERT_SMTP_URL ? 'CONFIGURED_NOT_IMPLEMENTED' : 'NOT_IMPLEMENTED',
+    email: process.env.ALERT_SMTP_URL ? 'CONFIGURED' : 'NOT_CONFIGURED',
   };
 }
 
@@ -163,20 +172,24 @@ export async function fullHealth(app: FastifyInstance) {
   const t0 = performance.now();
   const [database, objectStorage] = await Promise.all([databaseHealth(app), storageHealth(app)]);
   const qs = database.ok ? await queueStats(app.db).catch(() => [] as QueueStat[]) : [];
-  const [workers, backups, ledger, storageUse, alerts] = database.ok
+  const [workers, backups, ledger, storageUse, alerts, integrity] = database.ok
     ? await Promise.all([
         workerHeartbeats(app), backupStatus(app), ledgerStatus(app), storageUtilisation(app),
         app.db.selectFrom('alerts').select(['severity', sql<number>`count(*)::int`.as('n')]).where('status', '<>', 'RESOLVED').groupBy('severity').execute(),
+        integrityCoverage(app.db),
       ])
-    : [null, null, null, null, []];
+    : [null, null, null, null, [], null];
   const reasons: string[] = [];
   if (!database.ok) reasons.push('database unreachable');
   if (!objectStorage.ok) reasons.push('object storage unreachable');
   if (workers && workers.alive === 0) reasons.push('no live worker heartbeat');
+  // AI analysis is optional: only degrade when an AI worker was seen in the last day or AI jobs are waiting.
+  if (workers && workers.aiWorker.alive === 0 && (workers.aiWorker.stale > 0 || (workers.aiWorker.oldestQueuedSeconds ?? 0) > 300)) reasons.push('no live AI worker heartbeat');
   const q = summariseQueues(qs);
   if (q.deadLettered > 0) reasons.push(`${q.deadLettered} dead-lettered jobs`);
   if (backups && (!backups.lastSuccessful || (backups.lastSuccessfulAgeHours ?? 0) > 26)) reasons.push(backups.recorded ? 'no successful backup in the last 26 h' : 'no backup runs recorded');
   if (ledger?.verification?.firstBadSeq) reasons.push('audit ledger verification failed');
+  if (integrity?.projectedCycleDays && integrity.projectedCycleDays > integrity.policy.fullCycleDays) reasons.push(`fixity sweep needs ${integrity.projectedCycleDays} days per full cycle (policy ${integrity.policy.fullCycleDays})`);
   return {
     status: !database.ok ? 'down' : reasons.length ? 'degraded' : 'ok',
     reasons,
@@ -190,6 +203,7 @@ export async function fullHealth(app: FastifyInstance) {
     backups,
     auditLedger: ledger,
     storage: storageUse,
+    integrity,
     openAlerts: Object.fromEntries(['CRITICAL', 'WARNING', 'INFO'].map((s) => [s, alerts.find((a) => a.severity === s)?.n ?? 0])),
     alertChannels: channelStatus(),
   };

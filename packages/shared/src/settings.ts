@@ -36,6 +36,21 @@ export interface ShareExportPolicy {
   exportRetentionDays: number;
   excessiveDownloadsPerHour: number;
 }
+/** Outbound alert delivery (e-mail + webhook): retries with exponential backoff and e-mail recipients. */
+export interface AlertDeliveryPolicy {
+  maxAttempts: number; // attempts per external delivery (1 = no retry)
+  baseDelaySeconds: number; // retry n waits baseDelaySeconds * 2^(n-1)
+  emailAlertManagers: boolean; // e-mail alerts:manage holders in scope (users.email)
+  warningRecipients: string[]; // extra addresses for WARNING (and CRITICAL) alerts
+  criticalRecipients: string[]; // extra addresses for CRITICAL alerts only
+}
+/** Fixity (integrity) sweep: verify every original (and recorded secondary copy) once per cycle. */
+export interface IntegrityPolicy {
+  fullCycleDays: number; // nightly batch = ceil(total / fullCycleDays)
+  maxBytesPerNight: number; // byte budget for one nightly sweep (0 = unlimited)
+  minPerNight: number;
+  maxPerNight: number;
+}
 
 export interface SystemSettings {
   passwordPolicy: PasswordPolicy;
@@ -44,6 +59,8 @@ export interface SystemSettings {
   uploadPolicy: UploadPolicy;
   storagePolicy: StoragePolicy;
   shareExportPolicy: ShareExportPolicy;
+  alertDeliveryPolicy: AlertDeliveryPolicy;
+  integrityPolicy: IntegrityPolicy;
 }
 
 export const DEFAULT_SETTINGS: SystemSettings = {
@@ -58,6 +75,8 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   uploadPolicy: { maxFileSizeBytes: 50 * 1024 ** 3, chunkSizeBytes: 16 * 1024 ** 2, sessionTtlHours: 72, maxConcurrentSessionsPerUser: 20 },
   storagePolicy: { warnThresholdPercent: 75, criticalThresholdPercent: 90, capacityBytes: 0 },
   shareExportPolicy: { maxShareDays: 30, exportRetentionDays: 30, excessiveDownloadsPerHour: 20 },
+  alertDeliveryPolicy: { maxAttempts: 5, baseDelaySeconds: 60, emailAlertManagers: true, warningRecipients: [], criticalRecipients: [] },
+  integrityPolicy: { fullCycleDays: 90, maxBytesPerNight: 2 * 1024 ** 4, minPerNight: 100, maxPerNight: 200_000 },
 };
 
 export type SettingKey = keyof SystemSettings;

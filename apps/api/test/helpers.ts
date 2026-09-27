@@ -1,7 +1,10 @@
 import type { FastifyInstance, InjectOptions } from 'fastify';
 import { CSRF_COOKIE, CSRF_HEADER } from '@ksp/shared';
 import { DEV_PASSWORD } from '@ksp/core/dev-seed';
-import { hashSecret } from '@ksp/core';
+import { getQueue, hashSecret } from '@ksp/core';
+import { QUEUES, type SnapshotExtractPayload } from '@ksp/shared';
+import type { PgBoss } from 'pg-boss';
+import { runSnapshotExtract } from '../../worker/src/jobs/media/snapshot.js';
 import { authenticator } from 'otplib';
 import { buildApp } from '../src/app.js';
 
@@ -25,13 +28,30 @@ let appPromise: Promise<FastifyInstance> | undefined;
 
 /** One app instance per test file (closed in afterAll via closeApp). */
 export function getApp(): Promise<FastifyInstance> {
-  return (appPromise ??= buildApp({ logger: false }));
+  return (appPromise ??= buildApp({ logger: false }).then(async (app) => {
+    await startSnapshotConsumer(app);
+    return app;
+  }));
+}
+
+/**
+ * Snapshot extraction runs in the worker (media.snapshot, FN-8) and the API waits for it. API tests consume that
+ * queue in-process with the REAL worker handler (real queue, FFmpeg, S3, DB) so POST /snapshots behaves as deployed.
+ */
+let snapshotBoss: PgBoss | undefined;
+async function startSnapshotConsumer(app: FastifyInstance): Promise<void> {
+  snapshotBoss = await getQueue();
+  await snapshotBoss.work<SnapshotExtractPayload>(QUEUES.SNAPSHOT_EXTRACT, { pollingIntervalSeconds: 0.5, localConcurrency: 2 }, async (jobs) => {
+    for (const j of jobs) await runSnapshotExtract({ db: app.db, storage: app.storage, cfg: app.cfg }, j.data.snapshotRequestId);
+  });
 }
 
 export async function closeApp(): Promise<void> {
   if (appPromise) {
     const app = await appPromise;
     appPromise = undefined;
+    await snapshotBoss?.offWork(QUEUES.SNAPSHOT_EXTRACT).catch(() => undefined);
+    snapshotBoss = undefined;
     await app.close();
   }
 }

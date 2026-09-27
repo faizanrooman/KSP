@@ -4,10 +4,12 @@ import { createHmac } from 'node:crypto';
 import pg from 'pg';
 import { sql } from 'kysely';
 import {
-  appendAudit, createDb, dispatchPendingAlerts, getQueue, loadConfig, raiseAlert, stopQueue, storage, webhookChannel, type Database,
+  appendAudit, createDb, deliverAlert, dispatchPendingAlerts, emailChannel, getQueue, loadConfig, raiseAlert, resetMailers, stopQueue, storage, webhookChannel, type Database,
 } from '@ksp/core';
+import { DEFAULT_SETTINGS, type AlertDeliverPayload } from '@ksp/shared';
+import { SMTPServer } from 'smtp-server';
 import { createRegisteredEvidence, type CreatedEvidence } from '../../api/test/fixtures/evidence.js';
-import { evaluateRule } from '../src/jobs/alerts/index.js';
+import { evaluateRule, runAlertDelivery } from '../src/jobs/alerts/index.js';
 
 let db: Database;
 let owner: pg.Client;
@@ -328,13 +330,132 @@ describe('notification fan-out', () => {
     expect(received).toHaveLength(3);
   });
 
-  it('records webhook failures without failing the cycle', async () => {
+  it('retries failed webhook deliveries with exponential backoff and records every attempt', async () => {
     status = 500;
     const a = await raiseAlert(db, { ruleCode: 'UPLOAD_FAILED', title: 'x', message: 'x', dedupeKey: 'N:5' });
-    await dispatchPendingAlerts(db, [webhookChannel({ ALERT_WEBHOOK_URL: url })]);
-    const d = await db.selectFrom('alert_deliveries').select(['channel', 'status', 'detail']).where('alert_id', '=', a.id!).where('channel', '=', 'WEBHOOK').executeTakeFirstOrThrow();
-    expect(d).toMatchObject({ status: 'FAILED' });
-    expect(d.detail).toMatch(/HTTP 500/);
+    const scheduled: Array<{ payload: AlertDeliverPayload; delay: number }> = [];
+    const scheduleRetry = async (payload: AlertDeliverPayload, delay: number) => { scheduled.push({ payload, delay }); };
+    await dispatchPendingAlerts(db, [webhookChannel({ ALERT_WEBHOOK_URL: url })], 200, { scheduleRetry });
+    const rows = () => db.selectFrom('alert_deliveries').select(['channel', 'status', 'attempt', 'detail', 'next_attempt_at']).where('alert_id', '=', a.id!).where('channel', '=', 'WEBHOOK').orderBy('id').execute();
+    let d = await rows();
+    expect(d).toHaveLength(1);
+    expect(d[0]).toMatchObject({ status: 'RETRYING', attempt: 1 });
+    expect(d[0]!.detail).toMatch(/HTTP 500/);
+    expect(d[0]!.next_attempt_at!.getTime()).toBeGreaterThan(Date.now() + 50_000); // base delay 60 s
+    expect(scheduled).toEqual([{ payload: { alertId: a.id, channel: 'WEBHOOK', attempt: 2 }, delay: 60 }]);
+    // attempt 2 fails again → delay doubles
+    await deliverAlert(db, a.id!, webhookChannel({ ALERT_WEBHOOK_URL: url }), 2, { scheduleRetry });
+    expect(scheduled[1]).toEqual({ payload: { alertId: a.id, channel: 'WEBHOOK', attempt: 3 }, delay: 120 });
+    // attempt 3 succeeds
     status = 200;
+    expect(await deliverAlert(db, a.id!, webhookChannel({ ALERT_WEBHOOK_URL: url }), 3, { scheduleRetry })).toMatchObject({ status: 'SENT', attempt: 3 });
+    d = await rows();
+    expect(d.map((x) => `${x.attempt}:${x.status}`)).toEqual(['1:RETRYING', '2:RETRYING', '3:SENT']);
+    expect(scheduled).toHaveLength(2);
+  });
+
+  it('records FAILED once maxAttempts is exhausted; the default scheduler enqueues alerts.deliver with a delay', async () => {
+    status = 503;
+    await db.insertInto('system_settings').values({ key: 'alertDeliveryPolicy', value: JSON.stringify({ ...DEFAULT_SETTINGS.alertDeliveryPolicy, maxAttempts: 2, baseDelaySeconds: 30 }) })
+      .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify({ ...DEFAULT_SETTINGS.alertDeliveryPolicy, maxAttempts: 2, baseDelaySeconds: 30 }) })).execute();
+    try {
+      const a = await raiseAlert(db, { ruleCode: 'UPLOAD_FAILED', title: 'x', message: 'x', dedupeKey: 'N:6' });
+      const first = await deliverAlert(db, a.id!, webhookChannel({ ALERT_WEBHOOK_URL: url }), 1); // real queue
+      expect(first).toMatchObject({ status: 'RETRYING', attempt: 1 });
+      const { rows: jobs } = await sql<{ data: AlertDeliverPayload; start_after: Date }>`SELECT data, start_after FROM pgboss.job WHERE name = 'alerts.deliver' AND data->>'alertId' = ${a.id}`.execute(db);
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0]!.data).toEqual({ alertId: a.id, channel: 'WEBHOOK', attempt: 2 });
+      expect(new Date(jobs[0]!.start_after).getTime()).toBeGreaterThan(Date.now() + 20_000);
+      // the worker handler runs the retry: final attempt → FAILED, nothing more scheduled
+      expect(await runAlertDelivery(db, jobs[0]!.data, { ALERT_WEBHOOK_URL: url })).toMatchObject({ status: 'FAILED', attempt: 2 });
+      const d = await db.selectFrom('alert_deliveries').select(['status', 'attempt', 'detail']).where('alert_id', '=', a.id!).where('channel', '=', 'WEBHOOK').orderBy('id').execute();
+      expect(d.map((x) => `${x.attempt}:${x.status}`)).toEqual(['1:RETRYING', '2:FAILED']);
+      expect(d[1]!.detail).toMatch(/HTTP 503.*after 2 attempts/);
+      const { rows: after } = await sql<{ n: number }>`SELECT count(*)::int AS n FROM pgboss.job WHERE name = 'alerts.deliver' AND data->>'alertId' = ${a.id}`.execute(db);
+      expect(after[0]!.n).toBe(1);
+      // a retry for a resolved alert is skipped
+      await db.updateTable('alerts').set({ status: 'RESOLVED', resolved_at: new Date() }).where('id', '=', a.id!).execute();
+      expect(await runAlertDelivery(db, { alertId: a.id!, channel: 'WEBHOOK', attempt: 2 }, { ALERT_WEBHOOK_URL: url })).toMatchObject({ status: 'SKIPPED' });
+    } finally {
+      await db.deleteFrom('system_settings').where('key', '=', 'alertDeliveryPolicy').execute();
+      status = 200;
+    }
+  });
+});
+
+describe('e-mail channel (SMTP)', () => {
+  let smtp: SMTPServer;
+  let port = 0;
+  let mails: Array<{ from: string; to: string[]; raw: string }> = [];
+  let refuse = false;
+  beforeAll(async () => {
+    smtp = new SMTPServer({
+      authOptional: true, disabledCommands: ['STARTTLS'], logger: false,
+      onRcptTo(addr, _s, cb) { cb(refuse ? Object.assign(new Error('mailbox unavailable'), { responseCode: 550 }) : undefined); },
+      onData(stream, session, cb) {
+        let raw = '';
+        stream.on('data', (c: Buffer) => (raw += c.toString('utf8')));
+        stream.on('end', () => {
+          raw = raw.replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/g, (_x, h: string) => String.fromCharCode(parseInt(h, 16))); // quoted-printable
+          mails.push({ from: session.envelope.mailFrom ? (session.envelope.mailFrom as { address: string }).address : '', to: session.envelope.rcptTo.map((r) => r.address), raw });
+          cb();
+        });
+      },
+    });
+    await new Promise<void>((r) => smtp.listen(0, '127.0.0.1', () => r()));
+    port = (smtp.server.address() as { port: number }).port;
+  });
+  afterAll(async () => {
+    resetMailers();
+    await new Promise<void>((r) => smtp.close(() => r()));
+  });
+  const env = () => ({ ALERT_SMTP_URL: `smtp://127.0.0.1:${port}`, ALERT_EMAIL_FROM: 'KSP VMS <alerts@ksp.example>', APP_BASE_URL: 'https://vms.ksp.example' });
+
+  it('e-mails alert managers in scope, rule and severity recipients with the alert content', async () => {
+    mails = [];
+    await db.updateTable('alert_rules').set({ email_recipients: ['soc@ksp.example'] }).where('code', '=', 'INTEGRITY_FAILURE').execute();
+    await db.insertInto('system_settings').values({ key: 'alertDeliveryPolicy', value: JSON.stringify({ ...DEFAULT_SETTINGS.alertDeliveryPolicy, warningRecipients: ['ops@ksp.example'], criticalRecipients: ['dgp-office@ksp.example'] }) }).execute();
+    try {
+      const a = await raiseAlert(db, { ruleCode: 'INTEGRITY_FAILURE', title: 'Hash mismatch on BWC_0042', message: 'Stored original hash differs from the registered SHA-256.', orgUnitId: orgs.ps_cubbonpark!.id, resourceType: 'evidence', resourceId: ev.id, dedupeKey: 'E:1' });
+      await dispatchPendingAlerts(db, [emailChannel(env())]);
+      expect(mails).toHaveLength(1);
+      const m = mails[0]!;
+      expect(m.from).toBe('alerts@ksp.example');
+      const admin = await db.selectFrom('users').select('email').where('id', 'in', [adminId, kavyaId]).execute();
+      expect(m.to.sort()).toEqual([...admin.map((u) => u.email!.toLowerCase()), 'soc@ksp.example', 'ops@ksp.example', 'dgp-office@ksp.example'].sort());
+      expect(m.to).not.toContain((await db.selectFrom('users').select('email').where('id', '=', meeraId).executeTakeFirstOrThrow()).email); // alerts:read only
+      expect(m.raw).toMatch(/Subject: \[KSP VMS\] CRITICAL: Hash mismatch on BWC_0042/);
+      expect(m.raw).toContain('Stored original hash differs from the registered SHA-256.');
+      expect(m.raw).toContain(`https://vms.ksp.example/alerts/${a.id}`);
+      expect(m.raw).toMatch(new RegExp(`X-KSP-Alert-Id: ${a.id}`, "i"));
+      expect(m.raw).not.toMatch(/originals\//); // no storage keys
+      const d = await db.selectFrom('alert_deliveries').select(['status', 'recipients']).where('alert_id', '=', a.id!).where('channel', '=', 'EMAIL').executeTakeFirstOrThrow();
+      expect(d).toEqual({ status: 'SENT', recipients: 5 });
+    } finally {
+      await db.updateTable('alert_rules').set({ email_recipients: [] }).where('code', '=', 'INTEGRITY_FAILURE').execute();
+      await db.deleteFrom('system_settings').where('key', '=', 'alertDeliveryPolicy').execute();
+    }
+  });
+
+  it('a relay refusing every recipient is a failed (retried) delivery; no recipients is SKIPPED', async () => {
+    mails = [];
+    refuse = true;
+    try {
+      const a = await raiseAlert(db, { ruleCode: 'UPLOAD_FAILED', title: 'x', message: 'x', orgUnitId: orgs.ps_cubbonpark!.id, dedupeKey: 'E:2' });
+      const r = await deliverAlert(db, a.id!, emailChannel(env()), 1, { scheduleRetry: async () => undefined });
+      expect(r).toMatchObject({ status: 'RETRYING' });
+      expect(mails).toHaveLength(0);
+    } finally {
+      refuse = false;
+    }
+    await db.insertInto('system_settings').values({ key: 'alertDeliveryPolicy', value: JSON.stringify({ ...DEFAULT_SETTINGS.alertDeliveryPolicy, emailAlertManagers: false }) }).execute();
+    try {
+      const b = await raiseAlert(db, { ruleCode: 'UPLOAD_FAILED', title: 'y', message: 'y', orgUnitId: orgs.ps_cubbonpark!.id, dedupeKey: 'E:3' });
+      expect(await deliverAlert(db, b.id!, emailChannel(env()), 1)).toMatchObject({ status: 'SKIPPED', detail: 'no e-mail recipients' });
+    } finally {
+      await db.deleteFrom('system_settings').where('key', '=', 'alertDeliveryPolicy').execute();
+    }
+    // unconfigured channel
+    expect(emailChannel({}).configured).toBe(false);
   });
 });

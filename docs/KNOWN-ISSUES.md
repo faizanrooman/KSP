@@ -31,7 +31,7 @@ Owner is a role, not a person.
 | OPS-2 | GitHub Actions `ci.yml` / `release.yml` never executed; versitygw release tarball name in the CI DR step assumed; CI does not run the Playwright suite | MEDIUM | UNVERIFIED | DevOps: first CI run; add E2E job |
 | OPS-3 | 2-hour restoration and 99.5 % availability not demonstrated at production scale; local drill only (small data); CNPG failover, PITR, native replication untested | HIGH | UNVERIFIED | DevOps: staging DR drill at realistic volume |
 | OPS-4 | `s3-replicate.ts` copies get new version IDs → `--repoint` needed after failover (native replication avoids it); full re-hash is O(bytes) — use `--trust-marker` within the RTO | LOW | accepted | by design |
-| OPS-5 | Disposal is not propagated to the DR store (copies persist until their own lock expires) — DR disposal sweep needed | MEDIUM | open | DevOps / custodian |
+| OPS-5 | **Fixed**: DR copies made by `s3-replicate.ts` are recorded (`dr_object_copies`) and deleted by the `dr.dispose-sweep` cron / CLI once the evidence is DISPOSED (governance bypass, failures recorded + audited + retried). Native store replication of deletes and COMPLIANCE-mode DR buckets (cannot delete before retain-until) UNVERIFIED | LOW | fixed / UNVERIFIED | DevOps: give the worker a delete-capable DR identity |
 | OPS-6 | Staging bucket lifecycle (abort incomplete multipart, orphaned/quarantined objects) not applied on versitygw (NotImplemented); `ensure-buckets.mjs` applies it where supported | LOW | open | Infra: verify on production store |
 | OPS-7 | Base image digests resolved 2026-09-25; must be refreshed monthly (no Renovate/Dependabot yet) | LOW | open | DevOps |
 | OPS-8 | Backup manifests were not signed; `restore.sh` placed manifest `headSeq` into SQL unquoted | LOW | fixed | Ed25519 detached `manifest.json.sig` (`BACKUP_SIGNING_KEY_FILE`), verified before any manifest field is used when `BACKUP_SIGNING_PUBKEY_FILE` is set (k8s verify job sets it; `BACKUP_REQUIRE_SIGNATURE=1` option); `headSeq` validated as integer + psql variable. `verify-backup.test.sh` 14/14 incl. forged-signature cases |
@@ -60,18 +60,18 @@ Owner is a role, not a person.
 
 | ID | Area | Issue | Sev | Status |
 |---|---|---|---|---|
-| FN-1 | Alerts | E-mail channel not implemented (deliveries recorded FAILED "not implemented"); webhook tested only against a local server; failed external deliveries are not retried | MEDIUM | open |
-| FN-2 | Reports | Scheduled (recurring) reports not implemented | LOW | open |
-| FN-3 | Monitoring | AI worker has no service metrics/heartbeat (only per-job heartbeat); availability SLO probe and Prometheus alert rules authored, not deployed | MEDIUM | open / UNVERIFIED |
-| FN-4 | Ingestion | Quarantine release re-hashes the object inside the HTTP request (slow for multi-GB files) | LOW | open |
-| FN-5 | Ingestion | Client-declared `recordedAt` overrides container creation time | LOW | open |
-| FN-6 | Integrity | Nightly fixity sweep samples 100 items/night (≈36k/year) — too small for state-wide volume; secondary copies not fixity-checked | MEDIUM | open |
-| FN-7 | Video | Reprocess deletes old derivatives before new ones exist; reprocess enqueues even when already processing | LOW | open |
-| FN-8 | Video | Snapshot extraction runs in the API process (rate-limited, 90 s timeout) — move to queue at scale | LOW | open |
+| FN-1 | Alerts | **Fixed**: SMTP e-mail channel (nodemailer; manager/rule/severity recipients) and retried external deliveries (`alerts.deliver`, exponential backoff, every attempt in `alert_deliveries`), tested against a local SMTP sink and HTTP server. Delivery through a real SMTP relay / real webhook receiver remains UNVERIFIED | LOW | fixed / UNVERIFIED |
+| FN-2 | Reports | **Fixed**: scheduled reports (`report_schedules`, cron `reports.schedule`, owner jurisdiction frozen at run time, recipients notified in-app + e-mail link); e-mail via a real relay UNVERIFIED | LOW | fixed |
+| FN-3 | Monitoring | **Fixed**: AI worker service heartbeat (ksp_ai, 30 s) + Prometheus metrics on :METRICS_PORT+2 (jobs, frames, per-model inference, claim latency); health page shows AI workers; Prometheus alert rules authored. Rules/probe not deployed (no Prometheus on the dev host) | LOW | fixed / rules UNVERIFIED |
+| FN-4 | Ingestion | **Fixed**: quarantine release runs in the worker (`ingest.release`, 202 + status polling; release audit still in the registration transaction, actor = releasing user) | LOW | fixed |
+| FN-5 | Ingestion | **Fixed**: container creation_time wins; declared value kept in `declared_recorded_at`; discrepancies > 5 min flagged (audit detail + UI badge). Camera clocks themselves may be wrong — the flag is for the investigator to judge | LOW | fixed |
+| FN-6 | Integrity | **Fixed**: nightly fixity batch sized by `integrityPolicy.fullCycleDays` (+ byte budget, min/max), prioritising never-verified, recently tier-migrated and oldest-verified copies; RETAINED and recorded DR copies are verified with their own `integrity_checks` rows; coverage % and projected cycle on System health. Throughput at state-wide volume (≈ 2 TiB/night default budget) not measured | LOW | fixed |
+| FN-7 | Video | **Fixed**: rebuilds go to a new generation prefix, rows switch atomically, old objects deleted afterwards (failed rebuild keeps the old set playable); reprocess returns 409 while a job is queued/running. An AI job reading the old proxy during the switch fails and must be re-run | LOW | fixed |
+| FN-8 | Video | **Fixed**: snapshot extraction is a worker job (`media.snapshot`); the API waits ≤ 20 s (201) or returns 202 + status polling; UI unchanged for the fast path | LOW | fixed |
 | FN-9 | Export / custody | PDFs use standard fonts: Kannada / non-Latin text not rendered | MEDIUM | open |
-| FN-10 | Sharing | Locked external share cannot be unlocked or extended; no e-mail/SMS delivery of link/code; revoke does not delete per-share watermarked variants | LOW | open |
-| FN-11 | Sharing | `maxViews` counts portal opens and is not applied to internal-user shares | LOW | open |
-| FN-12 | Investigation | Manual timeline events are hard-deleted (audit row remains), unlike annotations | LOW | open |
+| FN-10 | Sharing | **Fixed**: unlock (sender / share:manage_all, attempts reset, audited), extend within policy, link e-mail (code out-of-band by default; opt-in separate code e-mail, trade-off documented), link re-issue, variants deleted on revoke/expire/lock. SMS delivery not implemented; real SMTP relay UNVERIFIED | LOW | fixed |
+| FN-11 | Sharing | **Fixed**: `maxViews` applies to internal shares (share-based detail/playback opens, one per 30-min session; used-up shares stop granting visibility) | LOW | fixed |
+| FN-12 | Investigation | **Fixed**: manual timeline events are soft-deleted (`deleted_at`/`deleted_by`; DELETE revoked from `ksp_app`) like annotations | LOW | fixed |
 | FN-13 | Search | Totals use `count(*) OVER ()`; ranking over large match sets ~0.2–0.35 s state-wide | LOW | open |
 | FN-14 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | LOW | accepted |
 | FN-15 | API clients | argon2 on every Basic-auth request — fixed: ≤ 60 s positive-verification cache (SEC-R8). Open: IPv6 allow-list entries must be exact addresses | LOW | open |
@@ -81,7 +81,7 @@ Owner is a role, not a person.
 | FN-19 | Performance | Single-host measurements only (PERFORMANCE.md); custody view unpaginated (1 000 events ≈ 0.6 MB); login ≈ 80/s per API process (argon2); audit append ≤ 1.2k/s | MEDIUM | open |
 | FN-20 | Storage | Uploads > 5 GiB, AWS S3 / MinIO / Ceph behaviour, Safari native HLS, real 1080p30 long-footage throughput untested | MEDIUM | UNVERIFIED |
 | FN-21 | Storage | versitygw ignores Object Lock on CopyObject and refuses conditional writes to tombstoned keys — code uses multipart copy and never reuses keys | LOW | mitigated |
-| FN-22 | Station CLI | Summary "Detail" column can show a stale status | LOW | open (cosmetic) |
+| FN-22 | Station CLI | **Fixed**: the summary is refreshed from the server before printing (also with `--no-wait`) and outcome updates always replace the detail; already-uploaded files are marked | LOW | fixed |
 | FN-23 | E2E | API runs with `NODE_ENV=test` semantics during E2E (relaxed rate limits) | LOW | by design |
 | FN-25 | Tests | Intermittent: `apps/api/test/ai.test.ts` end-to-end AI job once processed 3 frames instead of ≥ 5 (fresh-clone run, final audit); passed on 3 re-runs. Investigate frame sampling under load before blaming the host | LOW | monitor |
 | FN-24 | Web | Production bundle is a single 2.6 MB JS chunk (627 kB gzip) — no route-level code splitting | LOW | open |

@@ -17,5 +17,8 @@ scrape_configs:
     dns_sd_configs: [{ names: ["api"], type: A, port: 9464 }]
   - job_name: ksp-worker
     dns_sd_configs: [{ names: ["worker"], type: A, port: 9465 }]
+  # AI worker (METRICS_PORT + 2); it joins only the internal `ai` and `monitoring` networks.
+  - job_name: ksp-ai-worker
+    dns_sd_configs: [{ names: ["ai-worker"], type: A, port: 9466 }]
   - job_name: prometheus
     static_configs: [{ targets: ["localhost:9090"] }]

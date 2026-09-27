@@ -6,6 +6,7 @@ import { formatDateTime } from '@/lib/format';
 import { UserPicker, type UserOption } from '@/components/pickers';
 import { Alert, Button, Checkbox, CopyButton, Field, Input, Modal, Select, Textarea, useToast } from '@/components/ui';
 import type { CreatedShare } from './types';
+import { deliveryText, useShareOptions } from './ShareManageActions';
 
 export interface ShareTarget {
   id: string;
@@ -30,11 +31,15 @@ export function ShareDialog({ items, caseId, onClose }: { items: ShareTarget[]; 
   const [perm, setPerm] = useState({ allowDownload: false, allowOriginal: false, allowPrint: false, watermark: true });
   const [maxViews, setMaxViews] = useState('');
   const [expires, setExpires] = useState(defaultExpiry(7));
+  const opts = useShareOptions();
+  const [mail, setMail] = useState({ emailLink: true, emailAccessCode: false });
+  const emailOk = type === 'EXTERNAL' && !!opts.data?.emailConfigured;
   const m = useMutation({
     mutationFn: () => api.post<CreatedShare>('/shares', {
       evidenceIds: items.map((i) => i.id), caseId, recipientType: type, recipientUserId: type === 'INTERNAL_USER' ? user?.id : undefined,
       recipientName: type === 'EXTERNAL' ? rec.name : undefined, recipientEmail: type === 'EXTERNAL' ? rec.email : undefined, recipientOrg: type === 'EXTERNAL' ? rec.org || undefined : undefined,
       purpose, ...perm, allowOriginal: perm.allowDownload && perm.allowOriginal, maxViews: maxViews ? Number(maxViews) : undefined, expiresAt: new Date(expires).toISOString(),
+      ...(emailOk ? { emailLink: mail.emailLink, emailAccessCode: mail.emailLink && mail.emailAccessCode } : {}),
     }),
     onSuccess: (r) => {
       void qc.invalidateQueries({ queryKey: ['shares'] });
@@ -50,8 +55,9 @@ export function ShareDialog({ items, caseId, onClose }: { items: ShareTarget[]; 
     return (
       <Modal open onClose={onClose} title="Share created" footer={<Button onClick={onClose}>Done</Button>}>
         <div className="space-y-3 text-sm">
+          {deliveryText(created.delivery) && <Alert tone={created.delivery?.link === 'FAILED' || created.delivery?.accessCode === 'FAILED' ? 'red' : 'green'}>{deliveryText(created.delivery)} to {created.share.recipient.email}.</Alert>}
           <Alert tone="amber" title="Shown only once">
-            Send the link and the access code to {created.share.recipient.name} through <strong>different channels</strong> (for example the link by e-mail and the code by phone/SMS). Neither can be displayed again.
+            {created.delivery?.link === 'SENT' && created.delivery.accessCode !== 'SENT' ? 'Give the access code to the recipient by phone/SMS or in person — it was not e-mailed. ' : ''}Send the link and the access code to {created.share.recipient.name} through <strong>different channels</strong> (for example the link by e-mail and the code by phone/SMS). Neither can be displayed again.
           </Alert>
           <Field label="Link" htmlFor="sd-link"><div className="flex gap-2"><Input id="sd-link" readOnly value={created.link} className="mono text-xs" /><CopyButton value={created.link!} /></div></Field>
           <Field label="Access code" htmlFor="sd-code"><div className="flex gap-2"><Input id="sd-code" readOnly value={created.accessCode} className="mono text-lg tracking-widest" /><CopyButton value={created.accessCode!} /></div></Field>
@@ -94,8 +100,15 @@ export function ShareDialog({ items, caseId, onClose }: { items: ShareTarget[]; 
         </fieldset>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Field label="Expires" required htmlFor="sd-exp" hint="Limited by the system share policy (default 30 days)."><Input id="sd-exp" type="datetime-local" value={expires} onChange={(e) => setExpires(e.target.value)} /></Field>
-          {type === 'EXTERNAL' && <Field label="Maximum views (optional)" htmlFor="sd-views"><Input id="sd-views" inputMode="numeric" value={maxViews} onChange={(e) => setMaxViews(e.target.value.replace(/\D/g, ''))} /></Field>}
+          <Field label="Maximum views (optional)" htmlFor="sd-views" hint={type === 'INTERNAL_USER' ? 'Counts openings of each item (one per 30-minute viewing session).' : undefined}><Input id="sd-views" inputMode="numeric" value={maxViews} onChange={(e) => setMaxViews(e.target.value.replace(/\D/g, ''))} /></Field>
         </div>
+        {emailOk && (
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-semibold uppercase text-ink-600">Delivery</legend>
+            <Checkbox label="E-mail the link to the recipient" description="The access code is not included — give it by phone/SMS or in person." checked={mail.emailLink} onChange={(v) => setMail({ emailLink: v, emailAccessCode: v && mail.emailAccessCode })} />
+            {mail.emailLink && <Checkbox label="Also e-mail the access code (separate message)" description="Not recommended: anyone with access to that mailbox could then open the share." checked={mail.emailAccessCode} onChange={(v) => setMail({ ...mail, emailAccessCode: v })} />}
+          </fieldset>
+        )}
         {m.error ? <Alert tone="red">{errorMessage(m.error)}</Alert> : null}
       </div>
     </Modal>

@@ -38,8 +38,10 @@
     "@aws-sdk/s3-request-presigner": "^3.1140.0",
     "@ksp/shared": "*",
     "@node-rs/argon2": "^2.2.1",
+    "cron-parser": "^5.10.1",
     "dotenv": "^18.0.3",
     "kysely": "^0.29.6",
+    "nodemailer": "^10.0.10",
     "pdfkit": "^0.20.2",
     "pg": "^8.23.0",
     "pg-boss": "^12.34.0",
@@ -48,6 +50,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/nodemailer": "^8.0.2",
     "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",

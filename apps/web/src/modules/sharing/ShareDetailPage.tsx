@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { Alert, Badge, Button, Card, ConfirmDialog, DataTable, EmptyState, ErrorState, KeyValue, PageHeader, Spinner, StatusBadge, useToast, type Column } from '@/components/ui';
 import type { ShareDetail } from './types';
+import { ShareManageActions } from './ShareManageActions';
 
 export function ShareDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -39,16 +40,16 @@ export function ShareDetailPage() {
         title={`Share with ${s.recipient.name ?? 'recipient'}`}
         subtitle={s.purpose}
         breadcrumb={<Link to="/shares" className="text-brand-700 hover:underline">Shares</Link>}
-        actions={s.canRevoke ? <Button variant="danger" onClick={() => { revoke.reset(); setRevoking(true); }}>Revoke</Button> : undefined}
+        actions={<div className="flex flex-wrap gap-2"><ShareManageActions share={s} />{s.canRevoke && <Button variant="danger" onClick={() => { revoke.reset(); setRevoking(true); }}>Revoke</Button>}</div>}
       />
-      {s.status === 'LOCKED' && <Alert tone="red" title="Locked">Too many wrong access codes were entered ({s.failedCodeAttempts}). Revoke this share and create a new one if the recipient still needs access.</Alert>}
+      {s.status === 'LOCKED' && <Alert tone="red" title="Locked">Too many wrong access codes were entered ({s.failedCodeAttempts}). {s.canUnlock ? 'Confirm with the recipient, then unlock it — or revoke it.' : 'Ask the sender to unlock or revoke it.'}</Alert>}
       <Card title="Share">
         <KeyValue items={[
           { label: 'Status', value: <StatusBadge status={s.status} /> },
           { label: 'Recipient', value: s.recipientType === 'EXTERNAL' ? `${s.recipient.name} <${s.recipient.email}>${s.recipient.organisation ? ` · ${s.recipient.organisation}` : ''}` : `${s.recipient.name} (KSP user)` },
           { label: 'Permissions', value: [s.permissions.watermark && s.recipientType === 'EXTERNAL' ? 'watermarked playback' : 'playback', s.permissions.allowDownload && (s.permissions.allowOriginal ? 'download incl. original' : s.recipientType === 'EXTERNAL' ? 'download (watermarked)' : 'download original'), s.permissions.allowPrint && 'print'].filter(Boolean).join(', ') },
           { label: 'Expires', value: formatDateTime(s.expiresAt) },
-          { label: 'Views', value: s.recipientType === 'EXTERNAL' ? `${s.viewCount}${s.maxViews ? ` of ${s.maxViews}` : ''}` : '—' },
+          { label: 'Views', value: s.recipientType === 'EXTERNAL' || s.maxViews ? `${s.viewCount}${s.maxViews ? ` of ${s.maxViews}` : ''}` : '—' },
           { label: 'Downloads', value: s.downloadCount },
           { label: 'Shared by', value: `${s.createdBy.name} · ${formatDateTime(s.createdAt)}` },
           { label: 'Last accessed', value: formatDateTime(s.lastAccessedAt) },

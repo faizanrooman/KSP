@@ -32,7 +32,7 @@ function paramValue(url: string, param: string, ids: Record<string, string>): st
     if (url.includes('/quarantine/')) return ids.evidence!;
     return ids.evidence!;
   }
-  if (param === 'requestId') return ids.disposal!;
+  if (param === 'requestId') return url.includes('/quarantine/releases/') ? ids.quarantineRelease! : ids.disposal!;
   if (param === 'derivativeId') return ids.snapshot!;
   if (param === 'detectionId') return ids.detection!;
   if (param === 'tag') return 'idor';
@@ -48,7 +48,7 @@ function paramValue(url: string, param: string, ids: Record<string, string>): st
   const map: Array<[string, string]> = [
     ['ai/jobs', 'aiJob'], ['review/detections', 'detection'], ['alerts/', 'alert'], ['notifications/', 'notification'],
     ['auth/sessions', 'session'], ['cases/', 'case'], ['devices/', 'device'], ['exports/', 'export'], ['firs/', 'fir'],
-    ['reports/runs', 'reportRun'], ['search/saved', 'savedSearch'], ['shares/', 'share'], ['uploads/batches', 'batch'],
+    ['reports/runs', 'reportRun'], ['reports/schedules', 'reportSchedule'], ['media/snapshot-requests', 'snapshotRequest'], ['search/saved', 'savedSearch'], ['shares/', 'share'], ['uploads/batches', 'batch'],
     ['uploads/', 'upload'], ['users/', 'meera'], ['workspaces/bookmarks', 'bookmark'], ['workspaces/annotations', 'annotation'],
     ['workspaces/relations', 'relation'], ['workspaces/', 'workspace'],
   ];
