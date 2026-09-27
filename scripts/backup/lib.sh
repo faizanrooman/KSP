@@ -27,17 +27,45 @@ fetch_backup() {
     bucket="${src#s3://}"; bucket="${bucket%%/*}"; key="${src#s3://"$bucket"/}"
     log "fetching s3://$bucket/$key"
     node "$BACKUP_LIB_DIR/s3.ts" get "$bucket" "$key" "$work/manifest.json" || die "cannot download manifest"
+    node "$BACKUP_LIB_DIR/s3.ts" get "$bucket" "$key.sig" "$work/manifest.json.sig" >/dev/null 2>&1 || rm -f "$work/manifest.json.sig"
     MANIFEST="$work/manifest.json"
+    verify_manifest_signature "$MANIFEST" "$work/manifest.json.sig"
     local obj; obj=$(json "$MANIFEST" m.object)
     ENC_FILE="$work/$(basename "$obj")"
     node "$BACKUP_LIB_DIR/s3.ts" get "$bucket" "$obj" "$ENC_FILE" || die "cannot download $obj"
   else
     [ -f "$src" ] || die "manifest $src not found"
     MANIFEST="$src"
+    verify_manifest_signature "$MANIFEST" "$src.sig"
     ENC_FILE="$(dirname "$src")/$(basename "$(json "$MANIFEST" m.object)")"
     [ -f "$ENC_FILE" ] || die "encrypted dump $ENC_FILE not found next to the manifest"
   fi
   BACKUP_SOURCE="$src"
+}
+
+# verify_manifest_signature <manifest> <sig>  (OPS-8)
+#   The manifest carries the dump hashes, so it is signed (detached Ed25519, openssl pkeyutl) by pg-backup.sh with
+#   BACKUP_SIGNING_KEY_FILE. With BACKUP_SIGNING_PUBKEY_FILE set (production), a missing or invalid signature is
+#   fatal; without it the check is skipped with a warning unless BACKUP_REQUIRE_SIGNATURE=1.
+verify_manifest_signature() {
+  local m="$1" sig="$2"
+  if [ -n "${BACKUP_SIGNING_PUBKEY_FILE:-}" ]; then
+    [ -s "$sig" ] || die "manifest signature missing ($sig) — unsigned backups are refused when BACKUP_SIGNING_PUBKEY_FILE is set"
+    openssl pkeyutl -verify -pubin -inkey "$BACKUP_SIGNING_PUBKEY_FILE" -rawin -in "$m" -sigfile "$sig" >/dev/null 2>&1 \
+      || die "manifest signature INVALID — manifest forged or modified after signing"
+    log "manifest signature OK ($(openssl pkey -pubin -in "$BACKUP_SIGNING_PUBKEY_FILE" -outform DER 2>/dev/null | sha256sum | cut -c1-16))"
+  elif [ "${BACKUP_REQUIRE_SIGNATURE:-0}" = 1 ]; then
+    die "BACKUP_REQUIRE_SIGNATURE=1 but BACKUP_SIGNING_PUBKEY_FILE is not set"
+  else
+    log "WARNING: manifest signature NOT verified (set BACKUP_SIGNING_PUBKEY_FILE)"
+  fi
+}
+
+# manifest_head_seq: the manifest's audit headSeq, validated as a non-negative integer (never interpolated raw).
+manifest_head_seq() {
+  local v; v=$(json "$MANIFEST" m.audit.headSeq)
+  [[ "$v" =~ ^[0-9]{1,18}$ ]] || die "manifest audit.headSeq is not a non-negative integer"
+  echo "$v"
 }
 
 # decrypt_verify <out-dump>  (uses MANIFEST, ENC_FILE, BACKUP_AGE_IDENTITY_FILE)
@@ -105,9 +133,9 @@ post_checks() {
 
   if [ -n "${MANIFEST:-}" ]; then
     local mh mhash rh ev us
-    mh=$(json "$MANIFEST" m.audit.headSeq); mhash=$(json "$MANIFEST" m.audit.headHash)
+    mh=$(manifest_head_seq); mhash=$(json "$MANIFEST" m.audit.headHash)
     if [ "$mh" -gt 0 ]; then
-      rh=$(q "SELECT hash FROM audit_events WHERE seq = $mh")
+      rh=$(psql "$url" -qtAX -v ON_ERROR_STOP=1 -v s="$mh" <<<"SELECT hash FROM audit_events WHERE seq = :'s'::bigint")
       [ "$rh" = "$mhash" ] || die "audit row $mh hash differs from the manifest (history rewritten?)"
     fi
     [ "$head" -ge "$mh" ] || die "restored audit head $head < manifest head $mh"

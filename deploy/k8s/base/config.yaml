@@ -82,6 +82,7 @@ data:
   BACKUP_S3_BUCKET: ksp-db-backups
   BACKUP_RETENTION_DAYS: "35"
   BACKUP_AGE_RECIPIENTS_FILE: /run/secrets/ksp-backup/backup_age_recipients
+  BACKUP_SIGNING_KEY_FILE: /run/secrets/ksp-backup/backup_signing_key   # Ed25519, signs manifest.json (OPS-8)
   # s3-replicate.ts: primary (source) + DR (target) object stores.
   DR_S3_ENDPOINT: https://s3.dr.ksp.internal
   DR_S3_REGION: us-east-1

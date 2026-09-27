@@ -10,6 +10,7 @@
 #   --replace    if the target database exists and is NOT already this backup, rename it to <db>_pre_restore_<ts>
 #                (never dropped — it may be the only copy of newer evidence metadata) and restore
 # Environment: BACKUP_AGE_IDENTITY_FILE (age private key, from the offline store), BACKUP_S3_* for s3:// / latest,
+#   BACKUP_SIGNING_PUBKEY_FILE (manifest signature required + verified when set — always set it in production),
 #   optional RESTORE_OWNER_DB_PASSWORD / RESTORE_APP_DB_PASSWORD / RESTORE_AI_DB_PASSWORD / RESTORE_BACKUP_DB_PASSWORD
 #   to (re)set role passwords on a fresh cluster (use NEW values if the old ones may be compromised).
 #
@@ -32,7 +33,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$ADMIN" ] || die "--admin-url is required"
 [[ "$DB" =~ ^[a-z_][a-z0-9_]{0,40}$ ]] || die "invalid database name"
-for t in pg_restore psql age sha256sum node; do command -v "$t" >/dev/null || die "missing tool: $t"; done
+for t in pg_restore psql age sha256sum node openssl; do command -v "$t" >/dev/null || die "missing tool: $t"; done
 export PGOPTIONS="-c client_min_messages=warning"
 dburl() { node -e 'const u=new URL(process.argv[1]); u.pathname="/"+process.argv[2]; console.log(u.toString())' "$ADMIN" "$1"; }
 aq() { psql "$ADMIN" -qtAX -v ON_ERROR_STOP=1 -c "$1"; }
@@ -58,8 +59,8 @@ decrypt_verify "$WORK/restore.dump"
 # 3. Idempotency / safety checks on the target.
 log "step 3/5: target database $DB"
 if [ "$(aq "SELECT count(*) FROM pg_database WHERE datname = '$DB'")" = 1 ]; then
-  mh=$(json "$MANIFEST" m.audit.headSeq); mhash=$(json "$MANIFEST" m.audit.headHash)
-  have=$(psql "$(dburl "$DB")" -qtAX -c "SELECT hash FROM audit_events WHERE seq = $mh" 2>/dev/null || true)
+  mh=$(manifest_head_seq); mhash=$(json "$MANIFEST" m.audit.headHash)
+  have=$(psql "$(dburl "$DB")" -qtAX -v s="$mh" <<<"SELECT hash FROM audit_events WHERE seq = :'s'::bigint" 2>/dev/null || true)
   if [ -n "$have" ] && [ "$have" = "$mhash" ] && (post_checks "$(dburl "$DB")") 2>/dev/null; then
     log "database $DB already contains this backup (audit row $mh matches) and verifies — nothing to do"
     echo "RESTORE_OK (already restored) $BACKUP_SOURCE"

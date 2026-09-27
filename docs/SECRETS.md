@@ -22,6 +22,8 @@ are git-ignored. The application never logs secrets (pino redaction; audit detai
 | `signing_private_key`, `signing_certificate`, `signing_key_id` | api/worker (export manifests, audit checkpoints) | RSA-3072 + CA certificate (**HSM/DSC in production**) | per certificate policy; new `SIGNING_KEY_ID` per key | old exports stay verifiable with the old certificate — archive every certificate ever used |
 | `backup_age_recipients` | backup job | age public key(s) | yearly; add new recipient first | none |
 | `backup_age_identity` | verify job, restore operator | age private key | yearly (keep all old identities to read old backups!) | **offline**, two-person custody |
+| `backup_signing_key` → `BACKUP_SIGNING_KEY_FILE` | backup job | Ed25519 PEM (signs `manifest.json`) | yearly | none; keep every old **public** key to verify old backups |
+| `backup_signing_pubkey` → `BACKUP_SIGNING_PUBKEY_FILE` | verify job, restore operator | Ed25519 public PEM | with the key | not secret; when set, unsigned/invalid manifests are refused |
 | `grafana_admin_password` | grafana | random 40 | 90 days | none |
 | `S3_ROOT_*` (bundled gateway) | compose s3 only | random | yearly | gateway restart |
 | TLS certificate `ksp-vms-tls` | ingress | X.509 | cert-manager auto-renew | none |

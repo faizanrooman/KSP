@@ -282,8 +282,9 @@ services:
       BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:?}
       BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:?}
       BACKUP_AGE_RECIPIENTS_FILE: /run/secrets/backup_age_recipients
+      BACKUP_SIGNING_KEY_FILE: /run/secrets/backup_signing_key
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-35}
-    secrets: [backup_age_recipients]
+    secrets: [backup_age_recipients, backup_signing_key]
     volumes: ["backupwork:/work"]
     networks: [backend, egress]
     profiles: [ops]
@@ -368,4 +369,5 @@ secrets:
   signing_private_key: { file: ./secrets/signing_private_key }
   signing_certificate: { file: ./secrets/signing_certificate }
   backup_age_recipients: { file: ./secrets/backup_age_recipients }
+  backup_signing_key: { file: ./secrets/backup_signing_key }
   grafana_admin_password: { file: ./secrets/grafana_admin_password }
