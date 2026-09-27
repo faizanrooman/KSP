@@ -154,7 +154,7 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: "4000"
     secrets: *app-secrets
-    tmpfs: ["/work:size=256m,uid=1000,gid=1000", "/tmp:size=64m"]
+    tmpfs: ["/work:size=256m,uid=10001,gid=10001", "/tmp:size=64m"]
     networks: [edge, backend, egress, monitoring]
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -224,17 +224,12 @@ services:
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       S3_BUCKET_DERIVED: ${S3_BUCKET_DERIVED:-ksp-derived}
       OBJECT_LOCK_MODE: ${OBJECT_LOCK_MODE:-GOVERNANCE}
-      JWT_PRIVATE_KEY: unused-by-ai-worker
-      JWT_PUBLIC_KEY: unused-by-ai-worker
-      DATA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-      MEDIA_TOKEN_SECRET: unused-by-ai-worker-unused-by-ai-worker
-      SIGNING_PRIVATE_KEY: unused-by-ai-worker
-      SIGNING_CERTIFICATE: unused-by-ai-worker
+      KSP_SERVICE: ksp-ai-worker   # no JWT/signing/media/data-encryption secrets needed (OPS-9)
       AI_MODELS_DIR: /models
       AI_WORKER_CONCURRENCY: ${AI_WORKER_CONCURRENCY:-1}
       WORK_DIR: /work
     volumes: ["aimodels:/models:ro"]
-    tmpfs: ["/work:size=1g,uid=1000,gid=1000", "/tmp:size=64m"]
+    tmpfs: ["/work:size=1g,uid=10001,gid=10001", "/tmp:size=64m"]
     networks: [ai]
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -251,7 +246,7 @@ services:
     restart: unless-stopped
     environment:
       API_UPSTREAM_HOSTPORT: api:4000
-    tmpfs: ["/etc/nginx/conf.d:uid=101,gid=101", "/tmp:uid=101,gid=101", "/var/cache/nginx:uid=101,gid=101"]
+    tmpfs: ["/etc/nginx/conf.d:uid=10101,gid=10101", "/tmp:uid=10101,gid=10101", "/var/cache/nginx:uid=10101,gid=10101"]
     ports:
       # Put a TLS-terminating reverse proxy / load balancer in front; never expose plain HTTP beyond it.
       - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:8080"
@@ -282,8 +277,9 @@ services:
       BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:?}
       BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:?}
       BACKUP_AGE_RECIPIENTS_FILE: /run/secrets/backup_age_recipients
+      BACKUP_SIGNING_KEY_FILE: /run/secrets/backup_signing_key
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-35}
-    secrets: [backup_age_recipients]
+    secrets: [backup_age_recipients, backup_signing_key]
     volumes: ["backupwork:/work"]
     networks: [backend, egress]
     profiles: [ops]
@@ -368,4 +364,5 @@ secrets:
   signing_private_key: { file: ./secrets/signing_private_key }
   signing_certificate: { file: ./secrets/signing_certificate }
   backup_age_recipients: { file: ./secrets/backup_age_recipients }
+  backup_signing_key: { file: ./secrets/backup_signing_key }
   grafana_admin_password: { file: ./secrets/grafana_admin_password }

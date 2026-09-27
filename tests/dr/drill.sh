@@ -115,6 +115,7 @@ BUCKETENV=(S3_BUCKET_STAGING="$BP-staging" S3_BUCKET_EVIDENCE="$BP-evidence" S3_
 BACKUPENV=(PGHOST="$(node -e 'console.log(new URL(process.argv[1]).hostname)' "$PGADMIN_URL")" PGPORT="$(node -e 'console.log(new URL(process.argv[1]).port||5432)' "$PGADMIN_URL")"
   PGUSER="$(node -e 'console.log(new URL(process.argv[1]).username)' "$PGADMIN_URL")" PGDATABASE="$DB"
   BACKUP_AGE_RECIPIENTS_FILE="$BASE/age.pub" BACKUP_AGE_IDENTITY_FILE="$BASE/age.key"
+  BACKUP_SIGNING_KEY_FILE="$BASE/backup-sign.key" BACKUP_SIGNING_PUBKEY_FILE="$BASE/backup-sign.pub"
   BACKUP_S3_ENDPOINT="$DR_S3_ENDPOINT" BACKUP_S3_ACCESS_KEY="$S3_ROOT_ACCESS" BACKUP_S3_SECRET_KEY="$S3_ROOT_SECRET"
   BACKUP_S3_BUCKET="$BP-backups" BACKUP_LOCK_DAYS=1 BACKUP_WORK_DIR="$BASE/backup-work")
 
@@ -140,6 +141,7 @@ cleanup() {
 trap cleanup EXIT
 
 age-keygen -o "$BASE/age.key" 2>/dev/null; age-keygen -y "$BASE/age.key" > "$BASE/age.pub"
+openssl genpkey -algorithm ed25519 -out "$BASE/backup-sign.key" 2>/dev/null; openssl pkey -in "$BASE/backup-sign.key" -pubout -out "$BASE/backup-sign.pub"
 # The DR object store: a second, independent gateway with its own data directory.
 (ROOT_ACCESS_KEY="$S3_ROOT_ACCESS" ROOT_SECRET_KEY="$S3_ROOT_SECRET" setsid versitygw --port "127.0.0.1:$DR_S3_PORT" posix \
    --versioning-dir "$BASE/dr-s3/versions" --sidecar "$BASE/dr-s3/sidecar" "$BASE/dr-s3/buckets" > "$BASE/logs/dr-s3.log" 2>&1 & echo $! > "$BASE/dr-s3.pid")

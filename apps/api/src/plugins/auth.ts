@@ -1,7 +1,8 @@
 import fp from 'fastify-plugin';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { ACCESS_COOKIE, CSRF_COOKIE, CSRF_HEADER, type Permission } from '@ksp/shared';
-import { appendAudit, verifySecret, type AuditActor } from '@ksp/core';
+import { appendAudit, type AuditActor } from '@ksp/core';
+import { verifyApiClientSecret } from '../lib/api-client-auth.js';
 import { verifyJwt } from '../lib/session.js';
 import { loadApiClientPrincipal, loadUserPrincipal } from '../lib/load-principal.js';
 import { hasPermission, type Principal } from '../lib/principal.js';
@@ -80,9 +81,11 @@ export default fp(async (app) => {
       const client = clientId
         ? await app.db.selectFrom('api_clients').selectAll().where('client_id', '=', clientId).where('revoked_at', 'is', null).executeTakeFirst()
         : undefined;
-      const valid = client && secret && (!client.expires_at || client.expires_at > new Date()) && (await verifySecret(client.secret_hash, secret));
-      const ipOk = valid && (client.allowed_ips.length === 0 || client.allowed_ips.some((c) => ipInCidr(req.ip, c)));
-      if (!valid || !ipOk) {
+      // SEC-R8: unknown / expired ids verify against a dummy argon2 hash (uniform timing); positive results are cached ≤ 60 s.
+      const live = client && secret && (!client.expires_at || client.expires_at > new Date()) ? client : undefined;
+      const valid = (await verifyApiClientSecret(clientId ?? '', secret ?? '', live)) && !!live;
+      const ipOk = valid && (live.allowed_ips.length === 0 || live.allowed_ips.some((c) => ipInCidr(req.ip, c)));
+      if (!valid || !ipOk || !client) {
         await appendAudit(app.db, { type: 'API_CLIENT', id: clientId ?? null, ip: req.ip, userAgent: req.headers['user-agent'] ?? null }, {
           action: 'LOGIN_FAILED', outcome: 'FAILURE', resourceType: 'api_client', details: { reason: valid ? 'IP_NOT_ALLOWED' : 'BAD_CREDENTIALS' },
         });

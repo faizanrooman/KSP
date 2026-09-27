@@ -9,6 +9,7 @@
 #                             Use a scratch cluster, never the production primary. The KSP roles (ksp_owner, ksp_app,
 #                             ksp_ai) must exist there (db/bootstrap/roles.sql without passwords is enough).
 #   BACKUP_AGE_IDENTITY_FILE  age private key (the verification job is the only non-restore holder of it)
+#   BACKUP_SIGNING_PUBKEY_FILE  Ed25519 public key; when set the manifest signature is REQUIRED and verified (OPS-8)
 #   BACKUP_S3_* / BACKUP_S3_BUCKET / BACKUP_S3_PREFIX   when the source is s3:// or latest
 #   BACKUP_RECORD_URL         optional: record a VERIFY row in backup_runs of the production DB
 #   VERIFY_KEEP_DB=1          keep the scratch database (debugging)
@@ -17,7 +18,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 SRC="${1:-latest}"
 : "${VERIFY_ADMIN_URL:?VERIFY_ADMIN_URL is required}"
-for t in pg_restore psql age sha256sum node; do command -v "$t" >/dev/null || die "missing tool: $t"; done
+for t in pg_restore psql age sha256sum node openssl; do command -v "$t" >/dev/null || die "missing tool: $t"; done
 
 TS="$(date -u +%Y%m%d%H%M%S)"
 WORK="${BACKUP_WORK_DIR:-${TMPDIR:-/tmp}}/ksp-verify-$TS-$$"

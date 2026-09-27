@@ -17,11 +17,13 @@ are git-ignored. The application never logs secrets (pino redaction; audit detai
 | `s3_ai_access_key`/`secret` | ai-worker | IAM `ai.json` (derived only) | 90 days | restart |
 | `backup_s3_*`, `dr_s3_*`, `s3_replica_read_*` | backup/replicate jobs | IAM `backup.json`, `replicate.json` | 90 days | none |
 | `jwt_private_key`/`jwt_public_key` | api | Ed25519 PEM | 180 days | all access tokens (15 min) invalid → silent refresh fails → users log in again. Refresh tokens are opaque DB rows and survive. |
-| `data_encryption_key` → `DATA_ENCRYPTION_KEY` | api (MFA secrets at rest) | 32 B base64 | **only with re-encryption** (no key-versioning yet — KNOWN-ISSUES) | a lost/changed key makes every MFA enrolment unreadable → must be **restored with every DB restore** |
+| `data_encryption_key` → `DATA_ENCRYPTION_KEY`, or the versioned ring `DATA_ENCRYPTION_KEYS` (`id:base64,…`, first = current) | api (MFA secrets at rest) | 32 B base64 per key | yearly / on suspicion: put the new key first in `DATA_ENCRYPTION_KEYS`, roll out, run `npm run keys:rotate-data -w @ksp/core` (OPERATIONS.md § Key rotation) | a lost key makes the MFA enrolments encrypted with it unreadable → every key still referenced by a DB/backup must be **restored with that DB** |
 | `media_token_secret` | api | 32 B hex | 90 days | outstanding media tokens (≤ 5 min) fail; players refetch |
 | `signing_private_key`, `signing_certificate`, `signing_key_id` | api/worker (export manifests, audit checkpoints) | RSA-3072 + CA certificate (**HSM/DSC in production**) | per certificate policy; new `SIGNING_KEY_ID` per key | old exports stay verifiable with the old certificate — archive every certificate ever used |
 | `backup_age_recipients` | backup job | age public key(s) | yearly; add new recipient first | none |
 | `backup_age_identity` | verify job, restore operator | age private key | yearly (keep all old identities to read old backups!) | **offline**, two-person custody |
+| `backup_signing_key` → `BACKUP_SIGNING_KEY_FILE` | backup job | Ed25519 PEM (signs `manifest.json`) | yearly | none; keep every old **public** key to verify old backups |
+| `backup_signing_pubkey` → `BACKUP_SIGNING_PUBKEY_FILE` | verify job, restore operator | Ed25519 public PEM | with the key | not secret; when set, unsigned/invalid manifests are refused |
 | `grafana_admin_password` | grafana | random 40 | 90 days | none |
 | `S3_ROOT_*` (bundled gateway) | compose s3 only | random | yearly | gateway restart |
 | TLS certificate `ksp-vms-tls` | ingress | X.509 | cert-manager auto-renew | none |

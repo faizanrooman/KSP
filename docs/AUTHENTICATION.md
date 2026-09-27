@@ -37,7 +37,7 @@ Code: `apps/api/src/modules/auth/index.ts`, `apps/api/src/lib/session.ts`, `apps
 
 ## MFA
 
-* TOTP enrolment: `POST /auth/mfa/setup` (secret + QR) → `POST /auth/mfa/confirm` (returns 10 recovery codes once).
+* TOTP enrolment: `POST /auth/mfa/setup` (secret + QR) → `POST /auth/mfa/confirm` (returns 10 recovery codes once). Replacing an **enabled** enrolment requires `{ password, code }` or `{ password, recoveryCode }` in the setup body (SEC-R6; audited `MFA_REENROLL_STARTED`). `POST /auth/mfa/disable` consumes the TOTP step like login (SEC-R5).
   Secrets are AES-256-GCM encrypted at rest (`DATA_ENCRYPTION_KEY`).
 * **Mandatory** for roles in `sessionPolicy.requireMfaForRoles` (default: SYSTEM_ADMINISTRATOR, SUPERVISOR, AUDITOR,
   EVIDENCE_CUSTODIAN). Until enrolled, every non-auth route answers `403 MFA_ENROLLMENT_REQUIRED`; MFA cannot be

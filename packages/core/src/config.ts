@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { config as loadDotenv } from 'dotenv';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
 
 /** Locate the repository root (directory containing db/migrations) from cwd upwards. */
 export function repoRoot(): string {
@@ -26,6 +27,8 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
   COOKIE_SECURE: bool.default('false'),
   TRUST_PROXY: bool.default('false'),
+  /** Rate-limit counter store: `postgres` shares counts across API replicas (default in production), `memory` is per process (default elsewhere). */
+  RATE_LIMIT_STORE: z.enum(['memory', 'postgres']).optional(),
 
   DATABASE_URL: z.string().min(1), // ksp_app
   DATABASE_MIGRATION_URL: z.string().optional(), // schema owner, used by migrate only
@@ -58,7 +61,16 @@ const schema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().default(900),
   REFRESH_TOKEN_TTL_HOURS: z.coerce.number().int().default(12),
   /** 32-byte base64 key: AES-256-GCM for secrets at rest in the DB (MFA secrets). */
-  DATA_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, 'must be 32 bytes base64'),
+  DATA_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, 'must be 32 bytes base64').optional(),
+  /**
+   * Versioned keyring (OPS-10): comma-separated `id:base64` entries, the FIRST is the current (encrypting) key;
+   * the others only decrypt. When set, DATA_ENCRYPTION_KEY (if also set) is kept as a decrypt-only key with id
+   * `default`. Rotate with `npm run keys:rotate-data -w @ksp/core`.
+   */
+  DATA_ENCRYPTION_KEYS: z.string().optional().refine((v) => v === undefined || v.trim() === '' || v.split(',').every((e) => {
+    const m = /^([A-Za-z0-9_-]{1,32}):(.+)$/.exec(e.trim());
+    return !!m && Buffer.from(m[2]!, 'base64').length === 32;
+  }), 'must be a comma-separated list of <id>:<32-byte base64> entries'),
   /** HMAC secret for short-lived media/playback tokens. */
   MEDIA_TOKEN_SECRET: z.string().min(32),
   MEDIA_TOKEN_TTL_SECONDS: z.coerce.number().int().default(300),
@@ -87,6 +99,20 @@ function resolvePem(v: string): string {
   return v.replace(/\\n/g, '\n');
 }
 
+/**
+ * OPS-9: the isolated AI worker (KSP_SERVICE=ksp-ai-worker) never signs/verifies JWTs, media tokens or evidence
+ * signatures, so it is deployed WITHOUT those secrets (no key-shaped placeholders in its ConfigMap). Missing values
+ * are replaced by inert per-process values that cannot validate anything issued by the API.
+ */
+export const AI_WORKER_UNUSED_SECRETS = ['JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY', 'SIGNING_PRIVATE_KEY', 'SIGNING_CERTIFICATE', 'MEDIA_TOKEN_SECRET'] as const;
+function aiWorkerEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out = { ...env };
+  for (const k of AI_WORKER_UNUSED_SECRETS) {
+    if (!out[k]) out[k] = k === 'MEDIA_TOKEN_SECRET' ? randomBytes(32).toString('hex') : 'not-available-in-ai-worker';
+  }
+  return out;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (cached && env === process.env) return cached;
   if (env === process.env) {
@@ -94,7 +120,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     const file = env.KSP_ENV_FILE ?? resolve(root, env.NODE_ENV === 'test' ? '.env.test' : '.env');
     if (existsSync(file)) loadDotenv({ path: file, quiet: true } as never);
   }
-  const parsed = schema.safeParse(env);
+  const parsed = schema.safeParse(env.KSP_SERVICE === 'ksp-ai-worker' ? aiWorkerEnv(env) : env);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     throw new Error(`Invalid configuration: ${issues}`);

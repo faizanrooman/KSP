@@ -32,6 +32,22 @@
 See [SECRETS.md](SECRETS.md): JWT (forces re-login), media token secret (≤ 5 min disruption), signing key (new
 `SIGNING_KEY_ID`, archive old certificate), DB/S3 credentials (dual credentials, rolling restart).
 
+### Data-encryption key (MFA secrets at rest)
+
+Ciphertexts carry their key id (`v2.<keyId>.<iv>.<tag>.<ct>`; the id is GCM-authenticated). Legacy `v1.…`
+values (written before key versioning) are still decrypted with `DATA_ENCRYPTION_KEY`.
+
+1. Generate a key: `openssl rand -base64 32`; pick a new id (`[A-Za-z0-9_-]{1,32}`, e.g. `2026q4`).
+2. Set `DATA_ENCRYPTION_KEYS=2026q4:<new>,default:<old DATA_ENCRYPTION_KEY>` (first entry = current key; every
+   entry decrypts). Keeping `DATA_ENCRYPTION_KEY=<old>` instead of listing it is equivalent (it becomes the
+   decrypt-only id `default`). Roll out api + worker — new enrolments are written with the new key.
+3. `npm run keys:rotate-data -w @ksp/core` (in a container: `node packages/core/dist/bin/rotate-data-key.js`,
+   same env) re-encrypts `users.mfa_secret_enc` / `mfa_pending_secret_enc` in batches (`-- --batch N`, default
+   200, `FOR UPDATE SKIP LOCKED`), is idempotent and writes one `KEY_ROTATED` audit event per run (counts + key
+   ids, never key material). Exit 1 if a row could not be decrypted (user ids listed; those users re-enrol MFA).
+4. Remove an old key from the ring only after every DB backup that still contains its ciphertext has aged out —
+   otherwise keep it (decrypt-only) in the escrowed secrets next to those backups.
+
 ## Logs
 
 All services log JSON to stdout (pino; `service`, `reqId`, redacted secrets). Ship with the cluster log agent

@@ -174,6 +174,63 @@ describe('MFA hardening', () => {
     const last = (await app.db.selectFrom('users').select('mfa_last_totp_step').where('id', '=', v.id).executeTakeFirstOrThrow()).mfa_last_totp_step;
     if (Number(last) === Math.floor(Date.now() / 30_000)) expect((await verify(await step1(v), enrolCode)).statusCode).toBe(401);
   });
+
+  async function enrolled() {
+    const u = await createUser({ role: 'INVESTIGATING_OFFICER', org: 'ps_cubbonpark' });
+    const ag = await login(u.username);
+    const secret = (await ag.post('/api/v1/auth/mfa/setup')).body.secret as string;
+    const enrolCode = authenticator.generate(secret);
+    const c = await ag.post('/api/v1/auth/mfa/confirm', { code: enrolCode });
+    expect(c.status).toBe(200);
+    return { ...u, ag, secret, enrolCode, recoveryCodes: c.body.recoveryCodes as string[] };
+  }
+
+  it('SEC-R5: /mfa/disable consumes the TOTP step (an already-used code is refused)', async () => {
+    const u = await enrolled();
+    const now = Math.floor(Date.now() / 30_000);
+    const last = Number((await app.db.selectFrom('users').select('mfa_last_totp_step').where('id', '=', u.id).executeTakeFirstOrThrow()).mfa_last_totp_step);
+    // The enrolment code's step is consumed: replaying it to disable MFA fails (it passed before SEC-R5).
+    if (last === now) expect((await u.ag.post('/api/v1/auth/mfa/disable', { password: u.password, code: u.enrolCode })).status).toBe(400);
+    const code = await nextTotp(u.secret, u.username);
+    const ok = await u.ag.post('/api/v1/auth/mfa/disable', { password: u.password, code });
+    expect(ok.status).toBe(200);
+    const after = await app.db.selectFrom('users').select(['mfa_enabled', 'mfa_last_totp_step']).where('id', '=', u.id).executeTakeFirstOrThrow();
+    expect(after.mfa_enabled).toBe(false);
+    expect(Number(after.mfa_last_totp_step)).toBeGreaterThan(last);
+    const failed = await app.db.selectFrom('audit_events').select('details').where('actor_id', '=', u.id).where('action', '=', 'MFA_CHALLENGE_FAILED').execute();
+    if (last === now) expect(failed.some((f) => (f.details as { context?: string }).context === 'mfa-disable')).toBe(true);
+  });
+
+  it('SEC-R6: replacing an enabled MFA enrolment requires password + current TOTP or a recovery code, audited', async () => {
+    const u = await enrolled();
+    const none = await u.ag.post('/api/v1/auth/mfa/setup');
+    expect(none.status).toBe(400);
+    expect(none.body.error.code).toBe('REAUTH_REQUIRED');
+    expect((await u.ag.post('/api/v1/auth/mfa/setup', { password: u.password })).body.error.code).toBe('REAUTH_REQUIRED');
+    const code = await nextTotp(u.secret, u.username);
+    const badPw = await u.ag.post('/api/v1/auth/mfa/setup', { password: 'Wrong-Passw0rd!x', code });
+    expect(badPw.status).toBe(400);
+    expect(badPw.body.error.code).toBe('INVALID_CREDENTIALS');
+    expect((await u.ag.post('/api/v1/auth/mfa/setup', { password: u.password, code: '000000' })).status).toBe(400);
+    const pendingBefore = (await app.db.selectFrom('users').select('mfa_pending_secret_enc').where('id', '=', u.id).executeTakeFirstOrThrow()).mfa_pending_secret_enc;
+    expect(pendingBefore).toBeNull();
+    const ok = await u.ag.post('/api/v1/auth/mfa/setup', { password: u.password, code });
+    expect(ok.status).toBe(200);
+    expect(ok.body.secret).not.toBe(u.secret);
+    // The same TOTP code cannot be reused for a second replacement.
+    expect((await u.ag.post('/api/v1/auth/mfa/setup', { password: u.password, code })).status).toBe(400);
+    // Recovery code path (single use).
+    const rc = u.recoveryCodes[0]!;
+    expect((await u.ag.post('/api/v1/auth/mfa/setup', { password: u.password, recoveryCode: rc })).status).toBe(200);
+    expect((await u.ag.post('/api/v1/auth/mfa/setup', { password: u.password, recoveryCode: rc })).status).toBe(400);
+    const acts = await app.db.selectFrom('audit_events').select(['action', 'outcome']).where('actor_id', '=', u.id).where('action', 'in', ['MFA_REENROLL_STARTED', 'MFA_CHALLENGE_FAILED']).execute();
+    expect(acts.filter((a) => a.action === 'MFA_REENROLL_STARTED')).toHaveLength(2);
+    expect(acts.filter((a) => a.action === 'MFA_CHALLENGE_FAILED').length).toBeGreaterThanOrEqual(3);
+    // The old factor stays active until the new one is confirmed.
+    const still = await app.db.selectFrom('users').select(['mfa_enabled', 'mfa_pending_secret_enc']).where('id', '=', u.id).executeTakeFirstOrThrow();
+    expect(still.mfa_enabled).toBe(true);
+    expect(still.mfa_pending_secret_enc).not.toBeNull();
+  });
 });
 
 describe('login timing (user enumeration)', () => {

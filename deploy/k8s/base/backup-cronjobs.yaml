@@ -28,9 +28,9 @@ spec:
           restartPolicy: OnFailure
           securityContext:
             runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
-            fsGroup: 999
+            runAsUser: 10002
+            runAsGroup: 10002
+            fsGroup: 10002
             seccompProfile: { type: RuntimeDefault }
           containers:
             - name: pg-backup
@@ -66,7 +66,7 @@ spec:
               secret:
                 secretName: ksp-backup
                 defaultMode: 0440
-                items: [{ key: backup_age_recipients, path: backup_age_recipients }]
+                items: [{ key: backup_age_recipients, path: backup_age_recipients }, { key: backup_signing_key, path: backup_signing_key }, { key: backup_signing_pubkey, path: backup_signing_pubkey }]
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -92,9 +92,9 @@ spec:
           restartPolicy: Never
           securityContext:
             runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
-            fsGroup: 999
+            runAsUser: 10002
+            runAsGroup: 10002
+            fsGroup: 10002
             seccompProfile: { type: RuntimeDefault }
           containers:
             - name: verify
@@ -106,6 +106,8 @@ spec:
               env:
                 - { name: BACKUP_WORK_DIR, value: /work }
                 - { name: BACKUP_AGE_IDENTITY_FILE, value: /run/secrets/ksp-backup-identity/backup_age_identity }
+                # OPS-8: the manifest signature is required and verified.
+                - { name: BACKUP_SIGNING_PUBKEY_FILE, value: /run/secrets/ksp-backup-identity/backup_signing_pubkey }
                 # Scratch PostgreSQL (separate instance, e.g. CloudNativePG cluster "ksp-verify"); never the primary.
                 - name: VERIFY_ADMIN_URL
                   valueFrom: { secretKeyRef: { name: ksp-backup-verify, key: VERIFY_ADMIN_URL } }
@@ -134,7 +136,7 @@ spec:
               secret:
                 secretName: ksp-backup-verify
                 defaultMode: 0440
-                items: [{ key: backup_age_identity, path: backup_age_identity }]
+                items: [{ key: backup_age_identity, path: backup_age_identity }, { key: backup_signing_pubkey, path: backup_signing_pubkey }]
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -160,9 +162,9 @@ spec:
           restartPolicy: OnFailure
           securityContext:
             runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
-            fsGroup: 999
+            runAsUser: 10002
+            runAsGroup: 10002
+            fsGroup: 10002
             seccompProfile: { type: RuntimeDefault }
           containers:
             - name: replicate

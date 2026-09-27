@@ -20,7 +20,7 @@ Owner is a role, not a person.
 | EXT-7 | Production S3 IAM separation (AI worker → derived bucket only; app/backup/replicate identities) cannot be shown on versitygw (single account); policies in `deploy/s3/policies/` | HIGH | UNVERIFIED | Infra: apply on the production store, run negative tests |
 | EXT-8 | Object Lock runs in GOVERNANCE mode in dev (bypassable by privileged credentials); production should use COMPLIANCE | MEDIUM | decision | Custodian + infra: choose mode/retention per bucket |
 | EXT-9 | CPU transcoding of the full HLS ladder at state-wide volume (~40 000 footage-hours/day) needs ~1 100 4-vCPU workers — GPU / proxy-only default / on-demand HLS decision | HIGH | decision | Infra / product: capacity decision (INFRASTRUCTURE.md) |
-| EXT-10 | Should EVIDENCE_CUSTODIAN hold `export:approve`? Default matrix gives it only to SUPERVISOR | MEDIUM | decision | Product owner |
+| EXT-10 | Should EVIDENCE_CUSTODIAN hold `export:approve`? Default matrix gives it only to SUPERVISOR (unchanged) | MEDIUM | decision | Product owner. Mechanism ready: grant `export:approve` to EVIDENCE_CUSTODIAN in Roles admin (no separate setting — ADMIN-GUIDE.md § Export approval policy); tested incl. SoD (`exports.test.ts`) |
 | EXT-11 | react-router 6.30.x advisories (`npm audit --omit=dev`: 2 moderate — GHSA-wrjc-x8rr-h8h6 open redirect via backslash in `<Link>`/`useNavigate`, GHSA-337j-9hxr-rhxg SSR hydration, SSR not used) fixed only in 7.18 (major upgrade); 0 high/critical | MEDIUM | open | Web: plan react-router 7 upgrade |
 
 ## Deployment, DR & operations
@@ -34,26 +34,26 @@ Owner is a role, not a person.
 | OPS-5 | Disposal is not propagated to the DR store (copies persist until their own lock expires) — DR disposal sweep needed | MEDIUM | open | DevOps / custodian |
 | OPS-6 | Staging bucket lifecycle (abort incomplete multipart, orphaned/quarantined objects) not applied on versitygw (NotImplemented); `ensure-buckets.mjs` applies it where supported | LOW | open | Infra: verify on production store |
 | OPS-7 | Base image digests resolved 2026-09-25; must be refreshed monthly (no Renovate/Dependabot yet) | LOW | open | DevOps |
-| OPS-8 | Backup manifests are not signed (dump hashes live inside the manifest); `restore.sh` places manifest `headSeq` into SQL unquoted | LOW | open | DevOps: sign manifest with the backup key |
-| OPS-9 | Trivy k8s notes: `ksp-ai-config` carries inert key-shaped placeholders; container UIDs/GIDs ≤ 10000 | LOW | open | DevOps |
-| OPS-10 | `DATA_ENCRYPTION_KEY` has no key versioning; rotation needs re-encryption of MFA secrets (not implemented); must be restored with the DB | MEDIUM | open | Backend |
+| OPS-8 | Backup manifests were not signed; `restore.sh` placed manifest `headSeq` into SQL unquoted | LOW | fixed | Ed25519 detached `manifest.json.sig` (`BACKUP_SIGNING_KEY_FILE`), verified before any manifest field is used when `BACKUP_SIGNING_PUBKEY_FILE` is set (k8s verify job sets it; `BACKUP_REQUIRE_SIGNATURE=1` option); `headSeq` validated as integer + psql variable. `verify-backup.test.sh` 14/14 incl. forged-signature cases |
+| OPS-9 | Trivy k8s notes: `ksp-ai-config` carried inert key-shaped placeholders; container UIDs/GIDs ≤ 10000 | LOW | fixed | placeholders removed from `ksp-ai-config` + compose (`KSP_SERVICE=ksp-ai-worker` makes the shared config loader not require JWT/signing/media/data-encryption secrets; inert per-process values instead); non-root UID/GID 10001 (api/worker/ai-worker/migrate/models), 10002 (backup), 10101 (web) in Dockerfile, k8s securityContext and compose tmpfs. `validate-deploy.sh` passes (hadolint, shellcheck, kustomize+kubeconform, actionlint, compose; promtool skipped). Images still not built (OPS-1) — Trivy not re-run |
+| OPS-10 | `DATA_ENCRYPTION_KEY` had no key versioning / re-encryption | MEDIUM | fixed | `DATA_ENCRYPTION_KEYS` keyring (`id:base64,…`, first = current; `DATA_ENCRYPTION_KEY` still works as id `default`); ciphertext `v2.<keyId>.…` with the id as GCM AAD, legacy `v1` still decrypts; `npm run keys:rotate-data -w @ksp/core` re-encrypts MFA secrets + pending secrets in batches, idempotent, `KEY_ROTATED` audit (OPERATIONS.md). Keys must still be restored with the DB. Tests `security-crypto.test.ts` |
 
 ## Security (residual / hardening)
 
 | ID | Issue | Sev | Status | Owner / next step |
 |---|---|---|---|---|
-| SEC-R1 | `audit_canonical()` (migration 0002) does not include `user_agent`, so a DB superuser could alter that column without breaking the hash chain (all other columns are covered; the app role cannot UPDATE at all) | MEDIUM | open | Backend: new migration with a versioned canonical form (old rows keep v1) |
+| SEC-R1 | `audit_canonical()` (migration 0002) did not include `user_agent` | MEDIUM | fixed | Migration 1000: `audit_events.hash_version` (existing rows = 1, history not rewritten), `audit_canonical_v2()` covers every column incl. `user_agent`; `audit_append()` writes v2; `audit_verify()` + `audit_row_hash()` verify each row with its own version and reject a v2→v1 downgrade; custody/ledger + audit-viewer verifiers use `audit_row_hash()`. Pre-1000 rows remain without `user_agent` coverage. Test `audit-hash-v2.test.ts` |
 | SEC-R2 | Residual: FFmpeg demuxer/decoder memory-safety; media tokens are bearer secrets for their TTL (not re-checked against permission changes); DB superuser can bypass triggers (detected by the hash chain, not prevented); keys not in HSM | MEDIUM | accepted | Security officer |
 | SEC-R3 | Not yet tested: browser XSS fuzzing, container images, FFmpeg fuzzing, distributed share-portal brute force, real-cluster NetworkPolicies | MEDIUM | UNVERIFIED | VAPT scope |
-| SEC-R4 | Rate limits use an in-memory store → per API replica | LOW | open | Backend: shared store if needed |
-| SEC-R5 | `/auth/mfa/disable` checks the TOTP code without the single-use step (password also required) | LOW | open | Backend |
-| SEC-R6 | `/auth/mfa/setup` replaces an existing MFA secret without re-authentication (live session required) | LOW | open | Backend |
-| SEC-R7 | Public `/health/ready` echoes backend error text (≤ 200 chars) | LOW | open | Backend: generic message, detail in logs |
-| SEC-R8 | API-client Basic auth skips argon2 for an unknown `client_id` (timing enumeration of client ids) | LOW | open | Backend: dummy hash as in login |
-| SEC-R9 | Search `ai.reviewStatus=ANY_NON_REJECTED` needs only `search:use` (every default role with `search:use` also holds `ai:request`; only custom roles are affected) | LOW | open | Backend: require an AI permission |
-| SEC-R10 | `ksp_ai` may set any `ai_jobs.status` (no transition guard) — a compromised AI worker could revive a cancelled job | LOW | open | Backend: transition trigger |
-| SEC-R11 | Snapshot with `source: original` needs only `evidence:snapshot`, not `evidence:download_original` (output is a custody-audited still image) | LOW | decision | Product: confirm intended |
-| SEC-R12 | Dashboard `orgUnitId` filter does not check the unit is inside the viewer's jurisdiction (data stays scoped; unit existence leaks) | LOW | open | Backend |
+| SEC-R4 | Rate limits used an in-memory store (per API replica) | LOW | fixed | PostgreSQL store (`apps/api/src/lib/rate-limit-store.ts`, UNLOGGED table `rate_limit_counters`, migration 1001; atomic UPSERT per request, cleanup every 60 s, fails open if the DB is unreachable); `RATE_LIMIT_STORE=memory\|postgres` (default postgres in production, memory elsewhere). Test `rate-limit-store.test.ts` (two instances share counts) |
+| SEC-R5 | `/auth/mfa/disable` checked the TOTP code without the single-use step | LOW | fixed | disable now consumes the TOTP step exactly like login (shared `consumeTotp`), failures audited (`MFA_CHALLENGE_FAILED`, context mfa-disable), rate-limited. Test `security-auth.test.ts` |
+| SEC-R6 | `/auth/mfa/setup` replaced an existing MFA secret without re-authentication | LOW | fixed | when MFA is enabled, setup requires the current password + a current TOTP code (step consumed) or a recovery code (consumed); `MFA_REENROLL_STARTED` / `MFA_CHALLENGE_FAILED` audited; old factor stays active until `/mfa/confirm`. API-only (the web UI offers no re-enrolment). Test `security-auth.test.ts` |
+| SEC-R7 | Public `/health/ready` echoed backend error text | LOW | fixed | public probe returns only `ok`/`fail` per check; error detail is logged (warn) and available at authenticated `GET /system/health` (`system:monitor`). Test `security-residual.test.ts` |
+| SEC-R8 | API-client Basic auth skipped argon2 for an unknown `client_id` | LOW | fixed | unknown/expired ids verify against the dummy argon2 hash (uniform timing); positive verifications cached ≤ 60 s keyed by sha256(client_id:secret), honoured only while the row's current `secret_hash` matches (row + `revoked_at`/expiry/IP re-checked every request; rotate/revoke also evict). Test `security-residual.test.ts` |
+| SEC-R9 | Search `ai.reviewStatus=ANY_NON_REJECTED` needed only `search:use` | LOW | fixed | now also requires `ai:review` or `ai:request` (403 + `ACCESS_DENIED` audit otherwise). Test `security-residual.test.ts` |
+| SEC-R10 | `ksp_ai` could set any `ai_jobs.status` | LOW | fixed | trigger `ai_jobs_status_guard` (migration 1002): for ksp_ai only QUEUED→RUNNING→COMPLETED/FAILED/CANCELLED; no revival/re-queue (42501). Test `security-residual.test.ts` |
+| SEC-R11 | Snapshot with `source: original` needs only `evidence:snapshot`, not `evidence:download_original` (output is a custody-audited still image) | LOW | accepted | kept by decision; documented in AUTHORIZATION.md, pinned by `security-residual.test.ts` + `media.test.ts` |
+| SEC-R12 | Dashboard `orgUnitId` filter did not check the unit is inside the viewer's jurisdiction | LOW | fixed | a unit outside the viewer's `dashboard:view` grant subtrees answers 404 exactly like a non-existent unit. Test `dashboard.test.ts` |
 | SEC-R13 | Locked accounts answer 423 for any password — reveals that a username exists and is locked | LOW | accepted | trade-off |
 
 ## Functional gaps
@@ -74,7 +74,7 @@ Owner is a role, not a person.
 | FN-12 | Investigation | Manual timeline events are hard-deleted (audit row remains), unlike annotations | LOW | open |
 | FN-13 | Search | Totals use `count(*) OVER ()`; ranking over large match sets ~0.2–0.35 s state-wide | LOW | open |
 | FN-14 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | LOW | accepted |
-| FN-15 | API clients | argon2 on every Basic-auth request (no cache); IPv6 allow-list entries must be exact addresses | LOW | open |
+| FN-15 | API clients | argon2 on every Basic-auth request — fixed: ≤ 60 s positive-verification cache (SEC-R8). Open: IPv6 allow-list entries must be exact addresses | LOW | open |
 | FN-16 | AI | Accuracy figures are upstream; no evaluation on KSP footage; plate OCR not validated on Indian plates; GPU inference untested; small-face track fragmentation during pans | MEDIUM | UNVERIFIED |
 | FN-17 | Accessibility | Region annotations are pointer-only; E2E/axe in Chrome only (Firefox/Safari/Edge, screen readers, zoom/forced colours untested) — ACCESSIBILITY.md | MEDIUM | open / UNVERIFIED |
 | FN-18 | Web | Integrations, API-client, retention and disposal screens axe-scanned only, not driven by E2E | LOW | open |

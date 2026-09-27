@@ -269,6 +269,7 @@ export interface AuditEvents {
   event_id: Generated<string>;
   evidence_id: string | null;
   hash: string;
+  hash_version: Generated<number>;
   occurred_at: Timestamp;
   org_unit_id: string | null;
   outcome: string;
@@ -696,6 +697,13 @@ export interface ProcessingJobs {
   upload_session_id: string | null;
 }
 
+export interface RateLimitCounters {
+  count: Generated<number>;
+  expires_at: Timestamp;
+  key: string;
+  window_ms: number;
+}
+
 export interface RefreshTokens {
   expires_at: Timestamp;
   family_id: string;
@@ -1026,6 +1034,7 @@ export interface DB {
   org_units: OrgUnits;
   password_history: PasswordHistory;
   processing_jobs: ProcessingJobs;
+  rate_limit_counters: RateLimitCounters;
   refresh_tokens: RefreshTokens;
   report_runs: ReportRuns;
   retention_policies: RetentionPolicies;

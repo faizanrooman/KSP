@@ -17,6 +17,8 @@ import { createRegisteredEvidence } from './fixtures/evidence.js';
 import type { MediaEvidence } from './fixtures/media-evidence.js';
 import { runExportBuild } from '../../worker/src/jobs/exports/build.js';
 import { runExportsExpire } from '../../worker/src/jobs/exports/index.js';
+import { createAdmin, orgId, roleId } from './admin-helpers.js';
+import { invalidatePrincipals } from '../src/lib/load-principal.js';
 
 const LIAISON_PERMS = ['export:create', 'export:download', 'evidence:read', 'evidence:play', 'evidence:download_original', 'custody:read'] as const;
 
@@ -85,6 +87,39 @@ describe('request & approval', () => {
     const mys = await login((await userWithPerms(['export:approve', 'evidence:read'], 'mysuru_dist')).username);
     expect((await mys.post(`/api/v1/exports/${r.body.id}/approve`, {})).status).toBe(404);
     expect((await mys.get(`/api/v1/exports/${r.body.id}`)).status).toBe(404);
+  });
+
+  it('EXT-10: granting export:approve to EVIDENCE_CUSTODIAN in Roles admin lets custodians approve; SoD still holds', async () => {
+    const root = await createAdmin({ org: 'ksp' });
+    const custodian = await createAdmin({ role: 'EVIDENCE_CUSTODIAN', org: 'blr_central' });
+    const rid = await roleId('EVIDENCE_CUSTODIAN');
+    const role = await app.db.selectFrom('roles').select(['name', 'description', 'permissions']).where('id', '=', rid).executeTakeFirstOrThrow();
+    // Default matrix (unchanged): the custodian cannot approve.
+    expect(role.permissions).not.toContain('export:approve');
+    const r1 = await liaison.post('/api/v1/exports', body([clip.id]));
+    expect(r1.status).toBe(201);
+    expect((await custodian.agent.post(`/api/v1/exports/${r1.body.id}/approve`, { note: 'custodian' })).status).toBe(403);
+    try {
+      const patch = await root.agent.patch(`/api/v1/roles/${rid}`, { name: role.name, description: role.description, permissions: [...role.permissions, 'export:approve'] });
+      expect(patch.status, patch.raw).toBe(200);
+      const ok = await custodian.agent.post(`/api/v1/exports/${r1.body.id}/approve`, { note: 'custodian approval' });
+      expect(ok.status, ok.raw).toBe(200);
+      const row = await app.db.selectFrom('exports').select(['approved_by', 'status']).where('id', '=', r1.body.id).executeTakeFirstOrThrow();
+      expect(row.approved_by).toBe(custodian.id);
+      // SoD: a custodian who can also request exports still cannot approve their own request.
+      const extra = await userWithPerms([...LIAISON_PERMS], 'blr_central');
+      const extraRole = await app.db.selectFrom('user_roles').select('role_id').where('user_id', '=', extra.id).executeTakeFirstOrThrow();
+      await app.db.insertInto('user_roles').values({ user_id: custodian.id, role_id: extraRole.role_id, org_unit_id: await orgId('blr_central') }).execute();
+      invalidatePrincipals(custodian.id);
+      const own = await custodian.agent.post('/api/v1/exports', body([clip.id]));
+      expect(own.status, own.raw).toBe(201);
+      const self = await custodian.agent.post(`/api/v1/exports/${own.body.id}/approve`, { note: 'self' });
+      expect(self.status).toBe(403);
+      expect(self.body.error.code).toBe('SEPARATION_OF_DUTIES');
+    } finally {
+      await root.agent.patch(`/api/v1/roles/${rid}`, { name: role.name, description: role.description, permissions: role.permissions });
+    }
+    expect((await app.db.selectFrom('roles').select('permissions').where('id', '=', rid).executeTakeFirstOrThrow()).permissions).not.toContain('export:approve');
   });
 
   it('the approver must be able to see every item', async () => {
