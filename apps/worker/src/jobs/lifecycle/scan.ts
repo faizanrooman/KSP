@@ -5,7 +5,7 @@
  *  integrity.sweep — queue fixity checks for the least-recently-verified originals.
  */
 import { sql } from 'kysely';
-import { appendAudit } from '@ksp/core';
+import { appendAudit, integrityCoverage, loadIntegrityPolicy, selectFixityCandidates } from '@ksp/core';
 import { QUEUES, type FixityCheckPayload, type TierMigratePayload } from '@ksp/shared';
 import { ACTOR, enqueueFn, noopLog, type LifecycleDeps } from './common.js';
 
@@ -89,25 +89,30 @@ export async function runLifecycleScan(deps: LifecycleDeps, opts: { batch?: numb
   return result;
 }
 
-export async function runIntegritySweep(deps: LifecycleDeps, opts: { batch?: number; minAgeHours?: number } = {}): Promise<{ queued: string[] }> {
-  const batch = opts.batch ?? 100;
-  const minAge = opts.minAgeHours ?? 24 * 30;
-  const rows = await deps.db
-    .selectFrom('evidence as e')
-    .select('e.id')
-    .where('e.status', 'in', ['REGISTERED', 'DISPOSAL_PENDING'])
-    .where('e.storage_key', 'is not', null)
-    .where((eb) => eb.or([eb('e.last_verified_at', 'is', null), eb('e.last_verified_at', '<', new Date(Date.now() - minAge * 3_600_000))]))
-    .where(sql<boolean>`NOT EXISTS (SELECT 1 FROM processing_jobs pj WHERE pj.evidence_id = e.id AND pj.kind = 'FIXITY_CHECK' AND pj.status IN ('QUEUED','RUNNING'))`)
-    .orderBy(sql`e.last_verified_at ASC NULLS FIRST`)
-    .orderBy('e.registered_at')
-    .limit(batch)
-    .execute();
+/**
+ * integrity.sweep — nightly fixity batch sized for full coverage: ceil(total copies / integrityPolicy.fullCycleDays)
+ * (clamped to min/maxPerNight) within maxBytesPerNight; never-verified first, then recently tier-migrated originals,
+ * then the least-recently verified. Covers current originals, RETAINED copies and recorded DR copies.
+ * `opts.batch` overrides the computed size (tests / manual runs).
+ */
+export async function runIntegritySweep(deps: LifecycleDeps, opts: { batch?: number; minAgeHours?: number; maxBytes?: number } = {}): Promise<{ queued: string[]; queuedCopies: Array<{ kind: 'RETAINED' | 'DR'; id: number; evidenceId: string }>; batch: number; bytes: number }> {
+  const policy = await loadIntegrityPolicy(deps.db);
+  const coverage = await integrityCoverage(deps.db, policy);
+  const batch = opts.batch ?? coverage.nightlyBatch;
+  const candidates = await selectFixityCandidates(deps.db, { batch, maxBytes: opts.maxBytes ?? policy.maxBytesPerNight, minAgeHours: opts.minAgeHours ?? 24 });
   const queued: string[] = [];
-  for (const r of rows) {
-    const payload: FixityCheckPayload = { evidenceId: r.id, trigger: 'SCHEDULED' };
-    if (await queueTracked(deps, QUEUES.FIXITY_CHECK, 'FIXITY_CHECK', r.id, payload, `fixity:${r.id}`)) queued.push(r.id);
+  const queuedCopies: Array<{ kind: 'RETAINED' | 'DR'; id: number; evidenceId: string }> = [];
+  let bytes = 0;
+  for (const c of candidates) {
+    if (c.kind === 'PRIMARY') {
+      const payload: FixityCheckPayload = { evidenceId: c.evidenceId, trigger: 'SCHEDULED' };
+      if (await queueTracked(deps, QUEUES.FIXITY_CHECK, 'FIXITY_CHECK', c.evidenceId, payload, `fixity:${c.evidenceId}`)) { queued.push(c.evidenceId); bytes += c.sizeBytes; }
+    } else {
+      const copy = { kind: c.kind, id: c.refId! };
+      const payload: FixityCheckPayload = { evidenceId: c.evidenceId, trigger: 'SCHEDULED', copy };
+      if (await queueTracked(deps, QUEUES.FIXITY_CHECK, 'FIXITY_CHECK_COPY', c.evidenceId, payload, `fixity:${c.evidenceId}:${c.kind}:${c.refId}`)) { queuedCopies.push({ ...copy, evidenceId: c.evidenceId }); bytes += c.sizeBytes; }
+    }
   }
-  (deps.log ?? noopLog).info({ queued: queued.length }, 'integrity sweep');
-  return { queued };
+  (deps.log ?? noopLog).info({ queued: queued.length, queuedCopies: queuedCopies.length, batch, bytes, coveragePercent: coverage.coveragePercent, projectedCycleDays: coverage.projectedCycleDays }, 'integrity sweep');
+  return { queued, queuedCopies, batch, bytes };
 }

@@ -13,6 +13,11 @@ interface Health {
   objectStorage: { ok: boolean; ms: number; buckets: Array<{ role: string; ok: boolean; ms: number; error?: string }> };
   queues: { summary: { totalQueued: number; totalActive: number; failed24h: number; deadLettered: number; oldestQueuedSeconds: number | null }; items: QueueStat[] };
   workers: { staleAfterSeconds: number; alive: number; aiWorker?: { alive: number; stale: number; lastSeenAt: string | null; queuedJobs: number; oldestQueuedSeconds: number | null }; items: Array<{ id: string; service: string; hostname: string; pid: number; version: string | null; startedAt: string; lastSeenAt: string; ageSeconds: number; alive: boolean }> } | null;
+  integrity?: {
+    total: number; verifiedInCycle: number; coveragePercent: number | null; neverVerified: number; oldestVerifiedAt: string | null; nightlyBatch: number; effectiveNightly: number;
+    projectedCycleDays: number | null; policy: { fullCycleDays: number; maxBytesPerNight: number }; byKind: Record<string, { total: number; verifiedInCycle: number; neverVerified: number }>;
+    lastSweep: { at: string; checks: number; failed: number } | null;
+  } | null;
   backups: { recorded: boolean; lastSuccessful: { kind: string; finishedAt: string; sizeBytes: number | null; sha256: string | null; location: string | null } | null; lastSuccessfulAgeHours: number | null; recent: Array<{ id: string; kind: string; status: string; startedAt: string; finishedAt: string | null; sizeBytes: number | null; error: string | null }> } | null;
   auditLedger: { headSeq: number; headAt: string | null; lastCheckpoint: { headSeq: number; createdAt: string; keyId: string } | null; eventsSinceCheckpoint: number; verification: { verifiedThroughSeq: number | null; lastRunAt: string; lastFullAt: string | null; lastMode: string | null; firstBadSeq: number | null } | null } | null;
   storage: StorageUtilisation | null;
@@ -161,6 +166,18 @@ export function SystemHealthPage() {
                 ))}</tbody>
               </table>
               {!h.storage.byBucket.length && <p className="text-sm text-ink-600">No snapshot captured yet.</p>}
+            </Card>
+          )}
+
+          {h.integrity && (
+            <Card title="Integrity (fixity) coverage">
+              <div className="grid gap-3 sm:grid-cols-4">
+                <Stat label="Verified within cycle" value={h.integrity.coveragePercent === null ? '—' : `${h.integrity.coveragePercent}%`} sub={`${h.integrity.verifiedInCycle} of ${h.integrity.total} copies · cycle ${h.integrity.policy.fullCycleDays} days`} />
+                <Stat label="Never verified" value={h.integrity.neverVerified} tone={h.integrity.neverVerified ? 'amber' : undefined} />
+                <Stat label="Projected full cycle" value={h.integrity.projectedCycleDays === null ? '—' : `${h.integrity.projectedCycleDays} days`} tone={h.integrity.projectedCycleDays && h.integrity.projectedCycleDays > h.integrity.policy.fullCycleDays ? 'red' : undefined} sub={`${h.integrity.effectiveNightly} per night (target ${h.integrity.nightlyBatch}${h.integrity.policy.maxBytesPerNight ? `, budget ${formatBytes(h.integrity.policy.maxBytesPerNight)}` : ''})`} />
+                <Stat label="Last nightly sweep" value={h.integrity.lastSweep ? formatDateTime(h.integrity.lastSweep.at) : 'none in 26 h'} tone={h.integrity.lastSweep?.failed ? 'red' : undefined} sub={h.integrity.lastSweep ? `${h.integrity.lastSweep.checks} checks, ${h.integrity.lastSweep.failed} failed` : undefined} />
+              </div>
+              <KeyValue items={Object.entries(h.integrity.byKind).map(([k, v]) => ({ label: k === 'PRIMARY' ? 'Current originals' : k === 'RETAINED' ? 'Retained copies' : 'DR copies', value: `${v.verifiedInCycle}/${v.total} verified in cycle · ${v.neverVerified} never` }))} />
             </Card>
           )}
 

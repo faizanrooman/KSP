@@ -65,7 +65,7 @@ Owner is a role, not a person.
 | FN-3 | Monitoring | **Fixed**: AI worker service heartbeat (ksp_ai, 30 s) + Prometheus metrics on :METRICS_PORT+2 (jobs, frames, per-model inference, claim latency); health page shows AI workers; Prometheus alert rules authored. Rules/probe not deployed (no Prometheus on the dev host) | LOW | fixed / rules UNVERIFIED |
 | FN-4 | Ingestion | Quarantine release re-hashes the object inside the HTTP request (slow for multi-GB files) | LOW | open |
 | FN-5 | Ingestion | Client-declared `recordedAt` overrides container creation time | LOW | open |
-| FN-6 | Integrity | Nightly fixity sweep samples 100 items/night (≈36k/year) — too small for state-wide volume; secondary copies not fixity-checked | MEDIUM | open |
+| FN-6 | Integrity | **Fixed**: nightly fixity batch sized by `integrityPolicy.fullCycleDays` (+ byte budget, min/max), prioritising never-verified, recently tier-migrated and oldest-verified copies; RETAINED and recorded DR copies are verified with their own `integrity_checks` rows; coverage % and projected cycle on System health. Throughput at state-wide volume (≈ 2 TiB/night default budget) not measured | LOW | fixed |
 | FN-7 | Video | Reprocess deletes old derivatives before new ones exist; reprocess enqueues even when already processing | LOW | open |
 | FN-8 | Video | Snapshot extraction runs in the API process (rate-limited, 90 s timeout) — move to queue at scale | LOW | open |
 | FN-9 | Export / custody | PDFs use standard fonts: Kannada / non-Latin text not rendered | MEDIUM | open |

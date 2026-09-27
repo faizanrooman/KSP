@@ -54,6 +54,7 @@ describe('GET /system/health', () => {
     expect(h.backups.lastSuccessful).toMatchObject({ kind: 'DB_BASE', status: 'SUCCEEDED', sizeBytes: 123456 });
     expect(h.auditLedger.headSeq).toBeGreaterThan(0);
     expect(h.storage).toHaveProperty('byTier');
+    expect(h.integrity).toMatchObject({ total: expect.any(Number), nightlyBatch: expect.any(Number), policy: { fullCycleDays: 90 }, byKind: { PRIMARY: expect.any(Object), RETAINED: expect.any(Object), DR: expect.any(Object) } });
     expect(h.alertChannels).toMatchObject({ inApp: 'ENABLED', email: 'NOT_CONFIGURED' });
     expect(Object.keys(h.openAlerts).sort()).toEqual(['CRITICAL', 'INFO', 'WARNING']);
     expect(JSON.stringify(h)).not.toMatch(/X-Amz|password|secret_key/i);

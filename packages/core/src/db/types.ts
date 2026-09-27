@@ -520,6 +520,7 @@ export interface EvidenceStorageCopies {
   created_at: Generated<Timestamp>;
   evidence_id: string;
   id: Generated<Int8>;
+  last_verified_at: Timestamp | null;
   object_key: string;
   object_lock_until: Timestamp | null;
   sha256: string;
@@ -646,12 +647,15 @@ export interface IntegrationSystems {
 export interface IntegrityChecks {
   actual_sha256: string | null;
   checked_at: Generated<Timestamp>;
+  copy_kind: Generated<string>;
+  dr_copy_id: Int8 | null;
   error: string | null;
   evidence_id: string;
   expected_sha256: string;
   id: Generated<Int8>;
   ok: boolean;
   requested_by: string | null;
+  storage_copy_id: Int8 | null;
   trigger: string;
 }
 
