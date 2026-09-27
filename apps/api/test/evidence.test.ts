@@ -359,6 +359,9 @@ describe('disposal (separation of duties)', () => {
     expect(a.body.error.message).toMatch(/Separation of duties/);
     // DB CHECK constraint backs this up.
     await expect(app.db.updateTable('disposal_requests').set({ decided_by: dual.id }).where('id', '=', r.body.id).execute()).rejects.toThrow();
+    // This SoD-violating combination was inserted behind the API's back: remove it so later files that edit the
+    // custodian role (exports.test.ts EXT-10) do not trip over a user the API would never have allowed.
+    await app.db.deleteFrom('user_roles').where('user_id', '=', dual.id).where('role_id', '=', sup.id).execute();
   });
 
   it('approves, executes (governance-bypass delete of all versions + derived) and keeps the record', async () => {
