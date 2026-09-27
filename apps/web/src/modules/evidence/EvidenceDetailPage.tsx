@@ -69,7 +69,7 @@ export function EvidenceDetailPage() {
         breadcrumb={<Link to="/evidence" className="hover:underline">Evidence</Link>}
         title={
           <span className="flex flex-wrap items-center gap-2">
-            <span className="mono">{ev.evidenceNumber ?? 'Unnumbered'}</span>
+            <span className="break-all font-mono">{ev.evidenceNumber ?? 'Unnumbered'}</span>
             <StatusBadge status={ev.status} />
             {ev.legalHold && (
               <Badge tone="red">
@@ -82,7 +82,7 @@ export function EvidenceDetailPage() {
         }
         subtitle={
           <span>
-            {ev.title ?? 'Untitled'} · {ev.orgUnit.name} · recorded {formatDateTime(ev.recordedAt)}
+            {ev.title ?? 'Untitled'} · {ev.orgUnit.name} · {ev.recordedAt ? `recorded ${formatDateTime(ev.recordedAt)}` : 'recording time unknown'}
           </span>
         }
         actions={

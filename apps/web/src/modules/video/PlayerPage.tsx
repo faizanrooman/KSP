@@ -34,7 +34,7 @@ export function PlayerPage() {
           </span>
         }
       />
-      <EvidencePlayer ref={player} evidenceId={id} initialTimeMs={Number.isFinite(t) && t > 0 ? t : undefined} onTimeUpdate={(ms) => setNow(ms)} maxHeight="78vh" />
+      <EvidencePlayer ref={player} evidenceId={id} initialTimeMs={Number.isFinite(t) && t > 0 ? t : undefined} onTimeUpdate={(ms) => setNow(ms)} maxHeight="max(15rem, calc(100vh - 18.5rem))" />
     </div>
   );
 }

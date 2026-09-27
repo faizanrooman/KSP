@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router';
 import { LogOut, Menu, ShieldCheck, UserCircle2, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
@@ -21,6 +21,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const nav = visibleNav(canAny as never);
+  const drawer = useRef<HTMLDivElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+
+  // Mobile drawer: Escape closes it, the page behind does not scroll, focus moves into it and back to the button.
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    const button = menuButton.current;
+    document.body.style.overflow = 'hidden';
+    drawer.current?.querySelector<HTMLElement>('a[href]')?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const onResize = () => window.matchMedia('(min-width: 1024px)').matches && setOpen(false);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onResize);
+      button?.focus();
+    };
+  }, [open]);
 
   const sidebar = (
     <nav aria-label="Main" className="flex h-full flex-col">
@@ -67,13 +88,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 self-start overflow-hidden bg-brand-950 lg:block">{sidebar}</aside>
       {open && (
         <div className="fixed inset-0 z-40 flex lg:hidden">
-          <div className="w-64 bg-brand-950">{sidebar}</div>
+          <div ref={drawer} className="h-full w-64 max-w-[85vw] overflow-hidden bg-brand-950">{sidebar}</div>
           <button type="button" className="flex-1 bg-ink-950/50" aria-label="Close menu" onClick={() => setOpen(false)} />
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-ink-200 bg-white px-4">
-          <button type="button" className="rounded p-1.5 hover:bg-ink-100 lg:hidden" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}>
+          <button ref={menuButton} type="button" className="rounded p-1.5 hover:bg-ink-100 lg:hidden" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}>
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <div className="flex-1 truncate text-sm text-ink-600">{me?.user.homeOrgUnit.name}</div>

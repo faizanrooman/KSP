@@ -5,7 +5,7 @@ import { FolderKanban, Plus } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';
 import { useUrlState } from '@/lib/hooks';
 import { formatDateTime, titleCase } from '@/lib/format';
-import { Alert, Badge, Button, DataTable, EmptyState, Field, Input, Modal, PageHeader, Pagination, Select, StatusBadge, Textarea, type Column } from '@/components/ui';
+import { Alert, Badge, Button, Card, DataTable, EmptyState, Field, Input, Modal, PageHeader, Pagination, Select, StatusBadge, Textarea, type Column } from '@/components/ui';
 import { useWorkspaces, useWsMutation, type WorkspaceDetail, type WorkspaceSummary } from './api';
 
 const DEFAULTS = { scope: 'all', status: 'ACTIVE', q: '', page: '1' };
@@ -57,6 +57,7 @@ export function WorkspacesPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Investigation workspaces" subtitle="Collect evidence, compare angles in sync, annotate and reconstruct incidents." actions={<Button icon={<Plus className="h-4 w-4" />} onClick={() => setCreating(true)}>New workspace</Button>} />
+      <Card>
       <div className="flex flex-wrap items-end gap-3">
         <Field label="Show" htmlFor="ws-scope">
           <Select id="ws-scope" value={s.scope} onChange={(e) => set({ scope: e.target.value })}>
@@ -74,9 +75,11 @@ export function WorkspacesPage() {
         </Field>
         <Field label="Title contains" htmlFor="ws-q"><Input id="ws-q" value={s.q} onChange={(e) => set({ q: e.target.value })} /></Field>
       </div>
+      </Card>
+      <Card bodyClassName="p-0">
       <DataTable
         columns={columns}
-        rows={list.data?.items ?? []}
+        rows={list.data?.items}
         rowKey={(w) => w.id}
         loading={list.isLoading}
         error={list.error}
@@ -86,6 +89,7 @@ export function WorkspacesPage() {
         caption="Investigation workspaces"
       />
       {list.data && <Pagination page={page} pageSize={25} total={list.data.total} onPage={(p) => set({ page: String(p) })} />}
+      </Card>
       <CreateWorkspaceModal open={creating} onClose={() => setCreating(false)} onCreated={(w) => navigate(`/workspaces/${w.id}`)} />
     </div>
   );

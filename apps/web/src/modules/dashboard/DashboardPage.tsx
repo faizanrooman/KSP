@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatBytes, formatDateTime } from '@/lib/format';
 import { useUrlState } from '@/lib/hooks';
-import { Badge, Button, Card, DataTable, EmptyState, ErrorState, Field, Input, PageHeader, Spinner, Stat, type Column } from '@/components/ui';
+import { Badge, Button, Card, DataTable, EmptyState, ErrorState, Field, Input, PageHeader, Spinner, Stat, clsx, type Column } from '@/components/ui';
 import { OrgUnitSelect } from '@/components/pickers';
 import { CategoryBars, STATUS, ThresholdMeter, TimeBars } from './charts';
 import type { DashboardSummary } from './types';
@@ -129,7 +129,8 @@ function DashboardBody({ d }: { d: DashboardSummary }) {
         </Card>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-3">
+      {/* Column count follows the cards this role can see — a fixed 3-column grid left an empty third column. */}
+      <div className={clsx('grid gap-5', ['', '', 'xl:grid-cols-2', 'xl:grid-cols-3'][[d.analytics, d.alerts, d.storage].filter(Boolean).length])}>
         {d.analytics && (
           <Card title="AI analysis & review">
             <CategoryBars title="AI jobs by status" label="status" value="n"

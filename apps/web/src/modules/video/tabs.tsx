@@ -76,7 +76,7 @@ export function SnapshotsTab({ evidence }: { evidence: EvidenceSummary }) {
             }}
           >
             <Field label="Time (mm:ss.mmm)" htmlFor="snap-time" error={parsed === null ? 'Enter a time such as 01:23.456' : null}>
-              <Input id="snap-time" value={time} onChange={(e) => setTime(e.target.value)} className="mono w-40" />
+              <Input id="snap-time" value={time} onChange={(e) => setTime(e.target.value)} className="w-40 font-mono" />
             </Field>
             <Field label="Extract from" htmlFor="snap-source">
               <Select id="snap-source" value={source} onChange={(e) => setSource(e.target.value as 'proxy' | 'original')}>

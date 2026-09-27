@@ -43,7 +43,7 @@ function NotesTab({ evidence }: { evidence: EvidenceSummary }) {
               <option value="NOTE">Shared note</option>
             </Select>
           </Field>
-          <Field label="Time" htmlFor="na-time"><Input id="na-time" value={time} onChange={(e) => setTime(e.target.value)} className="mono" /></Field>
+          <Field label="Time" htmlFor="na-time"><Input id="na-time" value={time} onChange={(e) => setTime(e.target.value)} className="font-mono" /></Field>
           <Field label={kind === 'NOTE' ? 'Note (visible to everyone who can see this evidence)' : 'Label'} htmlFor="na-label">
             {kind === 'NOTE' ? <Textarea id="na-label" rows={1} value={label} maxLength={5000} onChange={(e) => setLabel(e.target.value)} /> : <Input id="na-label" value={label} maxLength={200} onChange={(e) => setLabel(e.target.value)} />}
           </Field>

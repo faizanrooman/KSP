@@ -45,8 +45,13 @@ export function shortHash(h: string | null | undefined, n = 12): string {
   return h ? `${h.slice(0, n)}…` : '—';
 }
 
+// Acronyms keep their capitals ("AI Approved", "ANPR", not "Ai Approved", "Anpr").
+const ACRONYMS = new Set(['ai', 'anpr', 'fir', 'hls', 'gps', 'pdf', 'cctns', 'sha', 'api', 'zip', 'ocr', 'mfa', 'totp', 'cctv', 'onnx']);
 export function titleCase(v: string): string {
-  return v.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return v
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w+/g, (w) => (ACRONYMS.has(w) ? w.toUpperCase() : w[0]!.toUpperCase() + w.slice(1)));
 }
 
 /** Parse "mm:ss.mmm", "hh:mm:ss.mmm", "ss.mmm" or plain milliseconds ("1234ms"). */

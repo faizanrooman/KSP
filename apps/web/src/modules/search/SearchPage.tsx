@@ -249,7 +249,9 @@ function ResultCard({ item }: { item: SearchItem }) {
         <p className="font-medium text-ink-900">{item.title ?? <span className="text-ink-500">Untitled</span>}</p>
         {m.snippet && <Snippet parts={m.snippet} />}
         <p className="text-xs text-ink-500">
-          {item.orgUnit.name} · recorded {formatDateTime(item.recordedAt)} · {formatDuration(item.durationMs)}
+          {item.orgUnit.name}
+          {item.recordedAt ? ` · recorded ${formatDateTime(item.recordedAt)}` : ' · recording time unknown'}
+          {item.durationMs ? ` · ${formatDuration(item.durationMs)}` : ''}
           {item.officer && <> · {item.officer.fullName}{item.officer.badgeNumber ? ` (${item.officer.badgeNumber})` : ''}</>}
         </p>
         {item.tags.length > 0 && (
@@ -388,7 +390,7 @@ export function SearchPage() {
         <p className="flex items-center gap-1 text-xs text-ink-600"><MapPin className="h-3.5 w-3.5" aria-hidden />Within {criteria.location.radiusKm} km of {criteria.location.lat}, {criteria.location.lon}</p>
       )}
       <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
-        <aside aria-label="Facets" className="space-y-3">
+        <aside aria-label="Facets" className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-1">
           {data?.facets ? (
             (Object.keys(FACET_LABEL) as FacetName[]).map((f) =>
               data.facets![f].length ? (
@@ -397,7 +399,7 @@ export function SearchPage() {
                     {data.facets![f].map((b) => (
                       <li key={b.key}>
                         <button type="button" onClick={() => addFacet(f, b.key)} className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-sm hover:bg-ink-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500">
-                          <span className="truncate">{f === 'status' || f === 'storageTier' ? titleCase(b.label) : b.label}</span>
+                          <span className="truncate" title={b.label}>{f === 'status' || f === 'storageTier' ? titleCase(b.label) : b.label}</span>
                           <span className="ml-2 text-xs text-ink-500">{b.count}</span>
                         </button>
                       </li>

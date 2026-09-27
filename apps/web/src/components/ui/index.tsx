@@ -193,7 +193,7 @@ const STATUS_TONES: Record<string, Tone> = {
 };
 export function StatusBadge({ status }: { status: string | null | undefined }) {
   if (!status) return <Badge>—</Badge>;
-  return <Badge tone={STATUS_TONES[status] ?? 'gray'}>{titleCase(status)}</Badge>;
+  return <Badge tone={STATUS_TONES[status] ?? 'gray'} className="whitespace-nowrap">{titleCase(status)}</Badge>;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -285,7 +285,7 @@ export function DataTable<T>({
   if (loading && !rows) return <Spinner />;
   if (!rows || rows.length === 0) return <>{empty ?? <EmptyState title="No records found" />}</>;
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto" /* relative: keeps sr-only (absolute) header text inside the scroller */>
       <table className="min-w-full divide-y divide-ink-200 text-sm">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead className="bg-ink-50">
@@ -352,13 +352,45 @@ export function Pagination({ page, pageSize, total, onPage }: { page: number; pa
 }
 
 // ---------------------------------------------------------------------------------------------
+// Open dialogs, innermost last: only the top one reacts to Escape/Tab, and the page behind stays locked.
+const modalStack: HTMLElement[] = [];
+let savedBodyOverflow = '';
+function lockBody(dialog: HTMLElement): void {
+  if (!modalStack.length) {
+    savedBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  modalStack.push(dialog);
+}
+function unlockBody(dialog: HTMLElement): void {
+  const i = modalStack.indexOf(dialog);
+  if (i >= 0) modalStack.splice(i, 1);
+  if (!modalStack.length) document.body.style.overflow = savedBodyOverflow;
+}
+/** Top-most = no other open dialog is rendered inside it, and none was opened after it outside it. */
+function isTopDialog(dialog: HTMLElement): boolean {
+  const mine = modalStack.indexOf(dialog);
+  return !modalStack.some((o, i) => o !== dialog && (dialog.contains(o) || (i > mine && !o.contains(dialog))));
+}
+
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Callers pass inline arrow functions; keeping the latest one in a ref means a parent re-render (e.g. typing in a
+  // controlled field of the dialog) does not re-run the focus effect — that used to move focus back to the first field.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  // The opener is captured while rendering: a child with autoFocus takes focus during commit, before any effect runs,
+  // so reading document.activeElement in the effect returned that child and focus was lost on close.
+  const opener = useRef<HTMLElement | null>(null);
+  if (!open) opener.current = null;
+  else if (!opener.current && typeof document !== 'undefined') opener.current = document.activeElement as HTMLElement | null;
   useEffect(() => {
-    if (!open) return;
-    const prev = document.activeElement as HTMLElement | null;
     const el = ref.current;
+    if (!open || !el) return;
+    const token = el;
+    lockBody(token);
+    const prev = opener.current && !el?.contains(opener.current) ? opener.current : null;
     const focusables = () => Array.from(el?.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? []).filter((x) => !x.hasAttribute('disabled'));
     // Respect a child's autoFocus (e.g. the reason textarea). Moving focus to the first focusable (the Close
     // button) meant typed text hit Close on Space and then the page's single-key shortcuts (E2E finding BUG-05).
@@ -367,13 +399,20 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: {
       (field ?? focusables()[0] ?? el)?.focus();
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (!isTopDialog(token)) return;
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onCloseRef.current();
+      }
       if (e.key === 'Tab') {
         const f = focusables();
         if (!f.length) return;
         const first = f[0]!;
         const last = f[f.length - 1]!;
-        if (e.shiftKey && document.activeElement === first) {
+        if (!el?.contains(document.activeElement)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first).focus();
+        } else if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
           last.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
@@ -385,22 +424,24 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: {
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
-      prev?.focus();
+      unlockBody(token);
+      if (prev?.isConnected) prev.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   const width = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl', xl: 'max-w-5xl' }[size];
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/50 p-4 pt-[8vh]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={clsx('w-full rounded-lg bg-white shadow-xl', width)}>
-        <header className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
-          <h2 id={titleId}>{title}</h2>
-          <button type="button" onClick={onClose} className="rounded p-1 text-ink-500 hover:bg-ink-100" aria-label="Close dialog">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overscroll-contain bg-ink-950/50 p-4 pt-[6vh]" onMouseDown={(e) => e.target === e.currentTarget && onCloseRef.current()}>
+      {/* Header and footer stay visible; only the body scrolls, and the dialog never exceeds the viewport. */}
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={clsx('flex max-h-[calc(100dvh-6vh-1rem)] w-full flex-col rounded-lg bg-white shadow-xl', width)}>
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-ink-100 px-5 py-3">
+          <h2 id={titleId} className="min-w-0 break-words">{title}</h2>
+          <button type="button" onClick={() => onCloseRef.current()} className="-mr-1 shrink-0 rounded p-1 text-ink-500 hover:bg-ink-100" aria-label="Close dialog">
             <X className="h-5 w-5" />
           </button>
         </header>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <footer className="flex justify-end gap-2 border-t border-ink-100 px-5 py-3">{footer}</footer>}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
+        {footer && <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-ink-100 px-5 py-3">{footer}</footer>}
       </div>
     </div>
   );
@@ -477,7 +518,7 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: Array<
   return (
     <div
       role="tablist"
-      className="mb-4 flex gap-1 overflow-x-auto border-b border-ink-200"
+      className="mb-4 flex flex-wrap gap-x-1 border-b border-ink-200" /* wraps: a sideways-scrolling strip hid the last tabs at ≤1024 px */
       onKeyDown={(e) => {
         // WAI-ARIA tabs: ←/→ (wrapping), Home/End move between tabs and activate them; Tab leaves the tablist.
         // Navigate from the FOCUSED tab, not from `value`: selection may be committed later (router transitions,
@@ -541,9 +582,13 @@ export function CopyButton({ value, label = 'Copy' }: { value: string; label?: s
   return (
     <button
       type="button"
-      className="inline-flex items-center gap-1 rounded px-1 text-xs text-brand-700 hover:bg-brand-50"
+      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1 text-xs text-brand-700 hover:bg-brand-50"
       onClick={async () => {
-        await navigator.clipboard.writeText(value);
+        try {
+          await navigator.clipboard.writeText(value);
+        } catch {
+          return; // clipboard unavailable (insecure origin / denied): the value stays selectable on the page
+        }
         setDone(true);
         setTimeout(() => setDone(false), 1500);
       }}
