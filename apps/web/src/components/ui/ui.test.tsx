@@ -1,7 +1,7 @@
 /** Regression tests for UI primitives fixed during the E2E / accessibility pass. */
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Card, ConfirmDialog, EmptyState, Field, Input, Modal, ProgressBar, Textarea } from './index';
+import { Card, ConfirmDialog, EmptyState, Field, Input, Modal, ProgressBar, Tabs, Textarea } from './index';
 
 afterEach(cleanup);
 
@@ -67,5 +67,22 @@ describe('Card / EmptyState / ProgressBar', () => {
       render(<ProgressBar value={0.42} label="Analysis progress" />);
     });
     expect(screen.getByRole('progressbar', { name: 'Analysis progress' })).toHaveAttribute('aria-valuenow', '42');
+  });
+});
+
+describe('Tabs keyboard navigation', () => {
+  it('advances from the focused tab even when the selection has not been committed yet (deferred router updates)', () => {
+    const changes: string[] = [];
+    // `value` never changes: models a selection committed later (transition / lazy tab content still loading).
+    render(<Tabs tabs={[{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }]} value="a" onChange={(v) => changes.push(v)} />);
+    const tabs = screen.getAllByRole('tab');
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(tabs[1]);
+    fireEvent.keyDown(tabs[1]!, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(tabs[2]);
+    fireEvent.keyDown(tabs[2]!, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(tabs[0]);
+    expect(changes).toEqual(['b', 'c', 'a']);
   });
 });

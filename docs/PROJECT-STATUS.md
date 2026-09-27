@@ -34,7 +34,7 @@ REAL IMPLEMENTATION STATUS: **FEATURE-COMPLETE FOR THE 20 SPECIFICATION MODULES 
 Test totals (final audit branch, 2026-09-27): API 446 · worker 55 · ai-worker 19 · web 23 · station client 3 · E2E 48 (594 total) — all passing; build, typecheck (+e2e), lint (0 errors, 5 warnings), web build green. `main` at `8ede45c` had 592 (API 444); the audit added 2 regression tests.
 
 ## In Progress
-Completion pass: B (e-mail alerts, scheduled reports, AI-worker metrics, sharing, fixity coverage, DR disposal, ingestion/video fixes) and C (Kannada PDFs, keyboard annotations, E2E coverage, code splitting, custody paging, react-router 7, CI). Completion A (security/backend hardening) merged 2026-09-27: API 466 tests, backup verify 14/14, DR drill restore→ready 4.7 s.
+Nothing. All code-completable work is done (completion pass A/B/C merged 2026-09-27; see FINAL-AUDIT.md §10).
 
 ## Queued
 Production-readiness conditions listed in [FINAL-AUDIT.md](FINAL-AUDIT.md) §8.
@@ -65,6 +65,4 @@ CNPG failover/PITR, native object replication, production-scale RTO (2 h target)
 See `docs/KNOWN-ISSUES.md`.
 
 ## Next Actions
-1. Orchestrator: review and merge the final-audit branch.
-2. Build the container images and deploy to a staging cluster (first real run of Dockerfile/k8s/CI); repeat E2E + DR drill there.
-3. Resolve the production conditions in [FINAL-AUDIT.md](FINAL-AUDIT.md) §8 (VAPT, HSM/DSC, CCTNS contracts, legal reviews, S3 IAM, capacity, re-verification off the faulty dev host).
+External only (see FINAL-AUDIT.md §8): build/scan images and deploy to staging via CI; re-run E2E + DR drill on sound hardware; CERT-In VAPT; HSM/DSC signing key; legal reviews (BSA s.63 template, ANPR licence, face-recognition DPIA); CCTNS contracts; production object store (COMPLIANCE lock, per-service IAM); transcoding capacity decision; custodian export-approval decision (EXT-10).

@@ -125,13 +125,17 @@ export class Guard {
 
   /** Final checks: wait for in-flight body scans and scan each open page's HTML. */
   async finish(): Promise<Problem[]> {
-    await Promise.allSettled([...this.pending]);
+    // Bound every wait: a response that never completes (e.g. an open media stream) or a busy page must not hang the
+    // teardown until the test timeout. Anything not readable within the bound cannot be scanned and is skipped.
+    const bounded = <T>(p: Promise<T>, ms = 10_000) =>
+      Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('guard: timed out')), ms))]);
+    await bounded(Promise.allSettled([...this.pending]), 15_000).catch(() => undefined);
     for (const p of this.pages) {
       if (p.isClosed()) continue;
       try {
-        this.scan(await p.content(), `HTML of ${p.url()}`);
+        this.scan(await bounded(p.content()), `HTML of ${p.url()}`);
       } catch {
-        /* page navigating/closed */
+        /* page navigating/closed/busy */
       }
     }
     return this.problems;

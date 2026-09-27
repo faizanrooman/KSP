@@ -157,7 +157,10 @@ test('keyboard: region annotation without a pointer — create, move, resize, En
   await page.goto(`/workspaces/${getState('workspaceId')}`);
   await tabTo(page, (a) => a.role === 'tab', 'workspace tab list');
   const reviewTab = page.getByRole('tab', { name: 'Review & annotate' });
-  for (let i = 0; i < 8 && (await reviewTab.getAttribute('aria-selected')) !== 'true'; i++) await page.keyboard.press('ArrowRight');
+  // Arrow keys move focus immediately; the selection (URL state, lazy tab content) commits a moment later — so steer by
+  // the FOCUSED tab and then let the assertion below wait for the selection to follow.
+  const focusedTab = () => page.evaluate(() => (document.activeElement?.getAttribute('role') === 'tab' ? document.activeElement.textContent : null));
+  for (let i = 0; i < 8 && (await focusedTab()) !== 'Review & annotate'; i++) await page.keyboard.press('ArrowRight');
   await expect(reviewTab).toHaveAttribute('aria-selected', 'true');
   const video = page.locator('video').first();
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), { timeout: 60_000 }).toBeGreaterThanOrEqual(2);

@@ -480,13 +480,16 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: Array<
       className="mb-4 flex gap-1 overflow-x-auto border-b border-ink-200"
       onKeyDown={(e) => {
         // WAI-ARIA tabs: ←/→ (wrapping), Home/End move between tabs and activate them; Tab leaves the tablist.
-        const i = tabs.findIndex((t) => t.id === value);
+        // Navigate from the FOCUSED tab, not from `value`: selection may be committed later (router transitions,
+        // lazy-loaded tab content), and computing from a stale value would pin repeated presses on one tab.
+        const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+        const focused = buttons.indexOf(document.activeElement as HTMLButtonElement);
+        const i = focused >= 0 ? focused : tabs.findIndex((t) => t.id === value);
         const next = e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
         if (next < 0 || !tabs[next]) return;
         e.preventDefault();
+        buttons[next]?.focus();
         onChange(tabs[next]!.id);
-        const buttons = e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-        requestAnimationFrame(() => buttons[next]?.focus());
       }}
     >
       {tabs.map((t) => (

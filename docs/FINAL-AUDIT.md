@@ -170,9 +170,9 @@ Conditions to reach production (all required):
 7. CCTNS/FIR contracts agreed and the `http-json` adapter (or a replacement) contract-tested against the real system,
    or integrations explicitly descoped for go-live.
 8. Transcoding/GPU capacity decision made and load-tested at expected daily volume.
-9. MEDIUM items resolved or formally accepted: SEC-R1 (audit hash coverage), FN-1 (e-mail alerts), FN-6 (fixity
-   sample rate), FN-9 (Kannada rendering in PDFs), OPS-5 (DR disposal sweep), OPS-10 (key versioning), EXT-11
-   (react-router upgrade), EXT-10 (custodian approval decision).
+9. ~~MEDIUM items resolved or formally accepted~~ — **resolved in the completion pass (§10)**: SEC-R1, FN-1, FN-6,
+   FN-9, OPS-5, OPS-10, react-router upgrade. Remaining: **EXT-10** product decision (mechanism exists: grant
+   `export:approve` to EVIDENCE_CUSTODIAN in Roles admin; SoD still enforced).
 10. All verification in §3 repeated on sound hardware (ENV-1).
 
 ## 9. UNVERIFIED (consolidated)
@@ -183,3 +183,34 @@ COMPLIANCE mode · CCTNS/FIR/case-diary integrations · mTLS client auth · HSM/
 package and BSA s.63 template · AI accuracy on KSP footage / Indian plates · GPU inference · uploads > 5 GiB · Safari
 native HLS and non-Chrome browsers · screen readers · real 1080p30 long-footage throughput · e-mail delivery · webhook
 to a real receiver · Prometheus/Grafana stack · CERT-In VAPT.
+
+## 10. Completion pass (2026-09-27)
+
+After this audit, three completion workstreams closed every open item that can be closed in code
+(details and fix references in [KNOWN-ISSUES.md](KNOWN-ISSUES.md)):
+
+* **Security/backend (A):** versioned audit hash v2 covering all columns incl. `user_agent` (history not rewritten;
+  mixed-chain verification), versioned data-encryption keys + rotation command, PostgreSQL-backed shared rate-limit
+  store, single-use TOTP on MFA disable, re-authentication for MFA re-enrolment, generic public health output,
+  uniform-timing API-client auth with short verification cache, AI-job status transition guard, dashboard scope
+  check, signed backup manifests, k8s/container UID hardening, custodian export-approval mechanism documented.
+* **Features (B):** e-mail alert channel + retried external deliveries, scheduled reports, AI-worker heartbeat +
+  metrics + alert rules, share unlock/extend/re-issue + e-mail link delivery + variant deletion on revoke + internal
+  maxViews, full-cycle fixity coverage incl. retained/DR copies, DR disposal sweep, async quarantine release and
+  snapshots, atomic reprocess generations, recordedAt provenance, timeline soft delete, CLI status refresh.
+* **Frontend/perf/i18n/CI (C):** Kannada in PDFs (bundled Noto fonts, HarfBuzz shaping, verified by glyph runs,
+  `pdftotext` and raster comparison), keyboard region annotation, E2E for integrations/API clients/retention/disposal,
+  route-level code splitting (first load 2.6 MB → 548 kB), custody-view paging, capped search totals and cheaper facets,
+  react-router 7 (npm audit: 0 vulnerabilities), flaky AI test root-caused, CI E2E job + pinned checksum-verified
+  validators + strict validation mode.
+
+**Verification after merging all three on main** (orchestrator, sequential): build, typecheck, typecheck:e2e, lint
+(0 errors) green; core 5/5 · API 482/482 · worker 66/66 · ai-worker 21/21 · web 25/25 · station client 4/4;
+`npx vite build` green; `npm audit --omit=dev` 0 vulnerabilities; backup verification 14/14; `validate-deploy.sh
+--strict` PASSED with all validators installed (Docker compose check skipped: no Docker); DR drill passed
+(restore→ready 3.7 s, small data); **E2E 52/52 in two consecutive runs** (after fixing a Tabs keyboard-navigation bug
+and hardening the E2E runtime guard's teardown). Web tests 26/26 incl. a Tabs regression test.
+
+**Verdict unchanged:** ready for staging/UAT (conditions in §8); **not ready for production** until the external
+conditions 1–8 and 10 in §8 are met. None of those can be completed in the codebase.
+
