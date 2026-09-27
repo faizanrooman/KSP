@@ -62,6 +62,14 @@ describe('Modal focus', () => {
     expect(document.body.style.overflow).toBe('');
   });
 
+  // UI-B-08: rendered in place, the fixed overlay picked up `space-y-*` sibling margins (uncovered strip at the top).
+  it('portals the overlay to <body>, outside page layout containers', () => {
+    render(<div className="space-y-4" data-testid="page"><p>x</p><Modal open title="T" onClose={() => undefined}><p>y</p></Modal></div>);
+    const overlay = screen.getByRole('dialog').parentElement!;
+    expect(screen.getByTestId('page').contains(overlay)).toBe(false);
+    expect(overlay.parentElement).toBe(document.body);
+  });
+
   it('falls back to the first focusable control', () => {
     render(<ConfirmDialog open title="Revoke" message="Sure?" onConfirm={() => undefined} onCancel={() => undefined} />);
     expect(screen.getByRole('button', { name: 'Close dialog' })).toHaveFocus();

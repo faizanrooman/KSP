@@ -10,7 +10,7 @@ import { ApiError, errorMessage, request } from '@/lib/api';
 import { formatDateTime, formatDuration } from '@/lib/format';
 import { Alert, Button, Field, Input } from '@/components/ui';
 import type { PortalItem, PortalSession, PortalShare } from './types';
-import { openFailure, refreshDelayMs, storeKey } from './portal-helpers';
+import { blockedText, openFailure, refreshDelayMs, storeKey } from './portal-helpers';
 
 
 function portal<T>(method: string, path: string, session: string | null, body?: unknown): Promise<T> {
@@ -102,7 +102,7 @@ function CodeForm({ token, onOpened, notice }: { token: string; onOpened: (r: Po
       setBusy(false);
     }
   };
-  if (blocked) return <Alert tone="red" title="This share is not available">{blocked} Contact the officer who shared it with you.</Alert>;
+  if (blocked) return <Alert tone="red" title="This share is not available">{blockedText(blocked)}</Alert>;
   return (
     <form onSubmit={submit} className="mx-auto max-w-sm space-y-4 rounded-lg border border-ink-200 bg-white p-6 shadow-sm">
       <div className="flex items-center gap-2 text-ink-900"><Lock className="h-5 w-5" aria-hidden /><h1 className="text-lg font-semibold">Enter your access code</h1></div>

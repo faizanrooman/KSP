@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { MeResponse, Permission } from '@ksp/shared';
 import { api, ApiError } from './api';
@@ -20,21 +20,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const qc = useQueryClient();
 
-  const refresh = useCallback(async () => {
-    try {
-      const m = await api.get<MeResponse>('/auth/me');
-      setMe(m);
-      return m;
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) setMe(null);
-      return null;
-    } finally {
-      setLoading(false);
-    }
+  // One /auth/me at a time: the start-up probe ran twice concurrently (two 401s + a refresh on every signed-out load).
+  const inFlight = useRef<Promise<MeResponse | null> | null>(null);
+  const refresh = useCallback(() => {
+    inFlight.current ??= (async () => {
+      try {
+        const m = await api.get<MeResponse>('/auth/me');
+        setMe(m);
+        return m;
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) setMe(null);
+        return null;
+      } finally {
+        setLoading(false);
+        inFlight.current = null;
+      }
+    })();
+    return inFlight.current;
   }, []);
 
   useEffect(() => {
-    void refresh();
+    // The public share portal (/s/:token) is for external recipients without an account: no session probe there
+    // (it produced three failed requests and console errors in the recipient's browser — UI-B-15).
+    if (/^\/s\//.test(window.location.pathname)) setLoading(false);
+    else void refresh();
     const onUnauth = () => {
       setMe(null);
       qc.clear();

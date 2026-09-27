@@ -110,10 +110,10 @@ export function LoginPage() {
             Verify
           </Button>
           <div className="flex justify-between text-sm">
-            <button type="button" className="text-brand-700 hover:underline" onClick={() => setUseRecovery((v) => !v)}>
+            <button type="button" className="text-brand-700 hover:underline" onClick={() => { setUseRecovery((v) => !v); setCode(''); setError(null); }}>
               {useRecovery ? 'Use authenticator code' : 'Use a recovery code'}
             </button>
-            <button type="button" className="text-ink-500 hover:underline" onClick={() => setMfaToken(null)}>
+            <button type="button" className="text-ink-600 hover:underline" onClick={() => { setMfaToken(null); setUseRecovery(false); setCode(''); setError(null); }}>
               Back
             </button>
           </div>
@@ -248,7 +248,7 @@ export function MfaEnrollPanel({ forced, onDone }: { forced?: boolean; onDone?: 
       <p className="text-sm text-ink-600">Scan this QR code with an authenticator app (e.g. Google Authenticator, Microsoft Authenticator), then enter the 6-digit code it shows.</p>
       <img src={setup.qrDataUrl} alt="QR code for authenticator enrolment" className="mx-auto h-48 w-48" />
       <p className="text-center text-xs text-ink-500">
-        Manual entry key: <span className="mono select-all" data-testid="mfa-secret">{setup.secret}</span>
+        Manual entry key: <span className="mono select-all break-all" data-testid="mfa-secret">{setup.secret}</span>
       </p>
       <Field label="Verification code" htmlFor="mfa-code" required>
         <Input id="mfa-code" inputMode="numeric" pattern="\d{6}" maxLength={6} autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} required />

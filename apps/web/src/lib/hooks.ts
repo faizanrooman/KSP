@@ -20,7 +20,10 @@ export function useUrlState<T extends Record<string, string>>(defaults: T): [T, 
         (prev) => {
           const next = new URLSearchParams(prev);
           for (const [k, v] of Object.entries(patch)) {
-            if (v === undefined || v === '' || v === defaults[k]) next.delete(k);
+            if (v === undefined || v === defaults[k]) next.delete(k);
+            // An explicit '' for a key whose default is not '' ("Any status" when the default is OPEN) must be kept in
+            // the URL, otherwise the default comes straight back and the choice cannot be made (UI-B-13).
+            else if (v === '' && !defaults[k]) next.delete(k);
             else next.set(k, String(v));
           }
           if (!('page' in patch) && 'page' in defaults) next.delete('page');

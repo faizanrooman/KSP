@@ -2,6 +2,7 @@
  * Shared UI primitives. All feature screens use these so loading / error / empty / confirmation states,
  * focus handling and keyboard behaviour are consistent (see docs/UI-GUIDELINES.md).
  */
+import { createPortal } from 'react-dom';
 import {
   cloneElement,
   createContext,
@@ -431,8 +432,10 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: {
   }, [open]);
   if (!open) return null;
   const width = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl', xl: 'max-w-5xl' }[size];
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/50 p-4 pt-[8vh]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+  // Portalled to <body>: rendered in place, the overlay inherited `space-y-*` sibling margins (a 16 px uncovered strip
+  // above every dialog opened from a page) and any ancestor stacking context (UI-B-08).
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink-950/50 p-4 pt-[8vh]" onMouseDown={(e) => e.target === e.currentTarget && onCloseRef.current()}>
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={clsx('w-full rounded-lg bg-white shadow-xl', width)}>
         <header className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
           <h2 id={titleId}>{title}</h2>
@@ -441,9 +444,10 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: {
           </button>
         </header>
         <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <footer className="flex justify-end gap-2 border-t border-ink-100 px-5 py-3">{footer}</footer>}
+        {footer && <footer className="flex flex-wrap justify-end gap-2 border-t border-ink-100 px-5 py-3">{footer}</footer>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -23,3 +23,10 @@ export function refreshDelayMs(pb: { status: string; expiresAt?: string } | null
   if (!pb.expiresAt) return 30_000;
   return Math.max(30_000, new Date(pb.expiresAt).getTime() - now - 60_000);
 }
+
+/** Server reason as a sentence, plus whom to contact unless the reason already says so (UI-B-14: it was doubled). */
+export function blockedText(reason: string): string {
+  const s = reason.trim().replace(/([^.!?])$/, '$1.');
+  const sentence = s.charAt(0).toUpperCase() + s.slice(1);
+  return /contact/i.test(sentence) ? sentence : `${sentence} Contact the officer who shared it with you.`;
+}
