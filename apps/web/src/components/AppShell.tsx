@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-2">
         Skip to content
       </a>
-      <aside className="hidden w-60 shrink-0 bg-brand-950 lg:block">{sidebar}</aside>
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 self-start overflow-hidden bg-brand-950 lg:block">{sidebar}</aside>
       {open && (
         <div className="fixed inset-0 z-40 flex lg:hidden">
           <div className="w-64 bg-brand-950">{sidebar}</div>
