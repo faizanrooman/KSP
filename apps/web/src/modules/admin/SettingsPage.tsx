@@ -102,7 +102,10 @@ function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: Sett
   const initial = data.settings[group.key] as unknown as Record<string, unknown>;
   const [v, setV] = useState<Record<string, unknown>>(initial);
   const [confirmReset, setConfirmReset] = useState(false);
-  useEffect(() => setV(initial), [initial]);
+  // Re-sync only when THIS group's saved values change: saving another group replaces the whole settings object, and
+  // depending on the object identity wiped this group's unsaved edits (UI-B-07).
+  const initialJson = JSON.stringify(initial);
+  useEffect(() => setV(JSON.parse(initialJson) as Record<string, unknown>), [initialJson]);
   const roles = useRoles(group.key === 'sessionPolicy');
   const qc = useQueryClient();
   const toast = useToast();
@@ -115,7 +118,7 @@ function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: Sett
     mutationFn: () => api.delete<SettingsResponse>(`/settings/${group.key}`),
     onSuccess: (r) => { qc.setQueryData(['admin', 'settings'], r); setConfirmReset(false); toast.success(`${group.title} restored to defaults`); },
   });
-  const dirty = JSON.stringify(v) !== JSON.stringify(initial);
+  const dirty = JSON.stringify(v) !== initialJson;
   const details = save.error instanceof ApiError && Array.isArray(save.error.details) ? (save.error.details as Array<{ path?: string; message: string }>) : [];
   return (
     <Card
@@ -124,10 +127,9 @@ function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: Sett
     >
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
         <div className="grid gap-3 sm:grid-cols-2">
-          {group.fields.map((fd) => {
+          {group.fields.filter((fd) => fd.kind !== 'bool').map((fd) => {
             const id = `set-${group.key}-${fd.name}`;
             const val = v[fd.name];
-            if (fd.kind === 'bool') return <div key={fd.name} className="self-end"><Checkbox label={fd.label} checked={!!val} onChange={(c) => setV({ ...v, [fd.name]: c })} /></div>;
             if (fd.kind === 'roles') {
               const sel = new Set((val as string[]) ?? []);
               return (
@@ -157,6 +159,12 @@ function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: Sett
               </Field>
             );
           })}
+          {/* Switches are grouped in their own row: interleaved with inputs they left ragged gaps in the grid (UI-B-06). */}
+          {group.fields.some((fd) => fd.kind === 'bool') && (
+            <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2 lg:grid-cols-4">
+              {group.fields.filter((fd) => fd.kind === 'bool').map((fd) => <Checkbox key={fd.name} label={fd.label} checked={!!v[fd.name]} onChange={(c) => setV({ ...v, [fd.name]: c })} />)}
+            </div>
+          )}
         </div>
         {save.error ? (
           <Alert tone="red" title="Not saved">

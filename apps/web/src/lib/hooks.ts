@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 /**
@@ -33,4 +33,14 @@ export function useUrlState<T extends Record<string, string>>(defaults: T): [T, 
   );
   const reset = useCallback(() => setParams(new URLSearchParams(), { replace: true }), [setParams]);
   return [state, update, reset];
+}
+
+/** `value`, updated only after it stopped changing for `ms` (search-as-you-type without a request per keystroke). */
+export function useDebounced<T>(value: T, ms = 300): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
 }

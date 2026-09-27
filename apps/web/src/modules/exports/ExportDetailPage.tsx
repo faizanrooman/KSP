@@ -64,7 +64,7 @@ export function ExportDetailPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title={<span className="mono">{x.exportNumber}</span>}
+        title={<span className="font-mono">{x.exportNumber}</span>}
         subtitle={x.purpose}
         breadcrumb={<Link to="/exports" className="text-brand-700 hover:underline">Court exports</Link>}
         actions={

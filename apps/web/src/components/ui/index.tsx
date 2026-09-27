@@ -129,7 +129,7 @@ export function Checkbox({ label, checked, onChange, disabled, description }: { 
   const id = useId();
   return (
     <div className="flex items-start gap-2">
-      <input id={id} type="checkbox" className="mt-0.5 h-4 w-4 rounded border-ink-300 text-brand-700 focus:ring-brand-500" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      <input id={id} type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 rounded border-ink-300 text-brand-700 focus:ring-brand-500" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <label htmlFor={id} className="text-sm text-ink-800">
         {label}
         {description && <span className="block text-xs text-ink-500">{description}</span>}
@@ -145,7 +145,7 @@ export function Card({ title, actions, children, className, bodyClassName }: { t
   return (
     <section className={clsx('card', className)} aria-labelledby={named ? titleId : undefined}>
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-3 border-b border-ink-100 px-4 py-3">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-4 py-3">
           {named ? <h2 id={titleId}>{title}</h2> : title}
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>
@@ -160,7 +160,7 @@ export function PageHeader({ title, subtitle, actions, breadcrumb }: { title: Re
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
         {breadcrumb && <div className="mb-1 text-xs text-ink-500">{breadcrumb}</div>}
-        <h1 className="truncate">{title}</h1>
+        <h1 className="break-words">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-ink-500">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -180,7 +180,7 @@ const tone: Record<string, string> = {
 export type Tone = keyof typeof tone;
 
 export function Badge({ children, tone: t = 'gray', className }: { children: ReactNode; tone?: Tone; className?: string }) {
-  return <span className={clsx('inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset', tone[t], className)}>{children}</span>;
+  return <span className={clsx('inline-flex items-center whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset', tone[t], className)}>{children}</span>;
 }
 
 const STATUS_TONES: Record<string, Tone> = {
@@ -285,7 +285,9 @@ export function DataTable<T>({
   if (loading && !rows) return <Spinner />;
   if (!rows || rows.length === 0) return <>{empty ?? <EmptyState title="No records found" />}</>;
   return (
-    <div className="overflow-x-auto">
+    // `relative`: absolutely positioned descendants (sr-only column headers) are contained by the scroller; without it
+    // they were positioned against the page and widened it at ≤1024 px (UI-B-02).
+    <div className="relative overflow-x-auto">
       <table className="min-w-full divide-y divide-ink-200 text-sm">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead className="bg-ink-50">
@@ -352,9 +354,46 @@ export function Pagination({ page, pageSize, total, onPage }: { page: number; pa
 }
 
 // ---------------------------------------------------------------------------------------------
+/** Page scroll lock while any dialog is open (ref-counted for stacked dialogs); keeps the scrollbar gutter stable. */
+let scrollLocks = 0;
+let savedOverflow = '';
+let savedPadding = '';
+export function lockBodyScroll(): () => void {
+  const b = document.body;
+  if (scrollLocks++ === 0) {
+    savedOverflow = b.style.overflow;
+    savedPadding = b.style.paddingRight;
+    const gutter = window.innerWidth - document.documentElement.clientWidth;
+    if (gutter > 0) b.style.paddingRight = `${gutter}px`;
+    b.style.overflow = 'hidden';
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (--scrollLocks === 0) {
+      b.style.overflow = savedOverflow;
+      b.style.paddingRight = savedPadding;
+    }
+  };
+}
+function isTopDialog(el: HTMLElement): boolean {
+  const all = Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]'));
+  return all[all.length - 1] === el;
+}
+
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Callers pass inline `onClose` arrows and usually own the form state, so its identity changes on every keystroke.
+  // Keep it out of the effect deps: re-running the effect restored focus to the opener and then moved it to the first
+  // field, so typing into any later field jumped after one character (UI-B-01).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    return lockBodyScroll();
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
@@ -367,7 +406,9 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: {
       (field ?? focusables()[0] ?? el)?.focus();
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      // Only the top-most dialog reacts (a ConfirmDialog opened from a Modal must not close both).
+      if (el && !isTopDialog(el)) return;
+      if (e.key === 'Escape') onCloseRef.current();
       if (e.key === 'Tab') {
         const f = focusables();
         if (!f.length) return;
@@ -387,7 +428,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: {
       document.removeEventListener('keydown', onKey);
       prev?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   const width = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl', xl: 'max-w-5xl' }[size];
   return (

@@ -29,10 +29,10 @@ export function ShareDetailPage() {
   const logCols: Column<ShareDetail['accessLog'][number]>[] = [
     { key: 'at', header: 'Time', render: (l) => <span className="whitespace-nowrap">{formatDateTime(l.at)}</span> },
     { key: 'a', header: 'Action', render: (l) => (['DENIED', 'CODE_FAILED'].includes(l.action) ? <Badge tone="red">{titleCase(l.action)}</Badge> : <Badge tone="blue">{titleCase(l.action)}</Badge>) },
-    { key: 'e', header: 'Item', render: (l) => <span className="mono text-xs">{itemNo(l.evidenceId)}</span> },
+    { key: 'e', header: 'Item', render: (l) => <span className="mono whitespace-nowrap text-xs">{itemNo(l.evidenceId)}</span> },
     { key: 'd', header: 'Detail', render: (l) => l.detail ?? '—' },
     { key: 'ip', header: 'IP', render: (l) => l.ip ?? '—' },
-    { key: 'ua', header: 'Browser', render: (l) => <span className="line-clamp-1 text-xs" title={l.userAgent ?? ''}>{l.userAgent ?? '—'}</span> },
+    { key: 'ua', header: 'Browser', render: (l) => <span className="block max-w-[14rem] truncate text-xs" title={l.userAgent ?? ''}>{l.userAgent ?? '—'}</span> },
   ];
   return (
     <div className="space-y-4">

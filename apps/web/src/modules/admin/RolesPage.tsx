@@ -166,7 +166,9 @@ export function RoleDetailPage() {
           </Alert>
         ) : null}
         {!readOnly && (
-          <div className="flex justify-end gap-2">
+          // Sticky: the permission matrix is taller than the viewport; saving must not require scrolling to the end.
+          <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-2 border-t border-ink-200 bg-ink-50/95 px-4 py-3 backdrop-blur lg:-mx-6 lg:px-6">
+            {dirty && <span className="mr-auto text-sm text-amber-800">Unsaved changes</span>}
             {dirty && <Button variant="secondary" onClick={() => { setDraft(null); save.reset(); }}>Discard changes</Button>}
             <Button type="submit" disabled={!valid || (!isNew && !dirty)} loading={save.isPending}>{isNew ? 'Create role' : 'Save changes'}</Button>
           </div>

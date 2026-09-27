@@ -26,7 +26,7 @@ export function FirListPage() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
-  const query = useMemo(() => ({ q: s.q || undefined, orgUnitId: s.orgUnitId || undefined, year: s.year || undefined, status: s.status || undefined, actSection: s.actSection || undefined, sort: s.sort, page: s.page, pageSize: s.pageSize }), [s]);
+  const query = useMemo(() => ({ q: s.q || undefined, orgUnitId: s.orgUnitId || undefined, year: /^\d{4}$/.test(s.year) ? s.year : undefined, status: s.status || undefined, actSection: s.actSection || undefined, sort: s.sort, page: s.page, pageSize: s.pageSize }), [s]);
   const list = useQuery({ queryKey: ['firs', 'list', query], queryFn: () => api.get<Paged<Fir>>('/firs', query), placeholderData: keepPreviousData });
   const filtered = !!(s.q || s.orgUnitId || s.year || s.status || s.actSection);
   const cols: Column<Fir>[] = [
