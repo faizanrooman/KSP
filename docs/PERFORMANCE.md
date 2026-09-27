@@ -246,7 +246,7 @@ eager and keep their extension-point shapes), vendors are split with `manualChun
 | | JS files | all JS | JS loaded for the first page (from `index.html`) |
 |---|---|---|---|
 | before | 1 | 2 615 kB (627 kB gzip) | 2 615 kB (627 kB gzip) |
-| after | 67 | 2 589 kB (668 kB gzip) | **541 kB (154 kB gzip)**: `index` 131 kB + `vendor-react` 423 kB |
+| after | 67 | 2 598 kB (671 kB gzip) | **548 kB (157 kB gzip)**: `index` 131 kB + `vendor-react` 431 kB (react-router 7) |
 
 Largest lazy chunks after: `vendor-hls` 594 kB (185 kB gzip, only with the player), `vendor-charts` 396 kB (116 kB
 gzip, dashboard/reports/system health), `WorkspacePage` 110 kB, `extensions` 67 kB (evidence/case tab registry),

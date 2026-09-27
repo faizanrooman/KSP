@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { Camera, Download, ExternalLink } from 'lucide-react';
 import type { EvidenceSummary } from '@/lib/extensions';
 import { useAuth } from '@/lib/auth';

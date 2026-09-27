@@ -4,7 +4,7 @@
  * only included when the user ticks "Include unreviewed AI results", and is labelled as such.
  */
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Bookmark, Film, Filter, Lock, MapPin, Save, Search, Sparkles, Trash2, X } from 'lucide-react';
 import { AI_TASKS, EVIDENCE_STATUSES, MEDIA_STATUSES, STORAGE_TIERS } from '@ksp/shared';
 import { useUrlState } from '@/lib/hooks';

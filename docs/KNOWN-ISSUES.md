@@ -21,7 +21,6 @@ Owner is a role, not a person.
 | EXT-8 | Object Lock runs in GOVERNANCE mode in dev (bypassable by privileged credentials); production should use COMPLIANCE | MEDIUM | decision | Custodian + infra: choose mode/retention per bucket |
 | EXT-9 | CPU transcoding of the full HLS ladder at state-wide volume (~40 000 footage-hours/day) needs ~1 100 4-vCPU workers — GPU / proxy-only default / on-demand HLS decision | HIGH | decision | Infra / product: capacity decision (INFRASTRUCTURE.md) |
 | EXT-10 | Should EVIDENCE_CUSTODIAN hold `export:approve`? Default matrix gives it only to SUPERVISOR (unchanged) | MEDIUM | decision | Product owner. Mechanism ready: grant `export:approve` to EVIDENCE_CUSTODIAN in Roles admin (no separate setting — ADMIN-GUIDE.md § Export approval policy); tested incl. SoD (`exports.test.ts`) |
-| EXT-11 | react-router 6.30.x advisories (`npm audit --omit=dev`: 2 moderate — GHSA-wrjc-x8rr-h8h6 open redirect via backslash in `<Link>`/`useNavigate`, GHSA-337j-9hxr-rhxg SSR hydration, SSR not used) fixed only in 7.18 (major upgrade); 0 high/critical | MEDIUM | open | Web: plan react-router 7 upgrade |
 
 ## Deployment, DR & operations
 
@@ -111,6 +110,7 @@ Owner is a role, not a person.
 | FN-9 PDFs used standard fonts (Kannada / non-Latin not rendered) | bundled Noto Sans + Noto Sans Kannada (OFL, SHA-256 pinned), HarfBuzz shaping, /ActualText; tests compare glyph runs with HarfBuzz, pdftotext round-trip and a 300 dpi raster (CHAIN-OF-CUSTODY.md). Other non-Latin scripts still print `?` |
 | FN-17 region annotations were pointer-only | keyboard region editor in AnnotationStudio (focusable frame: arrows move, Shift+arrows resize, Enter sets, Escape; X/Y/W/H % inputs; polite announcements); `91-keyboard` E2E + axe on the editor; unit tests for the geometry |
 | FN-18 integrations / API-client / retention / disposal screens not driven by E2E | `tests/e2e/specs/12-admin-lifecycle.spec.ts` (fixture system + FIR import, API client secret-once + revoke, retention create/assign, two-officer disposal to DISPOSED) |
-| FN-24 single 2.6 MB JS bundle (627 kB gzip) | route/tab `React.lazy` chunks + vendor chunks (react, charts, hls); first page loads 541 kB (154 kB gzip) — PERFORMANCE.md “Web bundle” |
+| FN-24 single 2.6 MB JS bundle (627 kB gzip) | route/tab `React.lazy` chunks + vendor chunks (react, charts, hls); first page loads 548 kB (157 kB gzip) — PERFORMANCE.md “Web bundle” |
 | FN-19 custody view unpaginated (1 000 events ≈ 0.6 MB per request) | keyset pages of 200 (`after`/`before`/`filter`), whole-chain verification in SQL, “Load more”; PDF complete (batched, 20 000 cap removed); 590 → 119 KiB, 57 → 116 rps |
 | FN-13 search totals via `count(*) OVER ()` | exact up to 10 000 then `totalApprox` (“10,000+”); tag/AI facets via bounded LATERAL lookups (facets 170–210 → 89–126 ms state-wide) |
+| EXT-11 / SEC-08 / SEC-18 react-router 6.30 advisories (GHSA-wrjc-x8rr-h8h6, GHSA-337j-9hxr-rhxg) | upgraded to `react-router` 7.18.4 (declarative mode; imports moved from `react-router-dom`); `npm audit --omit=dev`: 0 vulnerabilities |

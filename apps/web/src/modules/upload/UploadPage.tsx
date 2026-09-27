@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { FolderUp, Pause, Play, Trash2, UploadCloud, X } from 'lucide-react';
 import type { DeclaredUploadMetadata } from '@ksp/shared';
 import { api, errorMessage } from '@/lib/api';

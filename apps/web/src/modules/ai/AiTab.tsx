@@ -4,7 +4,7 @@
  * Results are advisory until reviewed (badge on every item).
  */
 import { useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { Bot, Play, XCircle } from 'lucide-react';
 import { AI_SAMPLE_FPS, type AiDetectionDto, type AiJobDto, type AiTask } from '@ksp/shared';
 import type { EvidenceSummary } from '@/lib/extensions';

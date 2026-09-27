@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 import { ShieldCheck } from 'lucide-react';
 import type { MeResponse } from '@ksp/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
@@ -57,7 +57,8 @@ export function LoginPage() {
   const [useRecovery, setUseRecovery] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const next = (location.state as { from?: string } | null)?.from ?? '/';
+  const from = (location.state as { from?: unknown } | null)?.from;
+  const next = typeof from === 'string' && /^\/(?![/\\])/.test(from) ? from : '/'; // in-app paths only
 
   const finish = (me: MeResponse) => {
     setMe(me);

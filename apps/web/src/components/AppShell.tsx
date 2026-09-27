@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router';
 import { LogOut, Menu, ShieldCheck, UserCircle2, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { MODULES, NAV_SECTIONS, type NavItem } from '@/lib/modules';

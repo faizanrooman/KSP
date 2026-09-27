@@ -31,7 +31,7 @@ export default defineConfig({
             if (/\/node_modules\/(recharts|d3-[a-z-]+|victory-vendor|internmap|decimal\.js-light|es-toolkit|eventemitter3|immer|redux|redux-thunk|reselect|react-redux|@reduxjs|tiny-invariant|clsx)\//.test(id)) {
               return /\/node_modules\/clsx\//.test(id) ? 'vendor-react' : 'vendor-charts';
             }
-            if (/\/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|@remix-run|@tanstack|use-sync-external-store)\//.test(id)) return 'vendor-react';
+            if (/\/node_modules\/(react|react-dom|scheduler|react-router|cookie|set-cookie-parser|@tanstack|use-sync-external-store)\//.test(id)) return 'vendor-react';
             return undefined;
           }
           return undefined;

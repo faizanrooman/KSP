@@ -4,7 +4,7 @@
  * No download/print controls unless the share allows them. Media URLs are short-lived API tokens.
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { Download, Loader2, Lock, Printer, ShieldCheck } from 'lucide-react';
 import { ApiError, errorMessage, request } from '@/lib/api';
 import { formatDateTime, formatDuration } from '@/lib/format';

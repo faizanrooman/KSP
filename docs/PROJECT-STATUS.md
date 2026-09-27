@@ -38,7 +38,7 @@ Completion pass: B (e-mail alerts, scheduled reports, AI-worker metrics, sharing
 Production-readiness conditions listed in [FINAL-AUDIT.md](FINAL-AUDIT.md) §8.
 
 ## Blocked / external
-CCTNS/FIR/case-diary API contracts (not in spec) · CERT-In VAPT · HSM/DSC signing key · production S3 IAM separation · legal review (ANPR model licence, face-recognition DPIA, BSA s.63 template / export package) · GPU/transcoding capacity decision · custodian export-approval decision · react-router major upgrade. Tracked in [KNOWN-ISSUES.md](KNOWN-ISSUES.md) (EXT-*).
+CCTNS/FIR/case-diary API contracts (not in spec) · CERT-In VAPT · HSM/DSC signing key · production S3 IAM separation · legal review (ANPR model licence, face-recognition DPIA, BSA s.63 template / export package) · GPU/transcoding capacity decision · custodian export-approval decision. Tracked in [KNOWN-ISSUES.md](KNOWN-ISSUES.md) (EXT-*).
 
 ## Unverified
 AI model accuracy on real KSP body-worn footage and Indian plates · GPU inference · Docker/compose/k8s (no Docker access on host) · behaviour on AWS S3/MinIO/Ceph (only versitygw tested) · uploads > 5 GiB · Safari native HLS · real 1080p30 long-footage throughput · 99.5% availability and 2-hour restoration targets at production scale (only a small-data local drill has run).

@@ -1,6 +1,6 @@
 /** Evidence detail tabs: "Bookmarks & annotations" (all I can see on this item) and "Related evidence". */
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import type { EvidenceSummary, EvidenceTab } from '@/lib/extensions';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';

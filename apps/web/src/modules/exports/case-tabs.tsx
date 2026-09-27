@@ -1,5 +1,5 @@
 /** Case tab "Court exports": exports made for this case + start a new export from the case's evidence. */
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { api } from '@/lib/api';

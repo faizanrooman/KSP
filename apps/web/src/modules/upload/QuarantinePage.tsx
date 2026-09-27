@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { QUARANTINE_REASONS, type Page } from '@ksp/shared';
 import { api } from '@/lib/api';
 import { formatBytes, formatDateTime, formatDuration, shortHash } from '@/lib/format';

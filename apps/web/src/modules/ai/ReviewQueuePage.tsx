@@ -3,7 +3,7 @@
  * · X select · H history. Filters and paging live in the URL. Bulk actions report per-item results.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { CheckCircle2, History, Keyboard, ShieldAlert, Tag, XCircle } from 'lucide-react';
 import { AI_TASKS, type ReviewAction } from '@ksp/shared';
 import { useUrlState } from '@/lib/hooks';

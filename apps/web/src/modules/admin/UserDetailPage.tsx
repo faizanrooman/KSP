@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Lock, LogOut, Pencil, Plus, ShieldOff, Unlock, UserCheck, UserX } from 'lucide-react';
 import { api, ApiError, errorMessage } from '@/lib/api';
