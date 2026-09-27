@@ -1,6 +1,7 @@
 export * from './config.js';
 export * from './logger.js';
 export * from './crypto.js';
+export * from './key-rotation.js';
 export * from './db/index.js';
 export { migrate } from './db/migrate.js';
 export * from './storage.js';

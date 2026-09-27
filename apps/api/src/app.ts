@@ -16,6 +16,7 @@ import type pg from 'pg';
 import authPlugin from './plugins/auth.js';
 import metricsPlugin from './plugins/metrics.js';
 import { AppError } from './lib/errors.js';
+import { cleanupRateLimitCounters, pgRateLimitStore } from './lib/rate-limit-store.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -91,8 +92,16 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   });
+  const rateLimitStore = cfg.RATE_LIMIT_STORE ?? (cfg.NODE_ENV === 'production' ? 'postgres' : 'memory');
+  if (rateLimitStore === 'postgres') {
+    const timer = setInterval(() => { cleanupRateLimitCounters(pool).catch((err: unknown) => app.log.warn({ err }, 'rate-limit cleanup failed')); }, 60_000);
+    timer.unref();
+    app.addHook('onClose', async () => clearInterval(timer));
+  }
   await app.register(rateLimit, {
     global: true,
+    // Shared store: fail open if the DB is unreachable (every limited endpoint needs the DB anyway; keeps /health/live up).
+    ...(rateLimitStore === 'postgres' ? { store: pgRateLimitStore(pool) as never, skipOnError: true } : {}),
     max: cfg.NODE_ENV === 'test' ? 100000 : 1200,
     timeWindow: '1 minute',
     keyGenerator: (req) => req.ip,

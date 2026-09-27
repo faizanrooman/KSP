@@ -52,6 +52,21 @@ Every refusal by rules 1–5 writes an `ADMIN_ACTION_DENIED` (SECURITY) audit ev
 `ACCESS_DENIED`. All successful changes are audited in the same transaction (`USER_*`, `ROLE_*`, `ORG_UNIT_*`,
 `DEVICE_*`, `SETTINGS_UPDATED` with old/new values).
 
+## Feature-level permission decisions
+
+* **Snapshot from the original (SEC-R11, decision: keep).** `POST /media/evidence/:id/snapshots` with
+  `source: "original"` requires only `evidence:snapshot` (+ jurisdiction via `loadEvidenceFor`), **not**
+  `evidence:download_original`. Rationale: the output is a single re-encoded PNG still (not the original bytes), it
+  is stored as a derivative with its own SHA-256 and custody-audited (`EVIDENCE_SNAPSHOT_CREATED`), and exact-frame
+  stills from the original are routine investigative work for roles that must not be able to exfiltrate the full
+  original. Pinned by `security-residual.test.ts` (role premise) and `media.test.ts` (io.meera, without
+  `download_original`, extracts an original frame). Changing this requires a DECISIONS.md entry.
+* **Unreviewed AI in search (SEC-R9).** `ai.reviewStatus=ANY_NON_REJECTED` requires `ai:review` or `ai:request`
+  in addition to `search:use` (403 + `ACCESS_DENIED` otherwise); the default `APPROVED` needs only `search:use`.
+* **Dashboard unit filter (SEC-R12).** `orgUnitId` must lie inside one of the viewer's `dashboard:view` grant
+  subtrees; otherwise 404 (identical to an unknown unit).
+* **Export approval by custodians (EXT-10).** See ADMIN-GUIDE.md § Export approval policy.
+
 ## Tests
 
 `apps/api/test/admin-{users,roles,org,devices,settings}.test.ts` and `security-authz.test.ts`: 401 / 403 / 404-other

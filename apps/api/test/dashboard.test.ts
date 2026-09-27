@@ -132,11 +132,15 @@ describe('dashboard scoping', () => {
     const f = await summary(kavya, `?orgUnitId=${hg.id}`);
     expect(f.evidence.total).toBe(await expectedTotal(hg.path));
     expect(f.meta.orgUnit.code).toBe('ps_highgrounds');
-    // filtering to a unit outside the viewer's jurisdiction yields nothing (no leak)
+    // SEC-R12: a unit outside the viewer's jurisdiction answers exactly like a non-existent unit (404, no existence leak)
     const naz = await orgOf('ps_nazarbad');
-    const out = await summary(kavya, `?orgUnitId=${naz.id}`);
-    expect(out.evidence.total).toBe(0);
-    expect(out.alerts.open).toBe(0);
+    const out = await kavya.get(`/api/v1/dashboard/summary?orgUnitId=${naz.id}`);
+    const ghost = await kavya.get('/api/v1/dashboard/summary?orgUnitId=00000000-0000-0000-0000-000000000000');
+    expect(out.status).toBe(404);
+    expect(ghost.status).toBe(404);
+    expect({ ...out.body.error, requestId: undefined }).toEqual({ ...ghost.body.error, requestId: undefined });
+    // an ancestor of the viewer's unit is outside the grant subtree as well
+    expect((await kavya.get(`/api/v1/dashboard/summary?orgUnitId=${(await orgOf('blr_city')).id}`)).status).toBe(404);
   });
 
   it('administrator: system health and storage sections, but no evidence visibility', async () => {

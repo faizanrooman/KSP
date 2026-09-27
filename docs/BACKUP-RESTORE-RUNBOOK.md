@@ -28,16 +28,27 @@ Every run is recorded in `backup_runs` (`PG_DUMP`, `VERIFY`, `S3_REPLICATION`; s
 `audit {headSeq, headHash}` (taken **before** the dump snapshot), `rowCounts`, `databaseSettings`
 (`ALTER DATABASE … SET` values such as `jit=off`, which a single-database dump does not contain).
 
+**Signature (OPS-8).** `pg-backup.sh` signs the manifest with the Ed25519 key `BACKUP_SIGNING_KEY_FILE`
+(detached `manifest.json.sig`, uploaded before the manifest; `openssl pkeyutl -sign -rawin`). `verify-backup.sh`
+and `restore.sh` verify it **before using any manifest field** when `BACKUP_SIGNING_PUBKEY_FILE` is set — then a
+missing or invalid signature is fatal (always set it in production; `BACKUP_REQUIRE_SIGNATURE=1` refuses to run
+without it). Manual check: `openssl pkeyutl -verify -pubin -inkey backup_signing_pubkey -rawin -in manifest.json
+-sigfile manifest.json.sig`. `audit.headSeq` is validated as an integer and passed to SQL only as a psql variable.
+
 ## Verification (`verify-backup.sh`) — what "verified" means
 
+0. manifest signature (when `BACKUP_SIGNING_PUBKEY_FILE` is set);
 1. ciphertext SHA-256 = manifest; 2. age decryption with the identity; 3. plaintext SHA-256 = manifest;
 4. `pg_restore --list`; 5. restore into a scratch DB; 6. every applied migration exists in `db/migrations` with the
 same checksum; 7. `audit_verify()` recomputes the whole chain with no broken row; 8. the audit row
 `manifest.audit.headSeq` still has `headHash` (history not rewritten); 9. row counts ≥ manifest.
 
-Tested by `scripts/backup/test/verify-backup.test.sh` (8/8 pass): pristine backup accepted; bit-flipped
-ciphertext, truncated ciphertext, wrong key, truncated dump re-encrypted with forged manifest hashes, audit row
-tampered and re-sealed, migration checksum tampered and re-sealed, audit tail deleted and re-sealed — all rejected.
+Tested by `scripts/backup/test/verify-backup.test.sh` (14/14 pass): pristine signed backup accepted; manifest
+modified with the old signature, signed by another key, signature missing, unsigned with `BACKUP_REQUIRE_SIGNATURE=1`,
+non-integer `headSeq`, bit-flipped ciphertext, truncated ciphertext, wrong key, truncated dump re-encrypted with forged
+manifest hashes, audit row tampered and re-sealed, migration checksum tampered and re-sealed, audit tail deleted and
+re-sealed (the re-sealed cases are re-signed with the real key = signing-key compromise) — all rejected; a legacy
+unsigned manifest is accepted only when no public key is configured.
 
 ## Routine commands
 

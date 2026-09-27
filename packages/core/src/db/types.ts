@@ -272,6 +272,7 @@ export interface AuditEvents {
   event_id: Generated<string>;
   evidence_id: string | null;
   hash: string;
+  hash_version: Generated<number>;
   occurred_at: Timestamp;
   org_unit_id: string | null;
   outcome: string;
@@ -735,6 +736,13 @@ export interface QuarantineReleases {
   status: Generated<string>;
 }
 
+export interface RateLimitCounters {
+  count: Generated<number>;
+  expires_at: Timestamp;
+  key: string;
+  window_ms: number;
+}
+
 export interface RefreshTokens {
   expires_at: Timestamp;
   family_id: string;
@@ -1093,6 +1101,7 @@ export interface DB {
   password_history: PasswordHistory;
   processing_jobs: ProcessingJobs;
   quarantine_releases: QuarantineReleases;
+  rate_limit_counters: RateLimitCounters;
   refresh_tokens: RefreshTokens;
   report_runs: ReportRuns;
   report_schedules: ReportSchedules;

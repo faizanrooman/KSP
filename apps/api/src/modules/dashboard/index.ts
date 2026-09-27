@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { sql, type RawBuilder } from 'kysely';
 import { queueStats } from '@ksp/core';
 import { evidenceVisibleSql } from '../../lib/access.js';
-import { hasPermission, scopePaths, type Principal } from '../../lib/principal.js';
+import { hasPermission, hasPermissionAt, scopePaths, type Principal } from '../../lib/principal.js';
 import { notFound, validationFailed } from '../../lib/errors.js';
 import { alertScopeSql, resourceLink } from '../alerts/index.js';
 import { databaseHealth, storageHealth, storageUtilisation, summariseQueues, workerHeartbeats } from '../system/health-lib.js';
@@ -52,7 +52,8 @@ export default async function dashboard(fastify: FastifyInstance) {
     let org: { id: string; name: string; code: string; path: string } | null = null;
     if (req.query.orgUnitId) {
       org = (await db.selectFrom('org_units').select(['id', 'name', 'code', 'path']).where('id', '=', req.query.orgUnitId).executeTakeFirst()) ?? null;
-      if (!org) throw notFound('Org unit');
+      // SEC-R12: a unit outside the viewer's dashboard jurisdiction answers exactly like a non-existent one.
+      if (!org || !hasPermissionAt(p, 'dashboard:view', org.path)) throw notFound('Org unit');
     }
     const orgE = org ? sql<boolean>`e.org_path <@ ${org.path}::ltree` : sql<boolean>`true`;
     const orgO = org ? sql<boolean>`o.path <@ ${org.path}::ltree` : sql<boolean>`true`;

@@ -205,6 +205,11 @@ export const AUDIT_ACTIONS = {
   ALERT_RULE_UPDATED: { category: 'ADMIN', custody: false },
   BACKUP_COMPLETED: { category: 'SYSTEM', custody: false },
   RESTORE_COMPLETED: { category: 'SYSTEM', custody: false },
+  // Security hardening (completion round A)
+  /** Data-encryption key rotation run: DB secrets re-encrypted to the current key (OPS-10). */
+  KEY_ROTATED: { category: 'SECURITY', custody: false },
+  /** A user replaced an already-enabled MFA enrolment after re-authenticating (SEC-R6). */
+  MFA_REENROLL_STARTED: { category: 'AUTH', custody: false },
 } as const satisfies Record<string, { category: AuditCategory; custody: boolean }>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

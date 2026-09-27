@@ -44,6 +44,29 @@ export default async function authRoutes(fastify: FastifyInstance) {
     type: 'USER', id, name, ip: req.ip, userAgent: req.headers['user-agent'] ?? null,
   });
 
+  /** SEC-12: a TOTP code is valid once per time step (RFC 6238 §5.2) — atomic, so concurrent replays cannot both pass. */
+  async function consumeTotp(userId: string, secretEnc: string, code: string): Promise<boolean> {
+    const delta = authenticator.checkDelta(code, decryptSecret(secretEnc));
+    if (delta === null) return false;
+    const step = Math.floor(Date.now() / 30_000) + delta;
+    const upd = await db.updateTable('users').set({ mfa_last_totp_step: step }).where('id', '=', userId)
+      .where((eb) => eb.or([eb('mfa_last_totp_step', 'is', null), eb('mfa_last_totp_step', '<', step)])).executeTakeFirst();
+    return Number(upd.numUpdatedRows) === 1;
+  }
+
+  /** SEC-12: consume a recovery code atomically (array_remove where still present) so one code cannot be used twice. */
+  async function consumeRecoveryCode(userId: string, hashes: string[], code: string): Promise<boolean> {
+    const normalized = code.replace(/[\s-]/g, '').toLowerCase();
+    for (const hash of hashes) {
+      if (await verifySecret(hash, normalized)) {
+        const upd = await db.updateTable('users').set({ mfa_recovery_codes: sql`array_remove(mfa_recovery_codes, ${hash}::text)` })
+          .where('id', '=', userId).where(sql<boolean>`${hash}::text = ANY(mfa_recovery_codes)`).executeTakeFirst();
+        return Number(upd.numUpdatedRows) === 1;
+      }
+    }
+    return false;
+  }
+
   async function respondWithSession(req: FastifyRequest, reply: FastifyReply, userId: string, mode: 'cookie' | 'bearer', mfaVerified: boolean) {
     const tokens = await createSession(db, userId, { ip: req.ip, userAgent: req.headers['user-agent'] ?? null, mfaVerified });
     await db.updateTable('users').set({ last_login_at: new Date(), last_login_ip: req.ip, failed_login_count: 0, locked_until: null }).where('id', '=', userId).execute();
@@ -157,27 +180,10 @@ export default async function authRoutes(fastify: FastifyInstance) {
     let ok = false;
     let usedRecovery = false;
     if (req.body.code) {
-      const delta = authenticator.checkDelta(req.body.code, decryptSecret(user.mfa_secret_enc));
-      if (delta !== null) {
-        // SEC-12: single use per time step (RFC 6238 §5.2) — atomic, so concurrent replays cannot both pass.
-        const step = Math.floor(Date.now() / 30_000) + delta;
-        const upd = await db.updateTable('users').set({ mfa_last_totp_step: step }).where('id', '=', user.id)
-          .where((eb) => eb.or([eb('mfa_last_totp_step', 'is', null), eb('mfa_last_totp_step', '<', step)])).executeTakeFirst();
-        ok = Number(upd.numUpdatedRows) === 1;
-      }
+      ok = await consumeTotp(user.id, user.mfa_secret_enc, req.body.code);
     } else if (req.body.recoveryCode) {
-      const normalized = req.body.recoveryCode.replace(/[\s-]/g, '').toLowerCase();
-      for (let i = 0; i < user.mfa_recovery_codes.length; i++) {
-        const hash = user.mfa_recovery_codes[i]!;
-        if (await verifySecret(hash, normalized)) {
-          // SEC-12: consume atomically (array_remove where still present) so one code cannot open two sessions.
-          const upd = await db.updateTable('users').set({ mfa_recovery_codes: sql`array_remove(mfa_recovery_codes, ${hash}::text)` })
-            .where('id', '=', user.id).where(sql<boolean>`${hash}::text = ANY(mfa_recovery_codes)`).executeTakeFirst();
-          ok = Number(upd.numUpdatedRows) === 1;
-          usedRecovery = ok;
-          break;
-        }
-      }
+      ok = await consumeRecoveryCode(user.id, user.mfa_recovery_codes, req.body.recoveryCode);
+      usedRecovery = ok;
     }
     if (!ok) {
       authFailures.inc({ reason: 'mfa' });
@@ -268,9 +274,30 @@ export default async function authRoutes(fastify: FastifyInstance) {
 
   // ---------------------------------------------------------------------------------------------
   // MFA enrolment (TOTP, RFC 6238)
-  app.post('/mfa/setup', { config: { allowRestricted: true }, schema: { tags: ['auth'], summary: 'Begin TOTP enrolment: returns secret + QR code' } }, async (req) => {
+  app.post('/mfa/setup', {
+    config: { allowRestricted: true, rateLimit: { max: cfg.NODE_ENV === 'test' ? 10000 : 10, timeWindow: '1 minute' } },
+    schema: {
+      tags: ['auth'],
+      summary: 'Begin TOTP enrolment: returns secret + QR code. Replacing an ENABLED enrolment requires the current password + current TOTP code (or a recovery code)',
+      body: z.object({ password: z.string().min(1).max(256).optional(), code: z.string().regex(/^\d{6}$/).optional(), recoveryCode: z.string().min(8).max(32).optional() })
+        .refine((b) => !(b.code && b.recoveryCode), 'Provide at most one of code or recoveryCode').nullish(),
+    },
+  }, async (req) => {
     const p = req.requirePrincipal();
     if (!p.userId) throw badRequest('Only available to users');
+    const u = await db.selectFrom('users').select(['mfa_enabled', 'mfa_secret_enc', 'mfa_recovery_codes', 'password_hash']).where('id', '=', p.userId).executeTakeFirstOrThrow();
+    if (u.mfa_enabled && u.mfa_secret_enc) {
+      // SEC-R6: a live session alone must not be able to swap the second factor (stolen session → attacker's authenticator).
+      const b = req.body ?? {};
+      if (!b.password || (!b.code && !b.recoveryCode)) throw new AppError(400, 'REAUTH_REQUIRED', 'MFA is already enabled: provide your password and a current code (or a recovery code) to replace it');
+      const ok = !!u.password_hash && (await verifySecret(u.password_hash, b.password))
+        && (b.code ? await consumeTotp(p.userId, u.mfa_secret_enc, b.code) : await consumeRecoveryCode(p.userId, u.mfa_recovery_codes, b.recoveryCode!));
+      if (!ok) {
+        await appendAudit(db, req.actor(), { action: 'MFA_CHALLENGE_FAILED', outcome: 'FAILURE', resourceType: 'user', resourceId: p.userId, details: { context: 'mfa-reenrol' } });
+        throw new AppError(400, 'INVALID_CREDENTIALS', 'Password or code is incorrect');
+      }
+      await appendAudit(db, req.actor(), { action: 'MFA_REENROLL_STARTED', resourceType: 'user', resourceId: p.userId, details: { recoveryCode: !b.code } });
+    }
     const secret = authenticator.generateSecret(20);
     await db.updateTable('users').set({ mfa_pending_secret_enc: encryptSecret(secret) }).where('id', '=', p.userId).execute();
     const otpauthUrl = authenticator.keyuri(p.username, 'KSP VMS', secret);
@@ -301,6 +328,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
   });
 
   app.post('/mfa/disable', {
+    config: { rateLimit: { max: cfg.NODE_ENV === 'test' ? 10000 : 10, timeWindow: '1 minute' } },
     schema: { tags: ['auth'], summary: 'Disable own MFA (requires password + current code; blocked when MFA is mandatory for your roles)', body: z.object({ password: z.string().min(1).max(256), code: z.string().regex(/^\d{6}$/) }) },
   }, async (req) => {
     const p = req.requirePrincipal();
@@ -308,7 +336,9 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const settings = await getSettings(db);
     if (p.grants.some((g) => settings.sessionPolicy.requireMfaForRoles.includes(g.roleCode))) throw new AppError(403, 'MFA_MANDATORY', 'MFA is mandatory for your role and cannot be disabled');
     const u = await db.selectFrom('users').select(['password_hash', 'mfa_secret_enc']).where('id', '=', p.userId).executeTakeFirstOrThrow();
-    if (!u.password_hash || !(await verifySecret(u.password_hash, req.body.password)) || !u.mfa_secret_enc || !authenticator.check(req.body.code, decryptSecret(u.mfa_secret_enc))) {
+    // SEC-R5: the TOTP step is consumed exactly like at login (single use).
+    if (!u.password_hash || !(await verifySecret(u.password_hash, req.body.password)) || !u.mfa_secret_enc || !(await consumeTotp(p.userId, u.mfa_secret_enc, req.body.code))) {
+      await appendAudit(db, req.actor(), { action: 'MFA_CHALLENGE_FAILED', outcome: 'FAILURE', resourceType: 'user', resourceId: p.userId, details: { context: 'mfa-disable' } });
       throw new AppError(400, 'INVALID_CREDENTIALS', 'Password or code is incorrect');
     }
     await db.updateTable('users').set({ mfa_enabled: false, mfa_secret_enc: null, mfa_recovery_codes: [], mfa_enrolled_at: null }).where('id', '=', p.userId).execute();

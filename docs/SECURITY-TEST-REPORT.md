@@ -195,7 +195,26 @@ Found while spot-checking code for the requirements traceability (not a new test
 | FA-1 | Share portal `maxViews` check-then-increment race: concurrent opens could exceed the limit | LOW | fixed (atomic conditional UPDATE; test `maxViews: concurrent opens never exceed the limit`) |
 | FA-2 | Failure counter not reset after a lockout expired → one wrong password re-locked the account (availability / DoS on users) | LOW | fixed (test `an expired lockout starts a fresh failure count`) |
 | FA-3 | `restore.sh` interpolated role passwords into SQL text (`-v "app_password='…'"`) | LOW | fixed (`roles.sql` uses `:'var'`) |
-| FA-4 | `audit_canonical()` omits `user_agent` from the hash | MEDIUM | open (KNOWN-ISSUES SEC-R1) |
-| FA-5 | Further LOW items (MFA disable TOTP replay window, MFA re-enrol without re-auth, `/health/ready` error echo, API-client id timing, `ANY_NON_REJECTED` search gate, `ksp_ai` job status transitions, dashboard org filter) | LOW | open (KNOWN-ISSUES SEC-R5…R12) |
+| FA-4 | `audit_canonical()` omits `user_agent` from the hash | MEDIUM | fixed in completion round A (SEC-R1) |
+| FA-5 | Further LOW items (MFA disable TOTP replay window, MFA re-enrol without re-auth, `/health/ready` error echo, API-client id timing, `ANY_NON_REJECTED` search gate, `ksp_ai` job status transitions, dashboard org filter) | LOW | fixed in completion round A (SEC-R5…R10, R12; R11 kept by decision) |
 
 Still **no CERT-In empanelled VAPT** has been performed.
+
+## Completion round A (2026-09-27) — residual findings closed
+
+| ID | Fix | Test |
+|---|---|---|
+| SEC-R1 / FA-4 | Versioned audit hash: `hash_version`, `audit_canonical_v2()` (all columns incl. `user_agent`), per-row verification, v2→v1 downgrade rejected (migration 1000; history not rewritten) | `audit-hash-v2.test.ts` |
+| SEC-R4 | Shared PostgreSQL rate-limit store (`RATE_LIMIT_STORE`, default postgres in production; migration 1001) | `rate-limit-store.test.ts` (two instances) |
+| SEC-R5 / R6 | MFA disable consumes the TOTP step; replacing an enabled MFA needs password + TOTP / recovery code | `security-auth.test.ts` |
+| SEC-R7 | Public readiness returns `ok`/`fail` only | `security-residual.test.ts` |
+| SEC-R8 / FN-15 | Dummy argon2 for unknown client ids; ≤ 60 s verification cache bound to the current `secret_hash` | `security-residual.test.ts` |
+| SEC-R9 | `ANY_NON_REJECTED` needs `ai:review` / `ai:request` | `security-residual.test.ts` |
+| SEC-R10 | `ai_jobs_status_guard` trigger for `ksp_ai` (migration 1002) | `security-residual.test.ts` |
+| SEC-R12 | Dashboard `orgUnitId` outside jurisdiction → 404 | `dashboard.test.ts` |
+| SEC-R11 | Kept by decision; documented (AUTHORIZATION.md) and pinned | `security-residual.test.ts`, `media.test.ts` |
+| OPS-8 | Ed25519-signed backup manifests; `headSeq` validated and passed as a psql variable | `verify-backup.test.sh` (14/14) |
+| OPS-9 | No key placeholders in the AI-worker config; UIDs/GIDs > 10000 | `security-residual.test.ts`, `validate-deploy.sh` |
+| OPS-10 | Data-encryption keyring with key ids + `keys:rotate-data` | `security-crypto.test.ts` |
+
+Container images still not built; Trivy not re-run against them (OPS-1).

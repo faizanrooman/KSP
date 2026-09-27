@@ -34,7 +34,22 @@ Eight system roles are seeded (`packages/shared/src/permissions.ts`; summary in 
 Custom roles are created from the permission catalogue. Conflicting pairs cannot share a role and a user cannot
 hold both through different roles: `evidence:dispose_request` + `evidence:dispose_approve`,
 `audit:read` + `roles:manage`. Requester ≠ approver is additionally enforced at runtime and in the database for
-disposals and court exports. Open decision: whether custodians should approve exports (KNOWN-ISSUES EXT-10).
+disposals and court exports.
+
+### Export approval policy (EXT-10 — product decision point)
+
+By default only **SUPERVISOR** holds `export:approve`; EVIDENCE_CUSTODIAN does not. The mechanism for changing
+this is the role matrix itself — deliberately no separate system setting, so the permission shown in **Roles &
+permissions** is the one that is enforced and audited (`ROLE_UPDATED` with old/new permissions):
+
+1. The product owner decides (record it in `docs/DECISIONS.md`).
+2. A state-level administrator opens **Roles & permissions → Evidence Custodian**, adds `export:approve`, saves
+   (or `PATCH /api/v1/roles/<id>` with the full permission list). Takes effect immediately for all custodians.
+3. Jurisdiction still applies (custodians approve only exports whose every item they can see in their subtree),
+   and separation of duties still applies: a user can never approve an export they requested (API + DB CHECK),
+   even if they also hold `export:create` through another role.
+
+Reverting = removing the permission again. Verified by `exports.test.ts` ("EXT-10 …").
 
 ## Devices (**Devices**)
 

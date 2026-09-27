@@ -11,6 +11,9 @@
 # Environment
 #   PGHOST PGPORT PGDATABASE PGUSER PGPASSWORD   source database (role ksp_backup = pg_read_all_data; a replica is fine)
 #   BACKUP_AGE_RECIPIENTS_FILE                   age recipients (public keys), one per line — REQUIRED
+#   BACKUP_SIGNING_KEY_FILE                      Ed25519 private key (PEM) signing manifest.json (detached manifest.json.sig);
+#                                                strongly recommended — verify/restore refuse unsigned manifests when
+#                                                BACKUP_SIGNING_PUBKEY_FILE is configured (OPS-8)
 #   BACKUP_S3_ENDPOINT/_REGION/_ACCESS_KEY/_SECRET_KEY, BACKUP_S3_BUCKET   backup store (other site)
 #   BACKUP_S3_PREFIX      default pg/<PGDATABASE>
 #   BACKUP_LOCK_DAYS      Object Lock retention for backup objects (default = BACKUP_RETENTION_DAYS)
@@ -27,7 +30,7 @@ LOCAL_ONLY=""
 : "${PGDATABASE:?PGDATABASE is required}"
 : "${BACKUP_AGE_RECIPIENTS_FILE:?BACKUP_AGE_RECIPIENTS_FILE (age public keys) is required}"
 [ -s "$BACKUP_AGE_RECIPIENTS_FILE" ] || { echo "recipients file $BACKUP_AGE_RECIPIENTS_FILE is empty" >&2; exit 1; }
-for t in pg_dump pg_restore psql age sha256sum node; do command -v "$t" >/dev/null || { echo "missing tool: $t" >&2; exit 1; }; done
+for t in pg_dump pg_restore psql age sha256sum node openssl; do command -v "$t" >/dev/null || { echo "missing tool: $t" >&2; exit 1; }; done
 RETENTION="${BACKUP_RETENTION_DAYS:-35}"
 LOCK_DAYS="${BACKUP_LOCK_DAYS:-$RETENTION}"
 PREFIX="${BACKUP_S3_PREFIX:-pg/$PGDATABASE}"
@@ -104,10 +107,17 @@ cat > "$WORK/manifest.json" <<JSON
   "databaseSettings": $DB_SETTINGS
 }
 JSON
+SIG_FILES=()
+if [ -n "${BACKUP_SIGNING_KEY_FILE:-}" ]; then
+  openssl pkeyutl -sign -inkey "$BACKUP_SIGNING_KEY_FILE" -rawin -in "$WORK/manifest.json" -out "$WORK/manifest.json.sig" || fail "manifest signing failed"
+  SIG_FILES=("$WORK/manifest.json.sig")
+else
+  echo "WARN: BACKUP_SIGNING_KEY_FILE not set — manifest is NOT signed" >&2
+fi
 
 if [ -n "$LOCAL_ONLY" ]; then
   mkdir -p "$LOCAL_ONLY/$TS"
-  cp "$ENC" "$WORK/manifest.json" "$LOCAL_ONLY/$TS/"
+  cp "$ENC" "$WORK/manifest.json" "${SIG_FILES[@]}" "$LOCAL_ONLY/$TS/"
   record SUCCEEDED "$ENC_SIZE" "$ENC_SHA" "file:$LOCAL_ONLY/$TS/$NAME.dump.age"
   echo "BACKUP_OK file:$LOCAL_ONLY/$TS/manifest.json"
   exit 0
@@ -116,6 +126,9 @@ fi
 # 4. Upload (ciphertext first, manifest last = commit marker), with Object Lock retention.
 node "$HERE/s3.ts" ensure-bucket "$BACKUP_S3_BUCKET" --lock >/dev/null || fail "backup bucket unavailable"
 node "$HERE/s3.ts" put "$BACKUP_S3_BUCKET" "$KEY" "$ENC" --lock-days "$LOCK_DAYS" >/dev/null || fail "upload of $KEY failed"
+if [ ${#SIG_FILES[@]} -gt 0 ]; then
+  node "$HERE/s3.ts" put "$BACKUP_S3_BUCKET" "$MKEY.sig" "$WORK/manifest.json.sig" --lock-days "$LOCK_DAYS" >/dev/null || fail "upload of manifest signature failed"
+fi
 node "$HERE/s3.ts" put "$BACKUP_S3_BUCKET" "$MKEY" "$WORK/manifest.json" --lock-days "$LOCK_DAYS" >/dev/null || fail "upload of manifest failed"
 REMOTE_SIZE=$(node "$HERE/s3.ts" head "$BACKUP_S3_BUCKET" "$KEY" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).size))')
 [ "$REMOTE_SIZE" = "$ENC_SIZE" ] || fail "uploaded size $REMOTE_SIZE != local $ENC_SIZE"

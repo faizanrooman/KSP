@@ -84,13 +84,13 @@ function escapeLike(s: string): string {
 
 const EVENT_COLUMNS = [
   'e.seq', 'e.event_id', 'e.occurred_at', 'e.actor_type', 'e.actor_id', 'e.actor_name', 'e.user_agent', 'e.session_id', 'e.action', 'e.category',
-  'e.outcome', 'e.resource_type', 'e.resource_id', 'e.evidence_id', 'e.case_id', 'e.org_unit_id', 'e.details', 'e.prev_hash', 'e.hash',
+  'e.outcome', 'e.resource_type', 'e.resource_id', 'e.evidence_id', 'e.case_id', 'e.org_unit_id', 'e.details', 'e.prev_hash', 'e.hash', 'e.hash_version',
 ] as const;
 
 type EventRow = {
   seq: number; event_id: string; occurred_at: Date; actor_type: string; actor_id: string | null; actor_name: string | null; actor_ip: string | null;
   user_agent: string | null; session_id: string | null; action: string; category: string; outcome: string; resource_type: string | null; resource_id: string | null;
-  evidence_id: string | null; case_id: string | null; org_unit_id: string | null; details: unknown; prev_hash: string; hash: string;
+  evidence_id: string | null; case_id: string | null; org_unit_id: string | null; details: unknown; prev_hash: string; hash: string; hash_version: number;
 };
 
 export function eventDto(r: EventRow) {
@@ -110,6 +110,7 @@ export function eventDto(r: EventRow) {
     details: sanitizeDetails(r.details),
     prevHash: r.prev_hash,
     hash: r.hash,
+    hashVersion: Number(r.hash_version),
   };
 }
 
@@ -119,7 +120,7 @@ export function csvCell(v: unknown): string {
   if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
-const CSV_HEADER = ['seq', 'event_id', 'occurred_at', 'actor_type', 'actor_id', 'actor_name', 'actor_ip', 'action', 'category', 'outcome', 'resource_type', 'resource_id', 'evidence_id', 'case_id', 'org_unit_id', 'details', 'prev_hash', 'hash'];
+const CSV_HEADER = ['seq', 'event_id', 'occurred_at', 'actor_type', 'actor_id', 'actor_name', 'actor_ip', 'action', 'category', 'outcome', 'resource_type', 'resource_id', 'evidence_id', 'case_id', 'org_unit_id', 'details', 'prev_hash', 'hash', 'hash_version'];
 
 export default async function audit(fastify: FastifyInstance) {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
@@ -173,7 +174,7 @@ export default async function audit(fastify: FastifyInstance) {
     const p = req.requirePrincipal();
     const row = (await baseQuery(p, 'audit:read')
       .select([
-        sql<boolean>`e.hash = encode(digest(e.prev_hash || '|' || audit_canonical(e), 'sha256'), 'hex')`.as('hash_ok'),
+        sql<boolean>`e.hash = audit_row_hash(e)`.as('hash_ok'),
         sql<boolean>`(e.prev_hash = CASE WHEN e.seq = 1 THEN repeat('0', 64) ELSE (SELECT pe.hash FROM audit_events pe WHERE pe.seq = e.seq - 1) END) IS TRUE`.as('link_ok'),
       ])
       .where('e.seq', '=', req.params.seq)
@@ -218,7 +219,7 @@ export default async function audit(fastify: FastifyInstance) {
         const batch = (await q.orderBy('e.seq', 'desc').limit(2000).execute()) as unknown as EventRow[];
         for (const r of batch) {
           if (format === 'csv') {
-            await write(`${[r.seq, r.event_id, r.occurred_at.toISOString(), r.actor_type, r.actor_id, r.actor_name, r.actor_ip, r.action, r.category, r.outcome, r.resource_type, r.resource_id, r.evidence_id, r.case_id, r.org_unit_id, sanitizeDetails(r.details), r.prev_hash, r.hash].map(csvCell).join(',')}\n`);
+            await write(`${[r.seq, r.event_id, r.occurred_at.toISOString(), r.actor_type, r.actor_id, r.actor_name, r.actor_ip, r.action, r.category, r.outcome, r.resource_type, r.resource_id, r.evidence_id, r.case_id, r.org_unit_id, sanitizeDetails(r.details), r.prev_hash, r.hash, r.hash_version].map(csvCell).join(',')}\n`);
           } else {
             await write(`${rows ? ',' : ''}${JSON.stringify(eventDto(r))}`);
           }

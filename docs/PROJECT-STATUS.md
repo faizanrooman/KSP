@@ -32,7 +32,7 @@ REAL IMPLEMENTATION STATUS: **FEATURE-COMPLETE FOR THE 20 SPECIFICATION MODULES 
 Test totals (final audit branch, 2026-09-27): API 446 · worker 55 · ai-worker 19 · web 23 · station client 3 · E2E 48 (594 total) — all passing; build, typecheck (+e2e), lint (0 errors, 5 warnings), web build green. `main` at `8ede45c` had 592 (API 444); the audit added 2 regression tests.
 
 ## In Progress
-Nothing. Final audit branch awaiting orchestrator merge.
+Completion pass: B (e-mail alerts, scheduled reports, AI-worker metrics, sharing, fixity coverage, DR disposal, ingestion/video fixes) and C (Kannada PDFs, keyboard annotations, E2E coverage, code splitting, custody paging, react-router 7, CI). Completion A (security/backend hardening) merged 2026-09-27: API 466 tests, backup verify 14/14, DR drill restore→ready 4.7 s.
 
 ## Queued
 Production-readiness conditions listed in [FINAL-AUDIT.md](FINAL-AUDIT.md) §8.

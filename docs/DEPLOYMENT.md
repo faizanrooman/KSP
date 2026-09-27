@@ -21,7 +21,7 @@ including a full DR drill (docs/DISASTER-RECOVERY.md).
 
 ## Images
 
-Base `node:22-bookworm-slim` pinned by digest; non-root uid 1000 (`web` 101, `backup` 999); `tini` as PID 1;
+Base `node:22-bookworm-slim` pinned by digest; non-root uid/gid 10001 (`web` 10101, `backup` 10002; all > 10000 — OPS-9); `tini` as PID 1;
 `npm ci --omit=dev -w <app>` (only the workspaces the image runs); no secrets or models in layers; HEALTHCHECKs;
 read-only-root friendly (only `/work` and `/tmp` writable). Worker/ai-worker FFmpeg: pinned
 `mwader/static-ffmpeg:7.1.1` (GPL static build — libx264/x265/vpx/aom/dav1d/opus/libass…); the worker image build
