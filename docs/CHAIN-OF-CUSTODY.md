@@ -60,7 +60,12 @@ hash / previous hash / details, and **Signed report (PDF)**.
 
 * Viewing the custody timeline is not itself audited (it would append to the very chain being viewed on every
   refresh); generating the signed report is audited.
-* Timeline is capped at 20 000 events per item.
+* `GET /custody/evidence/:id` is **keyset-paged** (FN-19): `?limit=1..1000` (200), `?after=<seq>` (next page) or
+  `?before=<seq>` (previous page), `?filter=all|custody` (applied in SQL). The response adds
+  `page { total, hasMore, hasEarlier, nextAfter, prevBefore, firstSeq, lastSeq }`; `verification` always covers the
+  **whole** chain of the item (every row re-hashed and link-checked inside PostgreSQL — only counts, the first 100
+  broken seqs and the ledger head are returned). The tab shows “Showing N of M” and **Load more**.
+* The signed PDF report still contains every event; they are read in keyset batches of 2 000 (no 20 000 cap any more).
 * PDF text (custody report, export Fact Sheet, report PDFs) uses the bundled **Noto Sans** and **Noto Sans
   Kannada** (SIL OFL 1.1; `packages/core/assets/fonts/`, licence files alongside, SHA-256 pinned in `fonts.json`
   and checked every time the fonts are loaded; `node packages/core/scripts/fetch-fonts.mjs --check` re-verifies,

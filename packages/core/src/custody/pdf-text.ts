@@ -83,11 +83,12 @@ interface Run {
 
 const isKannadaBlock = (cp: number) => (cp >= 0x0c80 && cp <= 0x0cff) || cp === 0x0964 || cp === 0x0965 || (cp >= 0x1cd0 && cp <= 0x1cff);
 /** Characters that never start a run of their own: they join the surrounding run (marks, joiners, spaces). */
-const isNeutral = (ch: string) => /[\p{M}\u200c\u200d\u00a0 ]/u.test(ch);
+const isNeutral = (ch: string) => ch === ' ' || ch === '\u00a0' || ch === '\u200c' || ch === '\u200d' || /\p{M}/u.test(ch);
 
 /** Normalise text for the PDF: NFC, tabs → space, other control characters removed. */
 export function cleanText(v: unknown): string {
   const s = v === null || v === undefined ? '' : String(v);
+  // eslint-disable-next-line no-control-regex -- stripping control characters is the point
   return s.normalize('NFC').replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u2028\u2029\ufeff]/g, '');
 }
 
@@ -117,7 +118,10 @@ export function splitRuns(line: string, style: Omit<TextStyle, 'size'>): Run[] {
     }
     const last = runs[runs.length - 1];
     if (last && last.face === face) last.text += out;
-    else runs.push({ face, text: pending + out }), (pending = '');
+    else {
+      runs.push({ face, text: pending + out });
+      pending = '';
+    }
   }
   if (pending) runs.push({ face: sans, text: pending });
   return runs;
@@ -236,8 +240,10 @@ export function layoutLines(doc: Doc, text: string, style: TextStyle, width?: nu
       for (const r of runs) {
         const last = cur.pieces[cur.pieces.length - 1];
         const rw = runs.length === 1 ? w : measure(doc, r, style.size);
-        if (last && last.face === r.face) (last.text += r.text), (last.width += rw);
-        else cur.pieces.push({ ...r, width: rw });
+        if (last && last.face === r.face) {
+          last.text += r.text;
+          last.width += rw;
+        } else cur.pieces.push({ ...r, width: rw });
       }
       cur.width += w;
     };

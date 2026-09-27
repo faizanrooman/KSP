@@ -1,7 +1,9 @@
 /**
  * Chain of custody (spec module 13).
  *
- *   GET /custody/evidence/:id             chronological custody events + per-event ledger verification
+ *   GET /custody/evidence/:id             one keyset page of the chronological custody events (per-event ledger
+ *                                         verification) + whole-chain verification of the item computed in SQL
+ *                                         (?after=<seq> | ?before=<seq>, ?limit=1..1000 (200), ?filter=all|custody)
  *   GET /custody/evidence/:id/report.pdf  signed Chain-of-Custody report (PDF with signed JSON payload attached)
  *
  * Access: custody:read + the evidence must be visible to the caller (loadEvidenceFor; out of scope => 404).
@@ -12,12 +14,23 @@ import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import { AUDIT_ACTIONS, type AuditAction } from '@ksp/shared';
 import { appendAudit } from '@ksp/core';
-import { buildCustodyReport, loadCustodyEvents, verifyCustody, type CustodyEvent } from '@ksp/core/custody';
+import { buildCustodyReport, loadCustodyPage, verifyCustodyChain, type CustodyEvent } from '@ksp/core/custody';
 import { loadEvidenceFor } from '../../lib/access.js';
 
 export const prefix = '/custody';
 
 const idParams = z.object({ id: z.string().uuid() });
+const seqParam = z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const pageQuery = z
+  .object({
+    after: seqParam.optional(),
+    before: seqParam.optional(),
+    limit: z.coerce.number().int().min(1).max(1000).default(200),
+    filter: z.enum(['all', 'custody']).default('all'),
+  })
+  .strict()
+  .refine((q) => q.after === undefined || q.before === undefined, { message: 'Use either after or before' });
+const CUSTODY_ACTIONS = Object.entries(AUDIT_ACTIONS as Record<string, { custody: boolean }>).filter(([, a]) => a.custody).map(([code]) => code);
 
 export function custodyEventDto(e: CustodyEvent) {
   return {
@@ -49,7 +62,7 @@ export default async function custody(fastify: FastifyInstance) {
 
   app.get('/evidence/:id', {
     preHandler: app.authorize('custody:read'),
-    schema: { tags: ['custody'], summary: 'Chain of custody of an evidence item, with ledger verification', params: idParams },
+    schema: { tags: ['custody'], summary: 'Chain of custody of an evidence item (keyset pages), with whole-chain ledger verification', params: idParams, querystring: pageQuery },
   }, async (req) => {
     const p = req.requirePrincipal();
     const ev = await loadEvidenceFor(app.db, p, req.params.id, 'custody:read', req.actor());
@@ -58,8 +71,15 @@ export default async function custody(fastify: FastifyInstance) {
       .select(['id', 'evidence_number', 'title', 'status', 'sha256', 'sha512', 'size_bytes', 'original_filename', 'registered_at', 'legal_hold'])
       .where('id', '=', ev.id)
       .executeTakeFirstOrThrow();
-    const events = await loadCustodyEvents(app.db, ev.id);
-    const verification = await verifyCustody(app.db, events);
+    const q = req.query;
+    const actions = q.filter === 'custody' ? CUSTODY_ACTIONS : undefined;
+    const [page, chain] = await Promise.all([
+      loadCustodyPage(app.db, ev.id, { after: q.after, before: q.before, limit: q.limit, actions }),
+      verifyCustodyChain(app.db, ev.id, actions),
+    ]);
+    const { firstSeq, lastSeq, matching, ...verification } = chain;
+    const first = page.events[0]?.seq ?? null;
+    const last = page.events[page.events.length - 1]?.seq ?? null;
     return {
       evidence: {
         id: row.id,
@@ -73,7 +93,18 @@ export default async function custody(fastify: FastifyInstance) {
         registeredAt: row.registered_at?.toISOString() ?? null,
         legalHold: row.legal_hold,
       },
-      events: events.map(custodyEventDto),
+      events: page.events.map(custodyEventDto),
+      page: {
+        limit: q.limit,
+        filter: q.filter,
+        total: matching,
+        hasMore: page.hasMore,
+        hasEarlier: page.hasEarlier,
+        nextAfter: page.hasMore ? last : null,
+        prevBefore: page.hasEarlier ? first : null,
+        firstSeq,
+        lastSeq,
+      },
       verification,
     };
   });

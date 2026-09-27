@@ -84,42 +84,125 @@ interface RawRow {
   link_ok: boolean;
 }
 
-/** Custody events of one evidence item (chronological), each re-verified against the ledger. */
-export async function loadCustodyEvents(db: Database | Tx, evidenceId: string, limit = 20_000): Promise<CustodyEvent[]> {
+const mapRow = (r: RawRow): CustodyEvent => ({
+  seq: Number(r.seq),
+  eventId: r.event_id,
+  occurredAt: r.occurred_at.toISOString(),
+  actorType: r.actor_type,
+  actorId: r.actor_id,
+  actorName: r.actor_name,
+  actorFullName: r.actor_full_name,
+  actorIp: r.actor_ip,
+  action: r.action,
+  category: r.category,
+  outcome: r.outcome,
+  resourceType: r.resource_type,
+  resourceId: r.resource_id,
+  caseId: r.case_id,
+  orgUnitId: r.org_unit_id,
+  details: sanitizeDetails(r.details) as Record<string, unknown>,
+  prevHash: r.prev_hash,
+  hash: r.hash,
+  hashOk: r.hash_ok,
+  linkOk: r.link_ok,
+});
+
+/** Stored hash recomputed (audit_row_hash: v1/v2 canonical form per row) and linked to ledger row seq-1. */
+const HASH_OK = sql<boolean>`(e.hash = audit_row_hash(e))`;
+const LINK_OK = sql<boolean>`((e.prev_hash = CASE WHEN e.seq = 1 THEN repeat('0', 64)
+                              ELSE (SELECT p.hash FROM audit_events p WHERE p.seq = e.seq - 1) END) IS TRUE)`;
+
+export interface CustodyPageQuery {
+  /** Events with seq > after (ascending). */
+  after?: number;
+  /** Events with seq < before (the page just before it; still returned ascending). */
+  before?: number;
+  limit?: number;
+  /** Only actions flagged `custody` (their codes). */
+  actions?: string[];
+}
+
+export interface CustodyPage {
+  events: CustodyEvent[];
+  /** More events after the last one returned. */
+  hasMore: boolean;
+  /** More events before the first one returned. */
+  hasEarlier: boolean;
+}
+
+/** One keyset page of an item's custody events (chronological), each re-verified against the ledger. */
+export async function loadCustodyPage(db: Database | Tx, evidenceId: string, q: CustodyPageQuery = {}): Promise<CustodyPage> {
+  const limit = Math.max(1, Math.min(q.limit ?? 200, 5_000));
+  const back = q.before !== undefined && q.after === undefined;
+  const cursor = back ? sql`AND e.seq < ${q.before}::bigint` : q.after !== undefined ? sql`AND e.seq > ${q.after}::bigint` : sql``;
+  const actions = q.actions ? sql`AND e.action = ANY(${q.actions}::text[])` : sql``;
   const { rows } = await sql<RawRow>`
     SELECT e.seq, e.event_id, e.occurred_at, e.actor_type, e.actor_id, e.actor_name, u.full_name AS actor_full_name,
            host(e.actor_ip) AS actor_ip, e.action, e.category, e.outcome, e.resource_type, e.resource_id, e.case_id,
-           e.org_unit_id, e.details, e.prev_hash, e.hash,
-           (e.hash = audit_row_hash(e)) AS hash_ok,
-           (e.prev_hash = CASE WHEN e.seq = 1 THEN repeat('0', 64)
-                               ELSE (SELECT p.hash FROM audit_events p WHERE p.seq = e.seq - 1) END) IS TRUE AS link_ok
+           e.org_unit_id, e.details, e.prev_hash, e.hash, ${HASH_OK} AS hash_ok, ${LINK_OK} AS link_ok
       FROM audit_events e
       LEFT JOIN users u ON e.actor_type = 'USER' AND u.id::text = e.actor_id
-     WHERE e.evidence_id = ${evidenceId}::uuid
-     ORDER BY e.seq
-     LIMIT ${limit}`.execute(db);
-  return rows.map((r) => ({
-    seq: Number(r.seq),
-    eventId: r.event_id,
-    occurredAt: r.occurred_at.toISOString(),
-    actorType: r.actor_type,
-    actorId: r.actor_id,
-    actorName: r.actor_name,
-    actorFullName: r.actor_full_name,
-    actorIp: r.actor_ip,
-    action: r.action,
-    category: r.category,
-    outcome: r.outcome,
-    resourceType: r.resource_type,
-    resourceId: r.resource_id,
-    caseId: r.case_id,
-    orgUnitId: r.org_unit_id,
-    details: sanitizeDetails(r.details) as Record<string, unknown>,
-    prevHash: r.prev_hash,
-    hash: r.hash,
-    hashOk: r.hash_ok,
-    linkOk: r.link_ok,
-  }));
+     WHERE e.evidence_id = ${evidenceId}::uuid ${cursor} ${actions}
+     ORDER BY e.seq ${back ? sql`DESC` : sql`ASC`}
+     LIMIT ${limit + 1}`.execute(db);
+  const more = rows.length > limit;
+  const page = rows.slice(0, limit).map(mapRow);
+  if (back) page.reverse();
+  // The opposite direction: is there anything beyond the cursor we started from?
+  const edge = back ? q.before! - 1 : q.after;
+  let beyond = false;
+  if (edge !== undefined) {
+    const { rows: r } = await sql<{ x: number }>`SELECT 1 AS x FROM audit_events e WHERE e.evidence_id = ${evidenceId}::uuid
+      AND e.seq ${back ? sql`>` : sql`<=`} ${edge}::bigint ${actions} LIMIT 1`.execute(db);
+    beyond = r.length > 0;
+  }
+  return back ? { events: page, hasMore: beyond, hasEarlier: more } : { events: page, hasMore: more, hasEarlier: beyond };
+}
+
+/** All custody events of one evidence item (chronological), fetched in keyset batches — no cap. */
+export async function* iterateCustodyEvents(db: Database | Tx, evidenceId: string, batch = 2_000): AsyncGenerator<CustodyEvent> {
+  let after = 0;
+  for (;;) {
+    const p = await loadCustodyPage(db, evidenceId, { after, limit: batch });
+    for (const e of p.events) yield e;
+    if (!p.hasMore || !p.events.length) return;
+    after = p.events[p.events.length - 1]!.seq;
+  }
+}
+
+/** Custody events of one evidence item (chronological), each re-verified against the ledger. */
+export async function loadCustodyEvents(db: Database | Tx, evidenceId: string, limit = Number.MAX_SAFE_INTEGER): Promise<CustodyEvent[]> {
+  const out: CustodyEvent[] = [];
+  for await (const e of iterateCustodyEvents(db, evidenceId)) {
+    if (out.length >= limit) break;
+    out.push(e);
+  }
+  return out;
+}
+
+/**
+ * Whole-chain verification of an item without shipping its rows: every custody row is re-hashed and its link
+ * checked inside PostgreSQL; only counts, the first 100 broken seqs and the ledger head come back.
+ */
+export async function verifyCustodyChain(db: Database | Tx, evidenceId: string, actions?: string[]): Promise<CustodyVerification & { firstSeq: number | null; lastSeq: number | null; matching: number }> {
+  const match = actions ? sql`e.action = ANY(${actions}::text[])` : sql`TRUE`;
+  const { rows } = await sql<{ n: number; matching: number; first_seq: string | null; last_seq: string | null; broken: string[] | null }>`
+    SELECT count(*)::int AS n, (count(*) FILTER (WHERE ${match}))::int AS matching, min(e.seq) AS first_seq, max(e.seq) AS last_seq,
+           (array_agg(e.seq ORDER BY e.seq) FILTER (WHERE NOT (${HASH_OK} AND ${LINK_OK})))[1:100] AS broken
+      FROM audit_events e
+     WHERE e.evidence_id = ${evidenceId}::uuid`.execute(db);
+  const r = rows[0]!;
+  const broken = (r.broken ?? []).map(Number);
+  return {
+    chainIntact: broken.length === 0,
+    eventsChecked: r.n,
+    brokenSeqs: broken,
+    ledgerHead: await ledgerHead(db),
+    verifiedAt: new Date().toISOString(),
+    firstSeq: r.first_seq === null ? null : Number(r.first_seq),
+    lastSeq: r.last_seq === null ? null : Number(r.last_seq),
+    matching: r.matching,
+  };
 }
 
 export async function ledgerHead(db: Database | Tx): Promise<LedgerHead | null> {

@@ -57,7 +57,7 @@ and the response carries `includesUnreviewedAi`. The AI-label facet follows the 
                "reviewStatus": "APPROVED", "unreviewed": false, "colorName": "Red", "plateText": "KA 01 AB 1234", "watchlistEntryId": null }],
       "aiTotal": 1                                      // matching detections for this item (top 5 returned)
     } }],
-  "total": 2, "page": 1, "pageSize": 25, "sort": "relevance",
+  "total": 2, "totalApprox": false, "page": 1, "pageSize": 25, "sort": "relevance",
   "facets": { "station": [{ "key": "<orgUnitId>", "label": "Cubbon Park Police Station", "count": 2 }], "status": [], "storageTier": [], "tag": [], "aiLabel": [] },
   "facetsTruncated": false, "includesUnreviewedAi": false, "tookMs": 23
 }
@@ -68,7 +68,10 @@ so user-entered text cannot inject markup. `frameTimeMs` powers "jump to moment"
 `/evidence/:id?tab=playback&t=<ms>`.
 
 Facets (station, status, storage tier, tag, approved AI label) are computed over the *visible, filtered* result set,
-at most 10 000 rows (`facetsTruncated` when more) and 20 buckets per facet.
+at most 10 000 rows (`facetsTruncated` when more) and 20 buckets per facet; tag and AI-label buckets use per-item
+index lookups so their cost is bounded by that sample. **Totals** are exact up to 10 000 matches; beyond that the
+response carries `total: 10000, totalApprox: true` and the UI shows “10,000+ results” (the count query stops at
+10 001 rows; the page query no longer uses `count(*) OVER ()`).
 
 ### Audit
 
@@ -125,8 +128,8 @@ text_pattern_ops)`, `ai_detections_watchlist`, `ai_detections_evidence_review`, 
 | end-to-end API (text + facets + hydration + audit) | — | ≈ 25–30 ms |
 
 The test asserts index usage and < 300 ms per query. Broad queries matching a large share of rows (e.g. a word in
-every title) legitimately use sequential scans; `count(*) OVER ()` costs O(matches). For multi-million-row
-deployments consider keyset pagination and an approximate total (not implemented).
+every title) legitimately use sequential scans; relevance ranking of such a query is still O(matches). Totals are
+capped (see above); measurements in PERFORMANCE.md.
 
 ## Web UI
 

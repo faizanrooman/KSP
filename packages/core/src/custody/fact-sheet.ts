@@ -5,7 +5,7 @@
  * Sakshya Adhiniyam, 2023 (formerly Section 65B(4) of the Indian Evidence Act, 1872) for the responsible
  * officer to complete and sign by hand. The template is an aid only; it does not claim legal compliance.
  */
-import { createDoc, drawText, gap, KSP_KN, finish, fmtBytes, fmtDuration, fmtTime, heading, keyValues, para, table, wrapToken, ensureSpace } from './pdf.js';
+import { createDoc, gap, KSP_KN, finish, fmtBytes, fmtDuration, fmtTime, heading, keyValues, para, table, wrapToken, ensureSpace } from './pdf.js';
 import { personLabel, type EvidenceRecord, type PersonRef } from './records.js';
 
 export interface FactSheetItem {

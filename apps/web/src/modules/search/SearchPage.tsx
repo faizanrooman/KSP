@@ -412,7 +412,7 @@ export function SearchPage() {
         <section aria-label="Results" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-ink-600" aria-live="polite">
-              {data ? `${data.total.toLocaleString('en-IN')} result${data.total === 1 ? '' : 's'}` : ' '}
+              {data ? `${data.total.toLocaleString('en-IN')}${data.totalApprox ? '+' : ''} result${data.total === 1 && !data.totalApprox ? '' : 's'}` : ' '}
               {data && <span className="text-ink-500"> · {data.tookMs} ms</span>}
               {q.isFetching && !q.isLoading && <span className="ml-2 text-ink-500">Updating…</span>}
             </p>

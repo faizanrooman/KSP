@@ -216,6 +216,27 @@ Every request re-validates the media token and its session row and reads from S3
 ever exposed). ≈ 70–165 MB/s through one API process ≈ 250–600 concurrent 2 Mbit/s viewers per process on this host;
 0 errors at 100 connections.
 
+### Custody view paging and capped search totals (FN-19 / FN-13, `tests/perf/paging-bench.mts`)
+
+Measured on a private perf database seeded with the same scripts (100 k evidence, 500 k detections, **201 k** audit
+events incl. the 1 000-event hot item — a smaller ledger than the 1.14 M above; the custody query is bounded by the
+item, not the ledger). "old" = previous code path (window count / whole chain in one response), same host, same run.
+
+| Scenario (median of 9, ms) | old | new |
+|---|---|---|
+| custody hot item, one request | 31 ms, **590 KiB**, 1 000 events | **19 ms, 119 KiB**, first page of 200 (whole chain still verified in SQL) |
+| custody hot item, autocannon 10 / 50 conn (rps · p50) | 57 · 170 / 56 · 821 (table above, 1.1 M ledger) | 116 · 85 / 120 · 405 |
+| search state-wide, no criteria (100 000 matches): page + total | 72.5 | **49.0** (page 50.2 ‖ capped count 4.5) |
+| search state-wide text "theft" (relevance, 10 000 matches) | 79.5 | 76.0 (ranking still covers every match) |
+| search state-wide category (16 667 matches) | 16.4 | 14.6 |
+| search station, no criteria (5 129 matches) | 33.8 | 49.5 ¹ |
+| facets state-wide (10 000-row sample) | 170–210 | **89–126** (tag / AI-label buckets via per-item LATERAL index lookups) |
+
+¹ below the cap both queries count every match; the two run in parallel on a loaded host (noise ±15 ms between runs).
+Totals are exact up to 10 000 and reported as `total: 10000, totalApprox: true` ("10,000+") beyond; the count stops at
+10 001 rows, so its cost no longer grows with the match set. Relevance ranking of very large text match sets is still
+O(matches) — see KNOWN-ISSUES FN-13.
+
 ### Web bundle (FN-24, `npx vite build`, minified; gzip = `zlib.gzipSync` of each file)
 
 Route pages and evidence-detail tabs are `React.lazy` chunks (`apps/web/src/lib/lazy.tsx`; the module registries stay
@@ -239,7 +260,8 @@ after a deployment) shows a "Reload" state instead of a blank page.
   separates these tiers; the absolute numbers are a floor, not a forecast.
 * **Relative** findings are solid: the visibility filter and list hydration fixes remove O(visible rows) work from the
   hottest read paths (4–7 × single-request, 4–6 × throughput under load); keyset audit paging, detail, AI/plate search
-  are flat with data size; custody view, text search counting/ranking and facets still scale with match-set size.
+  are flat with data size; the custody view is paged (whole-chain verification stays O(item events) inside PostgreSQL),
+  search totals are capped; relevance ranking of huge text match sets still scales with the match set.
 * **Not** measured and not implied: multi-node API scaling, PostgreSQL replicas/partitioning, object storage at
   petabyte scale, 10⁸ evidence rows / 10⁹ audit events, GPU transcoding, network-bound streaming, long soak tests.
 * Capacity arithmetic from these numbers (clearly an estimate, not a measurement): at ≈ 1 200 audit appends/s the
@@ -250,9 +272,9 @@ after a deployment) shows a "Reload" state instead of a blank page.
 
 ## Recommendations (not done here)
 
-1. Paginate `GET /custody/evidence/:id` (JSON), keep the PDF complete.
-2. Text search / facets: cap the exact count (e.g. "10 000+"), compute facets on a sample or a materialised summary
-   for state-wide scopes; consider `pg_trgm` threshold tuning.
+1. ~~Paginate `GET /custody/evidence/:id`~~ — done (keyset pages, PDF complete, FN-19).
+2. ~~Cap the exact search count~~ — done ("10 000+", FN-13); still open: a materialised facet summary for
+   state-wide scopes and bounding relevance ranking for very broad text queries; consider `pg_trgm` threshold tuning.
 3. Tune PostgreSQL for the host (`shared_buffers` ≈ 25 % RAM, `work_mem` for facets, `effective_io_concurrency`).
 4. Run API with ≥ 2 replicas and consider `UV_THREADPOOL_SIZE` = cores for argon2-heavy login peaks.
 5. Plan the audit ledger for scale: batch custody events per request, or partition the chain (per-district chains

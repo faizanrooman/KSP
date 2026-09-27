@@ -71,12 +71,12 @@ Owner is a role, not a person.
 | FN-10 | Sharing | Locked external share cannot be unlocked or extended; no e-mail/SMS delivery of link/code; revoke does not delete per-share watermarked variants | LOW | open |
 | FN-11 | Sharing | `maxViews` counts portal opens and is not applied to internal-user shares | LOW | open |
 | FN-12 | Investigation | Manual timeline events are hard-deleted (audit row remains), unlike annotations | LOW | open |
-| FN-13 | Search | Totals use `count(*) OVER ()`; ranking over large match sets ~0.2–0.35 s state-wide | LOW | open |
+| FN-13 | Search | Relevance ranking of very broad text queries is O(matches) (~75 ms for 10 000 matches on the dev host); totals capped at 10 000 and facets bounded (see appendix) | LOW | open |
 | FN-14 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | LOW | accepted |
 | FN-15 | API clients | argon2 on every Basic-auth request — fixed: ≤ 60 s positive-verification cache (SEC-R8). Open: IPv6 allow-list entries must be exact addresses | LOW | open |
 | FN-16 | AI | Accuracy figures are upstream; no evaluation on KSP footage; plate OCR not validated on Indian plates; GPU inference untested; small-face track fragmentation during pans | MEDIUM | UNVERIFIED |
 | FN-17 | Accessibility | E2E/axe in Chrome only (Firefox/Safari/Edge, screen readers, zoom/forced colours untested) — ACCESSIBILITY.md. (Keyboard region editor done, see appendix) | MEDIUM | UNVERIFIED |
-| FN-19 | Performance | Single-host measurements only (PERFORMANCE.md); custody view unpaginated (1 000 events ≈ 0.6 MB); login ≈ 80/s per API process (argon2); audit append ≤ 1.2k/s | MEDIUM | open |
+| FN-19 | Performance | Single-host measurements only (PERFORMANCE.md); login ≈ 80/s per API process (argon2); audit append ≤ 1.2k/s. (Custody view paging done, see appendix) | MEDIUM | open |
 | FN-20 | Storage | Uploads > 5 GiB, AWS S3 / MinIO / Ceph behaviour, Safari native HLS, real 1080p30 long-footage throughput untested | MEDIUM | UNVERIFIED |
 | FN-21 | Storage | versitygw ignores Object Lock on CopyObject and refuses conditional writes to tombstoned keys — code uses multipart copy and never reuses keys | LOW | mitigated |
 | FN-22 | Station CLI | Summary "Detail" column can show a stale status | LOW | open (cosmetic) |
@@ -112,3 +112,5 @@ Owner is a role, not a person.
 | FN-17 region annotations were pointer-only | keyboard region editor in AnnotationStudio (focusable frame: arrows move, Shift+arrows resize, Enter sets, Escape; X/Y/W/H % inputs; polite announcements); `91-keyboard` E2E + axe on the editor; unit tests for the geometry |
 | FN-18 integrations / API-client / retention / disposal screens not driven by E2E | `tests/e2e/specs/12-admin-lifecycle.spec.ts` (fixture system + FIR import, API client secret-once + revoke, retention create/assign, two-officer disposal to DISPOSED) |
 | FN-24 single 2.6 MB JS bundle (627 kB gzip) | route/tab `React.lazy` chunks + vendor chunks (react, charts, hls); first page loads 541 kB (154 kB gzip) — PERFORMANCE.md “Web bundle” |
+| FN-19 custody view unpaginated (1 000 events ≈ 0.6 MB per request) | keyset pages of 200 (`after`/`before`/`filter`), whole-chain verification in SQL, “Load more”; PDF complete (batched, 20 000 cap removed); 590 → 119 KiB, 57 → 116 rps |
+| FN-13 search totals via `count(*) OVER ()` | exact up to 10 000 then `totalApprox` (“10,000+”); tag/AI facets via bounded LATERAL lookups (facets 170–210 → 89–126 ms state-wide) |

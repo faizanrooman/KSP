@@ -10,6 +10,11 @@ export type SearchSort = (typeof SEARCH_SORTS)[number];
 
 /** Facets are computed over at most this many matching rows (flagged `facetsTruncated`). */
 export const FACET_ROW_CAP = 10_000;
+/**
+ * Totals are exact up to this many matches; beyond it the response says `total: TOTAL_CAP, totalApprox: true`
+ * ("10 000+"). Counting stops at the cap, so a broad state-wide query no longer counts every matching row.
+ */
+export const TOTAL_CAP = 10_000;
 /** Buckets per facet. */
 export const FACET_BUCKETS = 20;
 /** AI moments returned per result. */
@@ -43,7 +48,7 @@ export interface FacetBucket {
   count: number;
 }
 
-function rankSql(c: SearchCriteria) {
+export function rankSql(c: SearchCriteria) {
   if (!c.text) return sql<number>`0::float8`;
   return sql<number>`(ts_rank_cd(coalesce(e.search_text, ''::tsvector), ${tsQuery(c.text)}, 32)
     + 0.5 * greatest(similarity(coalesce(e.title, ''), ${c.text}), similarity(coalesce(e.evidence_number, ''), ${c.text}))
@@ -65,12 +70,21 @@ function orderSql(sort: SearchSort) {
   }
 }
 
-/** The main page query (exported for the EXPLAIN check in tests). */
+/**
+ * The main page query (exported for the EXPLAIN check in tests). No window count: with a date sort PostgreSQL can
+ * stop after the page; the total comes from `countQuery`.
+ */
 export function pageQuery(p: Principal, c: SearchCriteria, sort: SearchSort, page: number, pageSize: number) {
   const where = whereSql(buildConditions(p, c));
-  return sql<{ id: string; rank: number; total: string }>`SELECT e.id, ${rankSql(c)} AS rank, count(*) OVER () AS total
+  return sql<{ id: string; rank: number }>`SELECT e.id, ${rankSql(c)} AS rank
     FROM evidence e WHERE ${where}
     ORDER BY ${orderSql(sort)} LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`;
+}
+
+/** Matching rows counted up to cap + 1 (so "more than cap" is detectable without counting everything). */
+export function countQuery(p: Principal, c: SearchCriteria, cap = TOTAL_CAP) {
+  const where = whereSql(buildConditions(p, c));
+  return sql<{ n: number }>`SELECT count(*)::int AS n FROM (SELECT 1 FROM evidence e WHERE ${where} LIMIT ${cap + 1}) x`;
 }
 
 function splitSnippet(s: string): SnippetPart[] {
@@ -125,6 +139,11 @@ export async function aiMatches(db: Database, ids: string[], ai: AiCriteria): Pr
   return out;
 }
 
+/**
+ * Facets over at most FACET_ROW_CAP matching rows. Tag and AI-label buckets use per-item LATERAL index lookups, so
+ * their cost is bounded by that sample — not by the size of evidence_tags / ai_detections (a hash join over the
+ * whole detections table grows with state-wide data; FN-13).
+ */
 export async function facets(db: Database, p: Principal, c: SearchCriteria) {
   const where = whereSql(buildConditions(p, c));
   const aiReview = (c.ai?.reviewStatus ?? 'APPROVED') === 'APPROVED' ? sql`d.review_status = 'APPROVED'` : sql`d.review_status <> 'REJECTED'`;
@@ -137,24 +156,25 @@ export async function facets(db: Database, p: Principal, c: SearchCriteria) {
     UNION ALL
     (SELECT 'storageTier', m.storage_tier, m.storage_tier, count(*) FROM m GROUP BY m.storage_tier ORDER BY count(*) DESC LIMIT ${FACET_BUCKETS})
     UNION ALL
-    (SELECT 'tag', t.tag, t.tag, count(*) FROM m JOIN evidence_tags t ON t.evidence_id = m.id GROUP BY t.tag ORDER BY count(*) DESC, t.tag LIMIT ${FACET_BUCKETS})
+    (SELECT 'tag', t.tag, t.tag, count(*) FROM m CROSS JOIN LATERAL (SELECT t.tag FROM evidence_tags t WHERE t.evidence_id = m.id) t
+      GROUP BY t.tag ORDER BY count(*) DESC, t.tag LIMIT ${FACET_BUCKETS})
     UNION ALL
-    (SELECT 'aiLabel', ${effLabel('d')}, ${effLabel('d')}, count(DISTINCT m.id) FROM m JOIN ai_detections d ON d.evidence_id = m.id AND ${aiReview}
-      GROUP BY ${effLabel('d')} ORDER BY count(DISTINCT m.id) DESC, ${effLabel('d')} LIMIT ${FACET_BUCKETS})`.execute(db);
+    (SELECT 'aiLabel', x.label, x.label, count(*) FROM m
+      CROSS JOIN LATERAL (SELECT DISTINCT ${effLabel('d')} AS label FROM ai_detections d WHERE d.evidence_id = m.id AND ${aiReview}) x
+      GROUP BY x.label ORDER BY count(*) DESC, x.label LIMIT ${FACET_BUCKETS})`.execute(db);
   const out: Record<'station' | 'status' | 'storageTier' | 'tag' | 'aiLabel', FacetBucket[]> = { station: [], status: [], storageTier: [], tag: [], aiLabel: [] };
   for (const r of rows.rows) out[r.facet as keyof typeof out].push({ key: r.key, label: r.label, count: Number(r.count) });
   return out;
 }
 
-export async function runSearch(db: Database, p: Principal, c: SearchCriteria, opts: { sort?: SearchSort; page: number; pageSize: number; includeFacets: boolean }) {
+export async function runSearch(db: Database, p: Principal, c: SearchCriteria, opts: { sort?: SearchSort; page: number; pageSize: number; includeFacets: boolean; totalCap?: number }) {
+  const cap = opts.totalCap ?? TOTAL_CAP;
   const sort: SearchSort = opts.sort ?? (c.text ? 'relevance' : '-recorded_at');
   const t0 = performance.now();
-  const res = await pageQuery(p, c, sort, opts.page, opts.pageSize).execute(db);
-  let total = Number(res.rows[0]?.total ?? 0);
-  if (!res.rows.length && opts.page > 1) {
-    const cnt = await sql<{ n: string }>`SELECT count(*) AS n FROM evidence e WHERE ${whereSql(buildConditions(p, c))}`.execute(db);
-    total = Number(cnt.rows[0]?.n ?? 0);
-  }
+  const [res, cnt] = await Promise.all([pageQuery(p, c, sort, opts.page, opts.pageSize).execute(db), countQuery(p, c, cap).execute(db)]);
+  const counted = Number(cnt.rows[0]?.n ?? 0);
+  const totalApprox = counted > cap;
+  const total = totalApprox ? cap : counted;
   const ids = res.rows.map((r) => r.id);
   const rank = new Map(res.rows.map((r) => [r.id, Number(r.rank)]));
   const [items, snips, ai, facetData] = await Promise.all([
@@ -174,11 +194,13 @@ export async function runSearch(db: Database, p: Principal, c: SearchCriteria, o
       },
     })),
     total,
+    /** true when there are more than `total` matches (the count stopped at TOTAL_CAP). */
+    totalApprox,
     page: opts.page,
     pageSize: opts.pageSize,
     sort,
     facets: facetData,
-    facetsTruncated: facetData ? total > FACET_ROW_CAP : false,
+    facetsTruncated: facetData ? totalApprox || total > FACET_ROW_CAP : false,
     /** true when the results may include AI output that no human has approved (explicit opt-in). */
     includesUnreviewedAi: c.ai?.reviewStatus === 'ANY_NON_REJECTED',
     tookMs: Math.round(performance.now() - t0),

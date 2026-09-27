@@ -10,7 +10,7 @@ export default tseslint.config(
     ignores: [
       '.claude/**',
       '**/dist/**', '**/node_modules/**', '**/coverage/**', '.local/**', '**/.local/**',
-      'packages/core/src/db/types.ts', '**/*.d.ts', 'playwright-report/**', 'test-results/**',
+      'packages/core/src/db/types.ts', '**/*.d.ts', 'playwright-report/**', 'test-results/**', 'tests/e2e/artifacts/**',
     ],
   },
   js.configs.recommended,
