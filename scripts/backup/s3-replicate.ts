@@ -9,6 +9,7 @@
  *                                                       at the DR copy (only after a full re-hash matches the DB;
  *                                                       one custody audit event per item)
  * Options: --trust-marker (with --repoint: skip the re-read when the replication-time hash marker matches)
+ *          --prefix <key prefix> (replicate mode: only keys under it)
  *          --buckets evidence,archive,longterm,derived,exports,reports  --concurrency 4  --lock-days N (override the
  *          source retain-until on DR copies; drills only)  --rehash (re-read objects already replicated)  --dry-run
  *
@@ -19,6 +20,10 @@
  *                              store holds the SAME bucket names, so a restored database works unchanged)
  *   DATABASE_URL               KSP database (ksp_app) — evidence hashes; --repoint writes through it
  *   BACKUP_RECORD_URL          optional: record an S3_REPLICATION row in backup_runs
+ *
+ * Every DR copy of an evidence original or of an evidence-keyed derivative (evidence/<id>/…) is recorded in
+ * dr_object_copies (bucket in the DR store, key, DR version id, hash) — also for objects found already replicated —
+ * so disposal can reach the DR store (dr.dispose-sweep) and fixity can verify DR copies (FN-6, OPS-5).
  *
  * Why not only native replication? AWS S3 Replication / MinIO site replication preserve version IDs and should be
  * the primary mechanism (docs/DISASTER-RECOVERY.md). This tool is the store-agnostic fallback and the independent
@@ -64,6 +69,8 @@ const dryRun = has('--dry-run');
 // matches, without re-reading it (O(objects) HEADs instead of O(bytes)); schedule full fixity afterwards.
 const trustMarker = has('--trust-marker');
 const drPrefix = process.env.DR_BUCKET_PREFIX ?? '';
+// --prefix: replicate only keys under this prefix (e.g. originals/2026/09/ for a partial re-run, or one item in tests).
+const keyPrefix = opt('--prefix');
 
 function s3(prefix: 'S3' | 'DR_S3'): S3Client {
   const e = (k: string) => process.env[`${prefix}_${k}`];
@@ -119,7 +126,18 @@ async function loadOriginals(db: pg.Client): Promise<Map<string, { id: string; s
   return new Map(rows.map((r) => [`${r.storage_bucket}/${r.storage_key}`, { id: r.id, sha256: r.sha256, size: Number(r.size_bytes), versionId: r.storage_version_id, orgUnitId: r.org_unit_id }]));
 }
 
-async function replicate(src: S3Client, dr: S3Client, originals: Map<string, { sha256: string; size: number }>): Promise<void> {
+const EVIDENCE_KEY = /^evidence\/([0-9a-f-]{36})\//;
+/** Record a DR copy (idempotent). Failure to record is a replication problem: the copy would escape disposal. */
+async function recordCopy(db: pg.Client, c: { evidenceId: string; kind: 'ORIGINAL' | 'DERIVED'; bucket: string; key: string; versionId: string | null; sha256: string | null; size: number }): Promise<void> {
+  if (dryRun) return;
+  await db.query(
+    `INSERT INTO dr_object_copies (evidence_id, kind, bucket, object_key, version_id, sha256, size_bytes)
+     SELECT $1::uuid, $2, $3, $4, $5, $6, $7 WHERE EXISTS (SELECT 1 FROM evidence WHERE id = $1::uuid)
+     ON CONFLICT (bucket, object_key, version_id) DO NOTHING`,
+    [c.evidenceId, c.kind, c.bucket, c.key, c.versionId, c.sha256, c.size]);
+}
+
+async function replicate(src: S3Client, dr: S3Client, db: pg.Client, originals: Map<string, { id: string; sha256: string; size: number }>): Promise<void> {
   for (const role of roles) {
     const Bucket = bucketOf(role);
     const Target = drPrefix + Bucket;
@@ -128,7 +146,7 @@ async function replicate(src: S3Client, dr: S3Client, originals: Map<string, { s
     const keys: { Key: string; Size: number; ETag: string }[] = [];
     let token: string | undefined;
     do {
-      const r = await src.send(new ListObjectsV2Command({ Bucket, ContinuationToken: token }));
+      const r = await src.send(new ListObjectsV2Command({ Bucket, Prefix: keyPrefix, ContinuationToken: token }));
       for (const o of r.Contents ?? []) if (o.Key) keys.push({ Key: o.Key, Size: o.Size ?? 0, ETag: (o.ETag ?? '').replace(/"/g, '') });
       token = r.IsTruncated ? r.NextContinuationToken : undefined;
     } while (token);
@@ -140,7 +158,10 @@ async function replicate(src: S3Client, dr: S3Client, originals: Map<string, { s
         // Already replicated: same size and the marker written at copy time matches (DB hash for originals,
         // source ETag otherwise). --rehash forces a re-copy check; --verify-only re-reads DR copies fully.
         const marker = expected ? expected.sha256 : ETag;
+        const derivedOf = !expected ? EVIDENCE_KEY.exec(Key)?.[1] : undefined;
+        const evidenceId = expected?.id ?? derivedOf;
         if (existing && existing.ContentLength === Size && existing.Metadata?.['ksp-replica-of'] === marker && !rehash) {
+          if (evidenceId) await recordCopy(db, { evidenceId, kind: expected ? 'ORIGINAL' : 'DERIVED', bucket: Target, key: Key, versionId: existing.VersionId ?? null, sha256: expected?.sha256 ?? null, size: Size });
           stats.skipped++;
           return;
         }
@@ -168,8 +189,13 @@ async function replicate(src: S3Client, dr: S3Client, originals: Map<string, { s
         // Originals: the DB hash is written as the marker up front and the streamed bytes are hashed on the way;
         // a mismatch fails the run (the copy is flagged in the output; WORM prevents silently replacing it).
         const up = new Upload({ client: dr, params: params as never, partSize: 64 * 1024 * 1024, queueSize: 2 });
-        await up.done();
+        const done = (await up.done()) as { VersionId?: string };
         const sha = h.digest('hex');
+        // Record first: even a copy whose source hash turned out wrong must be reachable by disposal.
+        if (evidenceId) {
+          const versionId = done.VersionId ?? (await head(dr, Target, Key))?.VersionId ?? null;
+          await recordCopy(db, { evidenceId, kind: expected ? 'ORIGINAL' : 'DERIVED', bucket: Target, key: Key, versionId, sha256: expected ? sha : null, size: srcHead.ContentLength ?? Size });
+        }
         if (expected && sha !== expected.sha256) throw new Error(`SOURCE hash ${sha} != DB ${expected.sha256} (primary copy corrupted?)`);
         if (srcHead.ObjectLockLegalHoldStatus === 'ON') {
           await dr.send(new PutObjectLegalHoldCommand({ Bucket: Target, Key, LegalHold: { Status: 'ON' } })).catch((e: Error) => problems.push(`${Target}/${Key}: legal hold not replicated (${e.name})`));
@@ -236,7 +262,7 @@ async function main(): Promise<void> {
   try {
     const originals = await loadOriginals(db);
     const dr = s3('DR_S3');
-    if (mode === 'replicate') await replicate(s3('S3'), dr, originals);
+    if (mode === 'replicate') await replicate(s3('S3'), dr, db, originals);
     else await verifyOrRepoint(dr, db, originals);
     const summary = { mode, ...stats, originalsInDb: originals.size, seconds: Math.round((Date.now() - t0) / 100) / 10, problems };
     console.log(JSON.stringify(summary, null, 2));

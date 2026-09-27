@@ -53,6 +53,21 @@ Full step-by-step: [BACKUP-RESTORE-RUNBOOK.md](BACKUP-RESTORE-RUNBOOK.md). Summa
 4. `migrate` Job, `ensure-buckets.mjs`, start workloads, `/health/ready`, smoke test (login, evidence, playback,
    fixity), `audit_verify()`, then open to users. Record the restore in the incident register.
 
+### Disposal reaches the DR store (OPS-5)
+`s3-replicate.ts` records every DR copy of an evidence original or evidence-keyed derivative
+(`evidence/<id>/…`) in `dr_object_copies` (DR bucket, key, **DR version id**, hash) — including copies it finds already
+replicated, so a normal run back-fills the registry. After an authorised disposal on the primary, the
+**`dr.dispose-sweep`** cron (03:30 daily; CLI `npm run -w @ksp/worker dr:dispose-sweep`) deletes each recorded DR
+version of every DISPOSED item with `BypassGovernanceRetention` (disable with `DR_S3_BYPASS_GOVERNANCE=false`):
+success → `DELETED` + custody event `EVIDENCE_DR_COPY_DELETED`; a refusal (COMPLIANCE lock, missing
+`s3:BypassGovernanceRetention` / `s3:DeleteObjectVersion`, store down) → `DELETE_FAILED` with the error, `attempts`,
+custody event `EVIDENCE_DR_COPY_DELETE_FAILED` (outcome FAILURE), retried by later sweeps (max 20 attempts). The worker
+needs `DR_S3_ENDPOINT/ACCESS_KEY/SECRET_KEY` (a delete-capable DR identity — not the write-only replication identity);
+without them the cron is a no-op. Native store replication (AWS/MinIO/Ceph) must instead be configured to replicate
+deletes of versions, or these copies must be swept the same way — **UNVERIFIED** on those stores. Tested with two
+bucket sets on the local gateway (`apps/worker/test/dr.test.ts`: real replication script, real disposal, sweep with and
+without governance bypass).
+
 ## 4. Evidence — DR drill executed on the development host
 
 `tests/dr/drill.sh` (exit 0 on 2026-09-25): real API + worker from the **production image layout**

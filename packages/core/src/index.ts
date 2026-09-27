@@ -13,4 +13,5 @@ export * from './mailer.js';
 export * from './schedule.js';
 export * from './alerts.js';
 export * from './shares.js';
+export * from './dr.js';
 export * from './monitoring.js';

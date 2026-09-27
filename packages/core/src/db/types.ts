@@ -395,6 +395,24 @@ export interface DisposalRequests {
   status: Generated<string>;
 }
 
+export interface DrObjectCopies {
+  attempts: Generated<number>;
+  bucket: string;
+  deleted_at: Timestamp | null;
+  evidence_id: string | null;
+  id: Generated<Int8>;
+  kind: string;
+  last_error: string | null;
+  last_verified_at: Timestamp | null;
+  object_key: string;
+  replicated_at: Generated<Timestamp>;
+  sha256: string | null;
+  size_bytes: Int8 | null;
+  status: Generated<string>;
+  updated_at: Generated<Timestamp>;
+  version_id: string | null;
+}
+
 export interface Evidence {
   archived_at: Timestamp | null;
   audio_codec: string | null;
@@ -1037,6 +1055,7 @@ export interface DB {
   cases: Cases;
   devices: Devices;
   disposal_requests: DisposalRequests;
+  dr_object_copies: DrObjectCopies;
   evidence: Evidence;
   evidence_derivatives: EvidenceDerivatives;
   evidence_legal_hold_events: EvidenceLegalHoldEvents;
