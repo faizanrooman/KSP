@@ -72,7 +72,10 @@ describe('coverage target', () => {
     const one = await selectFixityCandidates(db, { batch: 10_000, maxBytes: 1 });
     expect(one).toHaveLength(1);
     const two = await selectFixityCandidates(db, { batch: 10_000, maxBytes: never.sizeBytes * 2 + 1 });
-    expect(two.reduce((s, x) => s + x.sizeBytes, 0)).toBeLessThanOrEqual(never.sizeBytes * 2 + 1);
+    // Budget holds, except the documented "always at least one" rule (the first candidate may be another suite's larger item).
+    const budget = never.sizeBytes * 2 + 1;
+    if (two.length > 1) expect(two.reduce((s, x) => s + x.sizeBytes, 0)).toBeLessThanOrEqual(budget);
+    else expect(two).toHaveLength(1);
   });
 
   it('the sweep sizes its batch from the policy and reports coverage / projected cycle', async () => {
