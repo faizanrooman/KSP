@@ -10,5 +10,6 @@ export * from './media.js';
 export * from './signing.js';
 export * from './ingest/index.js';
 export * from './mailer.js';
+export * from './schedule.js';
 export * from './alerts.js';
 export * from './monitoring.js';

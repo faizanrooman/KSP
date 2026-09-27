@@ -721,15 +721,41 @@ export interface ReportRuns {
   finished_at: Timestamp | null;
   format: string;
   id: Generated<string>;
+  notified_at: Timestamp | null;
   object_key: string | null;
   org_unit_id: string | null;
   params: Generated<Json>;
+  recipient_ids: Generated<string[]>;
   report_type: string;
   row_count: number | null;
+  schedule_id: string | null;
+  scheduled_for: Timestamp | null;
   sha256: string | null;
   size_bytes: Int8 | null;
   started_at: Timestamp | null;
   status: Generated<string>;
+}
+
+export interface ReportSchedules {
+  created_at: Generated<Timestamp>;
+  cron: string;
+  email_recipients: Generated<boolean>;
+  enabled: Generated<boolean>;
+  format: string;
+  frequency: string;
+  id: Generated<string>;
+  last_error: string | null;
+  last_run_at: Timestamp | null;
+  last_run_id: string | null;
+  lookback_days: Generated<number>;
+  name: string;
+  next_run_at: Timestamp | null;
+  owner_id: string;
+  params: Generated<Json>;
+  recipient_ids: Generated<string[]>;
+  report_type: string;
+  timezone: Generated<string>;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface RetentionPolicies {
@@ -1031,6 +1057,7 @@ export interface DB {
   processing_jobs: ProcessingJobs;
   refresh_tokens: RefreshTokens;
   report_runs: ReportRuns;
+  report_schedules: ReportSchedules;
   retention_policies: RetentionPolicies;
   roles: Roles;
   saved_searches: SavedSearches;

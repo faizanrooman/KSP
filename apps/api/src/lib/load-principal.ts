@@ -16,7 +16,7 @@ export function invalidatePrincipals(userId?: string): void {
   for (const [k, v] of cache) if (v.principal.userId === userId) cache.delete(k);
 }
 
-async function loadGrants(db: Database, userId: string): Promise<Grant[]> {
+export async function loadGrants(db: Database, userId: string): Promise<Grant[]> {
   const rows = await db
     .selectFrom('user_roles as ur')
     .innerJoin('roles as r', 'r.id', 'ur.role_id')

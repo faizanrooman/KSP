@@ -61,7 +61,7 @@ Owner is a role, not a person.
 | ID | Area | Issue | Sev | Status |
 |---|---|---|---|---|
 | FN-1 | Alerts | **Fixed**: SMTP e-mail channel (nodemailer; manager/rule/severity recipients) and retried external deliveries (`alerts.deliver`, exponential backoff, every attempt in `alert_deliveries`), tested against a local SMTP sink and HTTP server. Delivery through a real SMTP relay / real webhook receiver remains UNVERIFIED | LOW | fixed / UNVERIFIED |
-| FN-2 | Reports | Scheduled (recurring) reports not implemented | LOW | open |
+| FN-2 | Reports | **Fixed**: scheduled reports (`report_schedules`, cron `reports.schedule`, owner jurisdiction frozen at run time, recipients notified in-app + e-mail link); e-mail via a real relay UNVERIFIED | LOW | fixed |
 | FN-3 | Monitoring | AI worker has no service metrics/heartbeat (only per-job heartbeat); availability SLO probe and Prometheus alert rules authored, not deployed | MEDIUM | open / UNVERIFIED |
 | FN-4 | Ingestion | Quarantine release re-hashes the object inside the HTTP request (slow for multi-GB files) | LOW | open |
 | FN-5 | Ingestion | Client-declared `recordedAt` overrides container creation time | LOW | open |

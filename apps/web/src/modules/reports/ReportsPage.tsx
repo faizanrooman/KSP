@@ -5,24 +5,31 @@ import { formatBytes, formatDateTime, shortHash } from '@/lib/format';
 import { useUrlState } from '@/lib/hooks';
 import { Alert, Button, Card, DataTable, EmptyState, ErrorState, Field, Input, PageHeader, Pagination, Select, Spinner, StatusBadge, useToast, type Column } from '@/components/ui';
 import { OrgUnitSelect, UserPicker, type UserOption } from '@/components/pickers';
+import { SchedulesCard } from './SchedulesCard';
 
 interface ReportType { code: string; title: string; description: string; requires: string[]; extraParams: string[]; available: boolean; jurisdiction: string[] }
 interface ReportRun {
   id: string; reportType: string; title: string; format: string; status: string; rowCount: number | null; sha256: string | null; contentSha256: string | null;
   sizeBytes: number | null; error: string | null; createdAt: string; finishedAt: string | null; downloadCount: number;
   params: { from: string | null; to: string | null; jurisdiction: string[] }; orgUnit: { name: string } | null;
+  scheduleId: string | null; requestedBy: { id: string; name: string } | null;
 }
 
 export function ReportsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const types = useQuery({ queryKey: ['report-types'], queryFn: () => api.get<{ formats: string[]; items: ReportType[] }>('/reports/types') });
-  const [q, setQ] = useUrlState({ page: '1' });
+  const [q, setQ] = useUrlState({ page: '1', run: '' });
   const page = Number(q.page) || 1;
   const runs = useQuery({
     queryKey: ['report-runs', page],
     queryFn: () => api.get<{ items: ReportRun[]; total: number }>('/reports/runs', { page, pageSize: 20 }),
     refetchInterval: (qq) => (qq.state.data?.items.some((r) => r.status === 'QUEUED' || r.status === 'RUNNING') ? 3000 : false),
+  });
+  const shared = useQuery({
+    queryKey: ['report-runs', 'shared'],
+    queryFn: () => api.get<{ items: ReportRun[]; total: number }>('/reports/runs', { shared: 'true', pageSize: 20 }),
+    refetchInterval: (qq) => (qq.state.data?.items.some((r) => r.status === 'QUEUED' || r.status === 'RUNNING') ? 5000 : false),
   });
   const [type, setType] = useState('');
   const [format, setFormat] = useState('CSV');
@@ -53,7 +60,7 @@ export function ReportsPage() {
   });
 
   const cols: Column<ReportRun>[] = [
-    { key: 'title', header: 'Report', render: (r) => <span className="font-medium text-ink-900">{r.title}</span> },
+    { key: 'title', header: 'Report', render: (r) => <span className={r.id === q.run ? 'font-semibold text-brand-700' : 'font-medium text-ink-900'}>{r.title}{r.scheduleId && <span className="ml-1 text-xs font-normal text-ink-500">(scheduled)</span>}</span> },
     { key: 'format', header: 'Format', render: (r) => r.format },
     { key: 'period', header: 'Period', render: (r) => (r.params.from || r.params.to ? `${r.params.from?.slice(0, 10) ?? '…'} → ${r.params.to?.slice(0, 10) ?? '…'}` : 'All time'), className: 'whitespace-nowrap' },
     { key: 'scope', header: 'Scope', render: (r) => r.orgUnit?.name ?? <span className="font-mono text-xs">{r.params.jurisdiction.join(', ')}</span> },
@@ -91,11 +98,18 @@ export function ReportsPage() {
           </form>
         )}
       </Card>
+      {types.data && <SchedulesCard types={types.data.items} formats={types.data.formats} />}
       <Card title="My report runs">
         <DataTable columns={cols} rows={runs.data?.items} rowKey={(r) => r.id} loading={runs.isLoading} error={runs.error} onRetry={() => void runs.refetch()} caption="My report runs"
           empty={<EmptyState title="No reports yet" description="Run a report above; CSV, PDF and JSON are supported." />} />
         {runs.data && <Pagination page={page} pageSize={20} total={runs.data.total} onPage={(p) => setQ({ page: String(p) })} />}
       </Card>
+      {(shared.data?.items.length ?? 0) > 0 && (
+        <Card title="Shared with me (scheduled reports)">
+          <DataTable columns={[...cols.slice(0, 1), { key: 'owner', header: 'Owner', render: (r) => r.requestedBy?.name ?? '—' }, ...cols.slice(1)]} rows={shared.data?.items} rowKey={(r) => r.id}
+            loading={shared.isLoading} error={shared.error} onRetry={() => void shared.refetch()} caption="Scheduled report runs shared with me" empty={<EmptyState title="Nothing shared with you" />} />
+        </Card>
+      )}
     </div>
   );
 }

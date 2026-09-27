@@ -160,6 +160,28 @@ repeated header, footer on every page with "Page X of Y" and the content SHA-256
 says so; CSV has everything). Failures mark the run FAILED (audit `REPORT_FAILED`), not retried.
 Scheduled reports: not implemented (could be a cron that inserts runs for a service account — design note only).
 
+### Scheduled reports (`report_schedules`, cron `reports.schedule` every 5 min)
+Owner-only CRUD: `GET|POST /reports/schedules`, `GET|PATCH|DELETE /reports/schedules/:id` (`reports:generate` + the
+type's permissions; others' schedules → 404; audited `REPORT_SCHEDULE_CREATED|UPDATED|DELETED`). Timing: `DAILY`
+/ `WEEKLY` (dayOfWeek) / `MONTHLY` (dayOfMonth 1–28) at hour:minute, or `CRON` (5-field, at most hourly), in the
+schedule's timezone (default Asia/Kolkata; evaluated with cron-parser). `lookbackDays` (default 1/7/31) sets the
+period `[slot − lookback, slot)`.
+
+* **Jurisdiction at run time.** The cron (`apps/worker/src/jobs/reports/schedule.ts`) claims due schedules
+  (`FOR UPDATE SKIP LOCKED`; unique `(schedule_id, scheduled_for)` makes a slot run at most once), recomputes
+  the OWNER's scope from the owner's current grants and freezes it into `params.scopePaths` (narrowed to the
+  schedule's org unit). Inactive owner / lost permission / org unit now outside scope → slot skipped,
+  `last_error`, `REPORT_SCHEDULE_SKIPPED` (outcome FAILURE). Missed slots are not back-filled.
+* **Recipients** (users) must, at creation and at every run, be ACTIVE and able to run the same report over the
+  run's whole scope themselves; they are frozen into `report_runs.recipient_ids`. They see the run under
+  `GET /reports/runs?shared=true` and may read/download it (`REPORT_DOWNLOADED` details `asScheduleRecipient`)
+  only while that still holds (re-checked on each access, 404 otherwise).
+* **Notification** on completion: in-app `REPORT_READY` to owner + recipients linking `/reports?run=<id>`, and
+  (schedule `emailRecipients`, SMTP configured) one e-mail with the sign-in link — never a download token.
+  Tested with a local SMTP sink; real relay UNVERIFIED.
+* Web: Reports page → "Scheduled reports" card (create, pause/resume, delete, next/last run, last error) and
+  "Shared with me" runs.
+
 ## Storage snapshots — cron `storage.snapshot` (every 15 min)
 Per bucket role (tier label STAGING/ACTIVE/ARCHIVE/LONG_TERM/DERIVED/EXPORTS/REPORTS): the DB catalogue is
 summed for every bucket (evidence originals by current bucket, derivatives, live exports, reports, in-flight

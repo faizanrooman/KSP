@@ -80,3 +80,79 @@ export interface ReportParams {
   scopePaths: string[];
   requestedBy: { id: string; name: string; username: string };
 }
+
+// ---- scheduled reports ----------------------------------------------------------------------------
+export const REPORT_FREQUENCIES = ['DAILY', 'WEEKLY', 'MONTHLY', 'CRON'] as const;
+export type ReportFrequency = (typeof REPORT_FREQUENCIES)[number];
+
+export interface ReportScheduleTiming {
+  frequency: ReportFrequency;
+  /** Local time of day (schedule timezone) for DAILY / WEEKLY / MONTHLY. */
+  hour?: number;
+  minute?: number;
+  /** 0 = Sunday … 6 = Saturday (WEEKLY). */
+  dayOfWeek?: number;
+  /** 1 … 28 (MONTHLY; capped at 28 so every month has the day). */
+  dayOfMonth?: number;
+  /** 5-field cron expression (CRON). */
+  cron?: string;
+}
+
+/** Effective 5-field cron expression for a schedule's timing. */
+export function scheduleCron(t: ReportScheduleTiming): string {
+  const m = t.minute ?? 0;
+  const h = t.hour ?? 6;
+  switch (t.frequency) {
+    case 'DAILY': return `${m} ${h} * * *`;
+    case 'WEEKLY': return `${m} ${h} * * ${t.dayOfWeek ?? 1}`;
+    case 'MONTHLY': return `${m} ${h} ${t.dayOfMonth ?? 1} * *`;
+    default: return (t.cron ?? '').trim().replace(/\s+/g, ' ');
+  }
+}
+
+/** Default look-back period (days) of a frequency: the report covers [slot - lookback, slot). */
+export const DEFAULT_LOOKBACK_DAYS: Record<ReportFrequency, number> = { DAILY: 1, WEEKLY: 7, MONTHLY: 31, CRON: 1 };
+
+// ---- jurisdiction from grants (shared by the API and the scheduled-report cron) --------------------
+export interface ScopeGrant {
+  orgPath: string;
+  permissions: ReadonlySet<string> | readonly string[];
+}
+
+export function pathCoversPath(ancestor: string, path: string): boolean {
+  return path === ancestor || path.startsWith(`${ancestor}.`);
+}
+
+function minimalPaths(paths: string[]): string[] {
+  const sorted = [...new Set(paths)].sort((a, b) => a.length - b.length);
+  const out: string[] = [];
+  for (const x of sorted) if (!out.some((o) => pathCoversPath(o, x))) out.push(x);
+  return out;
+}
+
+const hasPerm = (g: ScopeGrant, perm: string) => (Array.isArray(g.permissions) ? (g.permissions as readonly string[]).includes(perm) : (g.permissions as ReadonlySet<string>).has(perm));
+
+/** Minimal set of org paths where the grants hold ALL of `perms` (intersection of grant scopes). */
+export function intersectGrantScopes(grants: readonly ScopeGrant[], perms: readonly string[]): string[] {
+  const scope = (perm: string) => minimalPaths(grants.filter((g) => hasPerm(g, perm)).map((g) => g.orgPath));
+  let acc = scope(perms[0]!);
+  for (const perm of perms.slice(1)) {
+    const other = scope(perm);
+    const next = new Set<string>();
+    for (const a of acc) for (const b of other) {
+      if (pathCoversPath(a, b)) next.add(b);
+      else if (pathCoversPath(b, a)) next.add(a);
+    }
+    acc = [...next];
+  }
+  return minimalPaths(acc);
+}
+
+export function reportScopeFromGrants(grants: readonly ScopeGrant[], type: ReportType): string[] {
+  return intersectGrantScopes(grants, ['reports:generate', ...(REPORT_TYPES[type].requires as readonly string[])]);
+}
+
+/** True when every path of `inner` lies inside some path of `outer`. */
+export function scopeCovered(inner: readonly string[], outer: readonly string[]): boolean {
+  return inner.every((i) => outer.some((o) => pathCoversPath(o, i)));
+}
