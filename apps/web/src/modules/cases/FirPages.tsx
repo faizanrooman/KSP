@@ -212,7 +212,7 @@ export function FirDetailPage() {
     <div className="space-y-4">
       <PageHeader
         breadcrumb={<Link to="/firs" className="text-brand-700 hover:underline">FIRs</Link>}
-        title={<span>FIR <span className="mono">{f.displayNumber}</span></span>}
+        title={<span>FIR <span className="font-mono">{f.displayNumber}</span></span>}
         subtitle={<span className="flex items-center gap-2"><StatusBadge status={f.status} /> {f.orgUnit.name} · registered {formatDate(f.registeredAt)}</span>}
         actions={f.permissions.canManage ? (
           <div className="flex gap-2">

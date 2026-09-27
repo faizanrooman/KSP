@@ -113,7 +113,7 @@ export function OrgUnitsPage() {
                 <span className="mono text-xs text-ink-500">{u.code}</span>
                 <Badge>{titleCase(u.unitType)}</Badge>
                 {!u.active && <Badge tone="gray">Inactive</Badge>}
-                <span className="text-xs text-ink-500">{u.userCount} users · {u.deviceCount} devices</span>
+                <span className="text-xs text-ink-500">{u.userCount} {u.userCount === 1 ? 'user' : 'users'} · {u.deviceCount} {u.deviceCount === 1 ? 'device' : 'devices'}</span>
                 {manage && u.canManage && (
                   <span className="ml-auto flex gap-1">
                     {u.active && <Button size="sm" variant="ghost" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setEdit({ unit: null, parent: u })} aria-label={`Add unit under ${u.name}`}>Add</Button>}
