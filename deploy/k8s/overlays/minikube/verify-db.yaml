@@ -1,0 +1,17 @@
+# Scratch PostgreSQL for the weekly ksp-backup-verify job (restores the latest dump here, never into ksp-db).
+# VERIFY_ADMIN_URL (Secret ksp-backup-verify) points at its superuser (Secret ksp-verify-superuser).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ksp-verify
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.10
+  enableSuperuserAccess: true
+  superuserSecret: { name: ksp-verify-superuser }   # created by minikube-up.sh (basic-auth, username postgres)
+  postgresql:
+    parameters: { shared_buffers: 64MB, max_connections: "50" }
+  storage: { size: 2Gi }
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits: { cpu: "1", memory: 512Mi }

@@ -1,0 +1,102 @@
+# minikube verification environment = the STAGING overlay + only what a laptop cluster lacks:
+#   * in-cluster PostgreSQL via the CloudNativePG component (2 small instances instead of 3x 32 GiB), plus a
+#     1-instance scratch cluster "ksp-verify" for the weekly backup-verify job;
+#   * in-cluster MinIO (real Object Lock) instead of the external S3 store; the backup/DR "site" is the same MinIO;
+#   * locally built images (ksp/<target>:dev, built inside the minikube VM), smaller resource requests;
+#   * self-signed TLS Ingress on host ksp.local (no cert-manager); Prometheus-Operator objects removed (no CRDs).
+# Everything else (NetworkPolicies, PodSecurity restricted, probes, HPAs, PDBs, securityContexts) is unchanged.
+# Reproduce: scripts/ops/minikube-up.sh (secrets are generated at run time and never committed).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ksp-vms-staging
+resources:
+  - ../staging
+  - minio.yaml
+  - verify-db.yaml
+components:
+  - ../../components/cloudnative-pg
+images:
+  - { name: ghcr.io/ksp/api, newName: ksp/api, newTag: dev }
+  - { name: ghcr.io/ksp/worker, newName: ksp/worker, newTag: dev }
+  - { name: ghcr.io/ksp/ai-worker, newName: ksp/ai-worker, newTag: dev }
+  - { name: ghcr.io/ksp/web, newName: ksp/web, newTag: dev }
+  - { name: ghcr.io/ksp/backup, newName: ksp/backup, newTag: dev }
+  # MinIO Inc. no longer publishes community images (docker.io/minio/minio and quay.io/minio/minio pulls are denied
+  # as of 2026-09); Chainguard's build from upstream source (minio RELEASE.2026-09-22, non-root 65532) is used.
+  - { name: minio/minio, newName: cgr.dev/chainguard/minio, digest: "sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1" }
+patches:
+  # --- Prometheus Operator CRDs are not installed on minikube
+  - target: { group: monitoring.coreos.com }
+    patch: |-
+      $patch: delete
+      apiVersion: monitoring.coreos.com/v1
+      kind: ServiceMonitor
+      metadata: { name: unused }
+  # --- configuration
+  - target: { kind: ConfigMap, name: ksp-config }
+    patch: |-
+      - { op: replace, path: /data/APP_BASE_URL, value: "https://ksp.local" }
+      - { op: replace, path: /data/CORS_ORIGINS, value: "https://ksp.local" }
+      - { op: replace, path: /data/S3_ENDPOINT, value: "http://ksp-minio:9000" }
+      - { op: replace, path: /data/LOG_LEVEL, value: info }
+      - { op: replace, path: /data/DATABASE_POOL_MAX, value: "8" }
+  - target: { kind: ConfigMap, name: ksp-ai-config }
+    patch: |-
+      - { op: replace, path: /data/S3_ENDPOINT, value: "http://ksp-minio:9000" }
+  - target: { kind: ConfigMap, name: ksp-backup-config }
+    patch: |-
+      - { op: replace, path: /data/BACKUP_S3_ENDPOINT, value: "http://ksp-minio:9000" }
+      - { op: replace, path: /data/DR_S3_ENDPOINT, value: "http://ksp-minio:9000" }
+  # --- ingress: self-signed TLS secret created by minikube-up.sh, host ksp.local
+  - target: { kind: Ingress, name: ksp-vms }
+    patch: |-
+      - { op: remove, path: "/metadata/annotations/cert-manager.io~1cluster-issuer" }
+      - { op: replace, path: /spec/tls/0/hosts/0, value: ksp.local }
+      - { op: replace, path: /spec/rules/0/host, value: ksp.local }
+  # --- network: object store / DR store / kube-apiserver are in-cluster or on the minikube node network
+  - target: { kind: NetworkPolicy, name: allow-s3-egress }
+    patch: |-
+      - op: replace
+        path: /spec/egress
+        value: [{ to: [{ podSelector: { matchLabels: { app.kubernetes.io/name: ksp-minio } } }], ports: [{ protocol: TCP, port: 9000 }] }]
+  - target: { kind: NetworkPolicy, name: backup }
+    patch: |-
+      - op: replace
+        path: /spec/egress
+        value: [{ to: [{ podSelector: { matchLabels: { app.kubernetes.io/name: ksp-minio } } }], ports: [{ protocol: TCP, port: 9000 }] }]
+  # --- PostgreSQL (CloudNativePG component) sized for a laptop; WAL archive to the in-cluster MinIO
+  - target: { kind: Cluster, name: ksp-db }
+    patch: |-
+      - { op: replace, path: /spec/instances, value: 2 }
+      - op: replace
+        path: /spec/postgresql/parameters
+        value: { shared_buffers: 128MB, effective_cache_size: 512MB, max_connections: "200", wal_compression: "on", log_min_duration_statement: "1000", password_encryption: scram-sha-256 }
+      - { op: replace, path: /spec/storage, value: { size: 3Gi } }
+      - { op: replace, path: /spec/walStorage, value: { size: 1Gi } }
+      - { op: replace, path: /spec/affinity, value: { enablePodAntiAffinity: false } }
+      - { op: replace, path: /spec/resources, value: { requests: { cpu: 100m, memory: 384Mi }, limits: { cpu: "1", memory: 768Mi } } }
+      - { op: replace, path: /spec/monitoring/enablePodMonitor, value: false }
+      - { op: replace, path: /spec/backup/barmanObjectStore/endpointURL, value: "http://ksp-minio:9000" }
+  # --- smaller requests so everything fits a 4 CPU / 6 GiB VM
+  - target: { kind: Deployment, name: ksp-api }
+    patch: |-
+      - { op: replace, path: /spec/template/spec/containers/0/resources, value: { requests: { cpu: 150m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } } }
+  - target: { kind: Deployment, name: ksp-worker }
+    patch: |-
+      - { op: replace, path: /spec/template/spec/containers/0/resources, value: { requests: { cpu: 200m, memory: 384Mi }, limits: { cpu: "2", memory: 2Gi } } }
+      - { op: replace, path: /spec/template/spec/volumes/1, value: { name: work, emptyDir: { sizeLimit: 8Gi } } }
+  - target: { kind: Deployment, name: ksp-ai-worker }
+    patch: |-
+      - { op: replace, path: /spec/template/spec/containers/0/resources, value: { requests: { cpu: 200m, memory: 512Mi }, limits: { cpu: "2", memory: 2Gi } } }
+  - target: { kind: CronJob }
+    patch: |-
+      - { op: replace, path: /spec/jobTemplate/spec/template/spec/containers/0/resources, value: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: "1", memory: 1Gi } } }
+  - target: { kind: CronJob, name: ksp-pg-backup }
+    patch: |-
+      - { op: replace, path: /spec/jobTemplate/spec/template/spec/volumes/0/ephemeral/volumeClaimTemplate/spec/resources/requests/storage, value: 2Gi }
+  - target: { kind: CronJob, name: ksp-backup-verify }
+    patch: |-
+      - { op: replace, path: /spec/jobTemplate/spec/template/spec/volumes/0/ephemeral/volumeClaimTemplate/spec/resources/requests/storage, value: 2Gi }
+  - target: { kind: PersistentVolumeClaim, name: ksp-ai-models }
+    patch: |-
+      - { op: replace, path: /spec/resources/requests/storage, value: 1Gi }

@@ -24,6 +24,10 @@ spec:
     initdb:
       database: ksp
       owner: ksp_owner
+      # Owner credentials come from OUR secret. Without this CNPG generates "<cluster>-app" (= ksp-db-app) holding
+      # the OWNER's credentials, which is exactly the name ksp_app's passwordSecret used to reference -> the
+      # managed role ksp_app could not reconcile (username mismatch). Role secrets are therefore named ksp-db-role-*.
+      secret: { name: ksp-db-role-owner }
       dataChecksums: true
       postInitSQL:
         - CREATE ROLE ksp_app LOGIN
@@ -31,10 +35,10 @@ spec:
         - CREATE ROLE ksp_backup LOGIN IN ROLE pg_read_all_data
   managed:
     roles:
-      - { name: ksp_owner, ensure: present, login: true, passwordSecret: { name: ksp-db-owner } }
-      - { name: ksp_app, ensure: present, login: true, passwordSecret: { name: ksp-db-app } }
-      - { name: ksp_ai, ensure: present, login: true, passwordSecret: { name: ksp-db-ai } }
-      - { name: ksp_backup, ensure: present, login: true, inRoles: [pg_read_all_data], passwordSecret: { name: ksp-db-backup } }
+      - { name: ksp_owner, ensure: present, login: true, passwordSecret: { name: ksp-db-role-owner } }
+      - { name: ksp_app, ensure: present, login: true, passwordSecret: { name: ksp-db-role-app } }
+      - { name: ksp_ai, ensure: present, login: true, passwordSecret: { name: ksp-db-role-ai } }
+      - { name: ksp_backup, ensure: present, login: true, inRoles: [pg_read_all_data], passwordSecret: { name: ksp-db-role-backup } }
   storage:
     size: 2Ti
     storageClass: fast-ssd

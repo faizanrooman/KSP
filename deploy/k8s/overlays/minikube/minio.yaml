@@ -1,0 +1,90 @@
+# Local-only object store for the minikube verification environment (NOT for staging/production, which use an
+# external erasure-coded S3 store with Object Lock). Real MinIO server, single drive, IAM users + policies from
+# deploy/s3/policies/*.json are created by scripts/ops/minikube-up.sh (mc inside this pod). PodSecurity restricted.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: ksp-minio-data, labels: { app.kubernetes.io/name: ksp-minio } }
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 8Gi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ksp-minio
+  labels: { app.kubernetes.io/name: ksp-minio }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/name: ksp-minio }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: ksp-minio }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10201
+        runAsGroup: 10201
+        fsGroup: 10201
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: minio
+          image: minio/minio
+          args: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom: { secretKeyRef: { name: ksp-minio-root, key: MINIO_ROOT_USER } }
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: ksp-minio-root, key: MINIO_ROOT_PASSWORD } }
+            - { name: MINIO_BROWSER, value: "off" }
+            - { name: HOME, value: /tmp }
+            - { name: MC_CONFIG_DIR, value: /tmp/.mc }
+          ports:
+            - { name: s3, containerPort: 9000 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          readinessProbe:
+            httpGet: { path: /minio/health/ready, port: s3 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /minio/health/live, port: s3 }
+            periodSeconds: 15
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: ksp-minio-data }
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: ksp-minio, labels: { app.kubernetes.io/name: ksp-minio } }
+spec:
+  selector: { app.kubernetes.io/name: ksp-minio }
+  ports:
+    - { name: s3, port: 9000, targetPort: s3 }
+---
+# Who may talk to the object store: s3-client pods, backup jobs and the PostgreSQL instances (WAL archive).
+# The AI worker is an s3-client at the network level; the bucket boundary is enforced by its MinIO identity (ai.json).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: minio }
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: ksp-minio } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { ksp.police/s3-client: "true" } }
+        - podSelector: { matchLabels: { app.kubernetes.io/name: ksp-backup } }
+        - podSelector: { matchLabels: { cnpg.io/cluster: ksp-db } }
+      ports: [{ protocol: TCP, port: 9000 }]
+  egress: []

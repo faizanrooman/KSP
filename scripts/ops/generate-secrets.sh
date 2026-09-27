@@ -3,6 +3,7 @@
 #
 #   scripts/ops/generate-secrets.sh --out <dir> [--env-name production] [--format files|compose|k8s|all]
 #                                   [--signing-cn "KSP VMS Evidence Signing"] [--force]
+#                                   [--namespace ksp-vms] [--verify-admin-url postgres://...]   (k8s output only)
 #
 # Output (<dir> is created 0700, files 0600; never commit it — import into the secrets manager, then shred):
 #   files    one file per secret (names = compose secret names / k8s Secret keys)
@@ -16,7 +17,8 @@
 #                  delete it from <dir>; only backup_age_recipients (public) is deployed.
 # Idempotent unless --force: existing files are kept (so re-running never silently rotates a key).
 set -euo pipefail
-OUT=""; FORMAT=all; ENV_NAME=production; CN="KSP VMS Evidence Signing"; FORCE=0
+OUT=""; FORMAT=all; ENV_NAME=production; CN="KSP VMS Evidence Signing"; FORCE=0; NS=""
+VERIFY_ADMIN_URL="postgres://SET-ME@ksp-verify-rw:5432/postgres?sslmode=require"
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT="$2"; shift 2 ;;
@@ -24,6 +26,8 @@ while [ $# -gt 0 ]; do
     --env-name) ENV_NAME="$2"; shift 2 ;;
     --signing-cn) CN="$2"; shift 2 ;;
     --force) FORCE=1; shift ;;
+    --namespace) NS="$2"; shift 2 ;;
+    --verify-admin-url) VERIFY_ADMIN_URL="$2"; shift 2 ;;
     -h|--help) sed -n 2,20p "$0"; exit 0 ;;
     *) echo "unknown argument $1" >&2; exit 2 ;;
   esac
@@ -52,6 +56,17 @@ want s3_ai_access_key && put s3_ai_access_key "kspai$(rand_hex 7)"
 want s3_ai_secret_key && put s3_ai_secret_key "$(rand_pw 40)"
 want backup_s3_access_key && put backup_s3_access_key "kspbak$(rand_hex 7)"
 want backup_s3_secret_key && put backup_s3_secret_key "$(rand_pw 40)"
+# Object-store identities of the other jobs (deploy/s3/policies): replicate (primary read + DR write), CNPG WAL
+# archive (PITR), and the bucket PROVISIONING identity used only by the migrate Job (creates buckets with
+# versioning + Object Lock; the app identity is denied PutBucketVersioning/PutBucketObjectLockConfiguration).
+want s3_replica_read_access_key && put s3_replica_read_access_key "ksprepl$(rand_hex 6)"
+want s3_replica_read_secret_key && put s3_replica_read_secret_key "$(rand_pw 40)"
+want dr_s3_access_key && put dr_s3_access_key "kspdr$(rand_hex 7)"
+want dr_s3_secret_key && put dr_s3_secret_key "$(rand_pw 40)"
+want wal_s3_access_key && put wal_s3_access_key "kspwal$(rand_hex 7)"
+want wal_s3_secret_key && put wal_s3_secret_key "$(rand_pw 40)"
+want s3_provision_access_key && put s3_provision_access_key "kspprov$(rand_hex 6)"
+want s3_provision_secret_key && put s3_provision_secret_key "$(rand_pw 40)"
 want data_encryption_key && put data_encryption_key "$(openssl rand -base64 32)"
 want media_token_secret && put media_token_secret "$(rand_hex 32)"
 
@@ -104,9 +119,11 @@ ENV
 fi
 if [ "$FORMAT" = k8s ] || [ "$FORMAT" = all ]; then
   b64() { base64 -w0 < "$OUT/$1"; }
+  s64() { printf '%s' "$1" | base64 -w0; }
+  meta() { echo "metadata: { name: $1,${NS:+ namespace: $NS,} labels: { app.kubernetes.io/part-of: ksp-vms } }"; }
   {
     echo "# PLAIN Kubernetes Secrets — seal with kubeseal or load into the external secrets store. NEVER commit/apply as-is."
-    echo "apiVersion: v1"; echo "kind: Secret"; echo "metadata: { name: ksp-app, labels: { app.kubernetes.io/part-of: ksp-vms } }"
+    echo "apiVersion: v1"; echo "kind: Secret"; meta ksp-app
     echo "type: Opaque"; echo "data:"
     echo "  DATABASE_URL: $(printf 'postgres://ksp_app:%s@ksp-db-rw:5432/ksp?sslmode=require' "$(v ksp_app_db_password)" | base64 -w0)"
     echo "  S3_ACCESS_KEY: $(b64 s3_access_key)"; echo "  S3_SECRET_KEY: $(b64 s3_secret_key)"
@@ -115,22 +132,48 @@ if [ "$FORMAT" = k8s ] || [ "$FORMAT" = all ]; then
     echo "  jwt_private_key: $(b64 jwt_private_key)"; echo "  jwt_public_key: $(b64 jwt_public_key)"
     echo "  signing_private_key: $(b64 signing_private_key)"; echo "  signing_certificate: $(b64 signing_certificate)"
     echo "---"
-    echo "apiVersion: v1"; echo "kind: Secret"; echo "metadata: { name: ksp-migrate, labels: { app.kubernetes.io/part-of: ksp-vms } }"
+    echo "apiVersion: v1"; echo "kind: Secret"; meta ksp-migrate
     echo "type: Opaque"; echo "data:"
     echo "  DATABASE_MIGRATION_URL: $(printf 'postgres://ksp_owner:%s@ksp-db-rw:5432/ksp?sslmode=require' "$(v ksp_owner_db_password)" | base64 -w0)"
+    # Overrides the ksp-app S3 identity inside the migrate Job only (bucket creation; IAM policy provision.json).
+    echo "  S3_ACCESS_KEY: $(b64 s3_provision_access_key)"; echo "  S3_SECRET_KEY: $(b64 s3_provision_secret_key)"
     echo "---"
-    echo "apiVersion: v1"; echo "kind: Secret"; echo "metadata: { name: ksp-ai, labels: { app.kubernetes.io/part-of: ksp-vms } }"
+    echo "apiVersion: v1"; echo "kind: Secret"; meta ksp-ai
     echo "type: Opaque"; echo "data:"
     echo "  DATABASE_AI_URL: $(printf 'postgres://ksp_ai:%s@ksp-db-rw:5432/ksp?sslmode=require' "$(v ksp_ai_db_password)" | base64 -w0)"
     echo "  S3_AI_ACCESS_KEY: $(b64 s3_ai_access_key)"; echo "  S3_AI_SECRET_KEY: $(b64 s3_ai_secret_key)"
     echo "---"
-    echo "apiVersion: v1"; echo "kind: Secret"; echo "metadata: { name: ksp-backup, labels: { app.kubernetes.io/part-of: ksp-vms } }"
+    echo "apiVersion: v1"; echo "kind: Secret"; meta ksp-backup
     echo "type: Opaque"; echo "data:"
     echo "  PGPASSWORD: $(b64 ksp_backup_db_password)"
     echo "  BACKUP_RECORD_URL: $(printf 'postgres://ksp_app:%s@ksp-db-rw:5432/ksp?sslmode=require' "$(v ksp_app_db_password)" | base64 -w0)"
     echo "  BACKUP_S3_ACCESS_KEY: $(b64 backup_s3_access_key)"; echo "  BACKUP_S3_SECRET_KEY: $(b64 backup_s3_secret_key)"
     [ -s "$OUT/backup_age_recipients" ] && echo "  backup_age_recipients: $(b64 backup_age_recipients)"
     [ -s "$OUT/backup_signing_key" ] && echo "  backup_signing_key: $(b64 backup_signing_key)" && echo "  backup_signing_pubkey: $(b64 backup_signing_pubkey)"
+    echo "---"
+    echo "apiVersion: v1"; echo "kind: Secret"; meta ksp-backup-verify
+    echo "type: Opaque"; echo "data:"
+    echo "  VERIFY_ADMIN_URL: $(s64 "$VERIFY_ADMIN_URL")"
+    [ -s "$OUT/backup_age_identity" ] && echo "  backup_age_identity: $(b64 backup_age_identity)"
+    [ -s "$OUT/backup_signing_pubkey" ] && echo "  backup_signing_pubkey: $(b64 backup_signing_pubkey)"
+    echo "---"
+    echo "apiVersion: v1"; echo "kind: Secret"; meta ksp-replicate
+    echo "type: Opaque"; echo "data:"
+    echo "  DATABASE_URL: $(s64 "postgres://ksp_app:$(v ksp_app_db_password)@ksp-db-r:5432/ksp?sslmode=require")"
+    echo "  BACKUP_RECORD_URL: $(s64 "postgres://ksp_app:$(v ksp_app_db_password)@ksp-db-rw:5432/ksp?sslmode=require")"
+    echo "  S3_ACCESS_KEY: $(b64 s3_replica_read_access_key)"; echo "  S3_SECRET_KEY: $(b64 s3_replica_read_secret_key)"
+    echo "  DR_S3_ACCESS_KEY: $(b64 dr_s3_access_key)"; echo "  DR_S3_SECRET_KEY: $(b64 dr_s3_secret_key)"
+    # CloudNativePG: login roles (managed.roles passwordSecret / bootstrap.initdb.secret) + WAL archive credentials.
+    for r in owner app ai backup; do
+      echo "---"
+      echo "apiVersion: v1"; echo "kind: Secret"; meta "ksp-db-role-$r"
+      echo "type: kubernetes.io/basic-auth"; echo "data:"
+      echo "  username: $(s64 "ksp_$r")"; echo "  password: $(b64 "ksp_${r}_db_password")"
+    done
+    echo "---"
+    echo "apiVersion: v1"; echo "kind: Secret"; meta ksp-db-wal-s3
+    echo "type: Opaque"; echo "data:"
+    echo "  ACCESS_KEY_ID: $(b64 wal_s3_access_key)"; echo "  SECRET_ACCESS_KEY: $(b64 wal_s3_secret_key)"
   } > "$OUT/k8s-secrets.yaml"
 fi
 echo "secrets for '$ENV_NAME' in $OUT ($(find "$OUT" -maxdepth 1 -type f | wc -l) files)."

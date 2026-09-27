@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CnpgBarmanWalArchiveAndBaseBackups_attach_on_DR_store",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:GetBucketLocation", "s3:DeleteObject"],
+      "Resource": ["arn:aws:s3:::ksp-pg-wal", "arn:aws:s3:::ksp-pg-wal/*"]
+    },
+    {
+      "Sid": "NoBucketOrLockChanges",
+      "Effect": "Deny",
+      "Action": ["s3:BypassGovernanceRetention", "s3:PutBucketObjectLockConfiguration", "s3:PutBucketVersioning", "s3:DeleteBucket", "s3:PutBucketPolicy"],
+      "Resource": "*"
+    }
+  ]
+}

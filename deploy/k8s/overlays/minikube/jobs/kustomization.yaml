@@ -1,0 +1,9 @@
+# One-shot Jobs (migrate, models) for the minikube environment: the staging jobs with locally built images.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ksp-vms-staging
+resources:
+  - ../../staging/jobs
+images:
+  - { name: ghcr.io/ksp/api, newName: ksp/api, newTag: dev }
+  - { name: ghcr.io/ksp/ai-worker, newName: ksp/ai-worker, newTag: dev }
