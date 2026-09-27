@@ -154,10 +154,9 @@ async function main() {
     await storage().ensureBuckets();
     await seedReference(db);
     if (production) {
-      await seedOrg(db, [ORG[0]!]);
-      const pw = `${randomToken(12)}!Aa1`;
-      const created = await createUser(db, { username: 'admin', name: 'System Administrator', badge: 'ADM-0001', rank: 'Admin', org: 'ksp', role: 'SYSTEM_ADMINISTRATOR' }, pw, true);
-      console.log(created ? `Initial administrator 'admin' created. One-time password (change on first login, MFA enrolment required):\n  ${pw}` : 'Administrator already exists; nothing changed.');
+      const r = await seedProduction(db);
+      for (const w of r.warnings) console.warn(`WARNING: ${w}`);
+      console.log(r.password ? `Initial administrator '${r.username}' created. One-time password (change on first login, MFA enrolment required):\n  ${r.password}` : 'Administrator already exists; nothing changed.');
     } else {
       await seedOrg(db, ORG);
       let n = 0;
@@ -169,6 +168,28 @@ async function main() {
     await db.destroy();
     await pool.end().catch(() => undefined);
   }
+}
+
+/**
+ * Production first run: reference data, the root org unit only, and ONE administrator with a random one-time password
+ * (must change on first login; MFA enrolment is mandatory because sessionPolicy.requireMfaForRoles always contains
+ * SYSTEM_ADMINISTRATOR after this). No dev users, no fixture org units, no integration systems. Idempotent.
+ */
+export async function seedProduction(db: Database): Promise<{ username: string; password: string | null; warnings: string[] }> {
+  await seedReference(db);
+  await seedOrg(db, [ORG[0]!]);
+  const policy = await db.selectFrom('system_settings').select('value').where('key', '=', 'sessionPolicy').executeTakeFirst();
+  const v = { ...DEFAULT_SETTINGS.sessionPolicy, ...((policy?.value as object | undefined) ?? {}) };
+  if (!v.requireMfaForRoles.includes('SYSTEM_ADMINISTRATOR')) {
+    const next = { ...v, requireMfaForRoles: [...v.requireMfaForRoles, 'SYSTEM_ADMINISTRATOR'] };
+    await db.updateTable('system_settings').set({ value: JSON.stringify(next), updated_at: new Date() }).where('key', '=', 'sessionPolicy').execute();
+  }
+  const warnings: string[] = [];
+  const dev = await db.selectFrom('users').select('username').where('username', 'in', DEV_USERS.filter((u) => u.username !== 'admin').map((u) => u.username)).execute();
+  if (dev.length) warnings.push(`development users exist in this database (${dev.map((d) => d.username).join(', ')}); run npm run ops:purge-demo-data or use a fresh database`);
+  const pw = `${randomToken(12)}!Aa1`;
+  const created = await createUser(db, { username: 'admin', name: 'System Administrator', badge: 'ADM-0001', rank: 'Admin', org: 'ksp', role: 'SYSTEM_ADMINISTRATOR' }, pw, true);
+  return { username: 'admin', password: created ? pw : null, warnings };
 }
 
 export async function seedDev(db: Database): Promise<number> {

@@ -21,3 +21,5 @@ export * from './integrity.js';
 export * from './monitoring.js';
 export * from './ai-gates.js';
 export * from './preflight.js';
+export * from './ops/purge-demo.js';
+export * from './ops/bootstrap-org.js';

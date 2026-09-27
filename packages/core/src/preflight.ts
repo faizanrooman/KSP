@@ -201,14 +201,14 @@ export async function databasePreflight(db: Database, cfg: AppConfig, service: P
 
   // Seeded development users / org units.
   const devUsers = await db.selectFrom('users').select(['username', 'password_hash', 'status']).where('username', 'in', [...DEV_SEED_USERNAMES]).execute();
-  const nonAdmin = devUsers.filter((u) => u.username !== 'admin');
+  const nonAdmin = devUsers.filter((u) => u.username !== 'admin' && u.status !== 'DISABLED'); // DISABLED = purged (ops:purge-demo-data)
   if (nonAdmin.length) err('DEV_SEED_USERS', `development seed users exist: ${nonAdmin.map((u) => u.username).join(', ')}`, 'npm run ops:purge-demo-data (staging/UAT DB) or rebuild with npm run db:seed -- --production');
   for (const u of devUsers) {
     if (u.password_hash && (await verifySecret(u.password_hash, DEV_SEED_PASSWORD).catch(() => false))) {
       err('DEV_SEED_PASSWORD', `user '${u.username}' still has the development seed password`, 'reset the password / remove the user');
     }
   }
-  const devOrg = await db.selectFrom('org_units').select('code').where('code', 'in', [...DEV_SEED_ORG_CODES]).execute();
+  const devOrg = await db.selectFrom('org_units').select('code').where('code', 'in', [...DEV_SEED_ORG_CODES]).where('active', '=', true).execute();
   if (devOrg.length) warn('DEV_SEED_ORG', `development seed org units exist: ${devOrg.map((o) => o.code).join(', ')}`, 'import the real hierarchy with npm run ops:bootstrap-org and purge demo data');
 
   // Integration systems backed by synthetic fixtures.
