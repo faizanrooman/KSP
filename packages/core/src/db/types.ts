@@ -159,10 +159,12 @@ export interface AlertCursors {
 
 export interface AlertDeliveries {
   alert_id: string;
+  attempt: Generated<number>;
   channel: string;
   created_at: Generated<Timestamp>;
   detail: string | null;
   id: Generated<Int8>;
+  next_attempt_at: Timestamp | null;
   recipients: number | null;
   status: string;
 }
@@ -170,6 +172,7 @@ export interface AlertDeliveries {
 export interface AlertRules {
   code: string;
   config: Generated<Json>;
+  email_recipients: Generated<string[]>;
   enabled: Generated<boolean>;
   id: Generated<string>;
   name: string;

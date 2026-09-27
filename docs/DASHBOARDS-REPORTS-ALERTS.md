@@ -80,13 +80,26 @@ Thresholds are "more than N". Org unit of actor-based alerts = the user's home u
 `dispatchPendingAlerts` (same cron) claims OPEN alerts with `notified_at IS NULL`: WARNING/CRITICAL →
 `notifications` rows for ACTIVE users holding `alerts:manage` through a grant covering the alert's unit (root
 units for system-wide alerts), plus outbound channels; INFO → marked notified, no fan-out. Every attempt is
-logged in `alert_deliveries` (IN_APP / WEBHOOK / EMAIL, SENT / FAILED / SKIPPED).
+logged in `alert_deliveries` (IN_APP / WEBHOOK / EMAIL; SENT / RETRYING / FAILED / SKIPPED; `attempt`,
+`next_attempt_at`). The table is append-only: every attempt is its own row.
 
 * **Webhook** (`ALERT_WEBHOOK_URL`, optional `ALERT_WEBHOOK_SECRET` → `x-ksp-signature: sha256=<HMAC>`,
   `ALERT_WEBHOOK_TIMEOUT_MS`): implemented; tested against a local HTTP server (success, HMAC, HTTP 500
-  failure). Against a real receiver: **UNVERIFIED**.
-* **E-mail**: **not implemented** (no SMTP relay/library in this deployment). If `ALERT_SMTP_URL` is set,
-  deliveries are recorded FAILED "SMTP delivery not implemented" — never reported as sent.
+  failure + retries). Against a real receiver: **UNVERIFIED**.
+* **E-mail** (SMTP via `nodemailer`, `packages/core/src/mailer.ts`): `ALERT_SMTP_URL`
+  (`smtp://user:pass@relay:587` or `smtps://relay:465`), `ALERT_EMAIL_FROM`, `ALERT_SMTP_TIMEOUT_MS`,
+  `ALERT_SMTP_TLS_REJECT_UNAUTHORIZED=false` (dev relays only). Recipients = e-mail addresses (`users.email`) of
+  the in-scope `alerts:manage` holders (setting `alertDeliveryPolicy.emailAlertManagers`) + the rule's
+  `emailRecipients` (Alert rules page) + `alertDeliveryPolicy.warningRecipients` (WARNING and CRITICAL) +
+  `criticalRecipients` (CRITICAL only). Plain-text message: severity, title, message, rule, occurrences,
+  first/last seen, resource id and a sign-in link `APP_BASE_URL/alerts/<id>` — no evidence content, storage
+  keys or credentials. No recipients → SKIPPED. Tested against a local SMTP sink (`smtp-server`) started by the
+  worker test, asserting envelope, recipients and body. **A real SMTP relay is UNVERIFIED.**
+* **Retries**: the first external attempt runs in the dispatcher; a failure is recorded RETRYING and the next
+  attempt is enqueued on `alerts.deliver` with `startAfter = baseDelaySeconds · 2^(attempt-1)` (capped at 24 h)
+  until `alertDeliveryPolicy.maxAttempts` (default 5, first retry after 60 s); the last failure is FAILED
+  "(after N attempts)". A retry for an alert resolved in the meantime is SKIPPED. The alert detail page shows
+  each attempt and the next scheduled attempt.
 
 ### API
 | Method & path | Permission | Notes |
@@ -161,6 +174,6 @@ API: `dashboard.test.ts` (5), `alerts.test.ts` (6), `reports.test.ts` (5), `syst
 Worker: `alerts.test.ts` (13), `reports.test.ts` (9), `storage.test.ts` (5). Web: `dashboard.test.ts` (3).
 
 ## Known gaps
-E-mail channel not implemented; webhook against a real receiver UNVERIFIED; no scheduled reports; PDF row cap
+E-mail against a real SMTP relay and webhook against a real receiver UNVERIFIED; PDF row cap
 5 000; dashboard at > 50k visible rows for state-wide roles not measured; alert list `q` search is ILIKE on
 title (no index).

@@ -5,9 +5,9 @@ export interface AlertView {
   firstSeenAt: string; lastSeenAt: string; notifiedAt: string | null;
   acknowledgedAt: string | null; acknowledgedBy: string | null; resolvedAt: string | null; resolvedBy: string | null;
   resolutionNote: string | null; autoResolved: boolean; link: string | null; canManage: boolean;
-  deliveries?: Array<{ channel: string; status: string; recipients: number | null; detail: string | null; at: string }>;
+  deliveries?: Array<{ channel: string; status: string; attempt: number; nextAttemptAt: string | null; recipients: number | null; detail: string | null; at: string }>;
 }
-export interface AlertRule { code: string; name: string; enabled: boolean; severity: 'INFO' | 'WARNING' | 'CRITICAL'; config: Record<string, number>; updatedAt: string; updatedBy: string | null; lastEvaluatedAt: string | null }
+export interface AlertRule { code: string; name: string; enabled: boolean; severity: 'INFO' | 'WARNING' | 'CRITICAL'; config: Record<string, number>; emailRecipients: string[]; updatedAt: string; updatedBy: string | null; lastEvaluatedAt: string | null }
 export interface NotificationView { id: string; kind: string; title: string; body: string | null; link: string | null; readAt: string | null; createdAt: string }
 export interface NotificationPage { items: NotificationView[]; total: number; unread: number; page: number; pageSize: number }
 

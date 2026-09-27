@@ -155,7 +155,7 @@ export function channelStatus() {
   return {
     inApp: 'ENABLED',
     webhook: process.env.ALERT_WEBHOOK_URL ? 'CONFIGURED' : 'NOT_CONFIGURED',
-    email: process.env.ALERT_SMTP_URL ? 'CONFIGURED_NOT_IMPLEMENTED' : 'NOT_IMPLEMENTED',
+    email: process.env.ALERT_SMTP_URL ? 'CONFIGURED' : 'NOT_CONFIGURED',
   };
 }
 

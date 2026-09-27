@@ -21,6 +21,7 @@ export const prefix = '/settings';
 const GiB = 1024 ** 3;
 const MiB = 1024 ** 2;
 const int = (min: number, max: number) => z.number().int().min(min).max(max);
+const emailList = z.array(z.string().trim().toLowerCase().email().max(254)).max(50).transform((v) => [...new Set(v)]);
 
 export const SETTING_SCHEMAS = {
   passwordPolicy: z.object({
@@ -60,6 +61,19 @@ export const SETTING_SCHEMAS = {
     exportRetentionDays: int(1, 3650),
     excessiveDownloadsPerHour: int(1, 10_000),
   }).strict(),
+  alertDeliveryPolicy: z.object({
+    maxAttempts: int(1, 20),
+    baseDelaySeconds: int(5, 3600),
+    emailAlertManagers: z.boolean(),
+    warningRecipients: emailList,
+    criticalRecipients: emailList,
+  }).strict(),
+  integrityPolicy: z.object({
+    fullCycleDays: int(1, 3650),
+    maxBytesPerNight: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    minPerNight: int(1, 1_000_000),
+    maxPerNight: int(1, 10_000_000),
+  }).strict().refine((v) => v.maxPerNight >= v.minPerNight, { message: 'Maximum per night must be at least the minimum', path: ['maxPerNight'] }),
 } satisfies { [K in SettingKey]: z.ZodType<SystemSettings[K], z.ZodTypeDef, unknown> };
 
 const keyParam = z.object({ key: z.enum(SETTING_KEYS as [SettingKey, ...SettingKey[]]) });

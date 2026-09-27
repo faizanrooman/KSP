@@ -60,7 +60,11 @@ const listQuery = z.object({
 const idParam = z.object({ id: z.string().uuid() });
 const noteBody = z.object({ note: z.string().trim().max(1000).optional() }).strict();
 const resolveBody = z.object({ note: z.string().trim().min(5, 'A resolution note of at least 5 characters is required').max(1000) }).strict();
-const ruleBody = z.object({ enabled: z.boolean(), severity: z.enum(ALERT_SEVERITIES), config: z.record(z.unknown()) }).partial().strict();
+const ruleBody = z.object({
+  enabled: z.boolean(), severity: z.enum(ALERT_SEVERITIES), config: z.record(z.unknown()),
+  /** Extra e-mail addresses notified for this rule (besides in-scope alert managers and the alertDeliveryPolicy lists). */
+  emailRecipients: z.array(z.string().trim().toLowerCase().email().max(254)).max(50).transform((v) => [...new Set(v)]),
+}).partial().strict();
 
 /** Alerts the principal may see for `perm`. */
 export function alertScopeSql(p: Principal, perm: Permission, alias = 'a'): RawBuilder<boolean> {
@@ -144,11 +148,11 @@ export default async function alerts(fastify: FastifyInstance) {
   }, async (req) => {
     const p = req.requirePrincipal();
     const rows = await db.selectFrom('alert_rules as r').leftJoin('users as u', 'u.id', 'r.updated_by')
-      .select(['r.code', 'r.name', 'r.enabled', 'r.severity', 'r.config', 'r.updated_at', 'u.full_name as updated_by']).orderBy('r.code').execute();
+      .select(['r.code', 'r.name', 'r.enabled', 'r.severity', 'r.config', 'r.email_recipients', 'r.updated_at', 'u.full_name as updated_by']).orderBy('r.code').execute();
     const cursors = await db.selectFrom('alert_cursors').select(['rule_code', 'updated_at']).execute();
     return {
       canEdit: hasRootPermission(p, 'alerts:manage'),
-      items: rows.map((r) => ({ code: r.code, name: r.name, enabled: r.enabled, severity: r.severity, config: r.config, updatedAt: r.updated_at, updatedBy: r.updated_by, lastEvaluatedAt: cursors.find((c) => c.rule_code === r.code)?.updated_at ?? null })),
+      items: rows.map((r) => ({ code: r.code, name: r.name, enabled: r.enabled, severity: r.severity, config: r.config, emailRecipients: r.email_recipients, updatedAt: r.updated_at, updatedBy: r.updated_by, lastEvaluatedAt: cursors.find((c) => c.rule_code === r.code)?.updated_at ?? null })),
     };
   });
 
@@ -167,17 +171,17 @@ export default async function alerts(fastify: FastifyInstance) {
       if (!parsed.success) throw validationFailed('Invalid rule configuration', parsed.error.issues);
       config = parsed.data as Record<string, unknown>;
     }
-    const patch = { ...(req.body.enabled !== undefined ? { enabled: req.body.enabled } : {}), ...(req.body.severity ? { severity: req.body.severity } : {}), ...(config ? { config: JSON.stringify(config) } : {}) };
+    const patch = { ...(req.body.enabled !== undefined ? { enabled: req.body.enabled } : {}), ...(req.body.severity ? { severity: req.body.severity } : {}), ...(config ? { config: JSON.stringify(config) } : {}), ...(req.body.emailRecipients ? { email_recipients: req.body.emailRecipients } : {}) };
     if (!Object.keys(patch).length) throw validationFailed('Nothing to update');
     const updated = await db.transaction().execute(async (tx) => {
       const r = await tx.updateTable('alert_rules').set({ ...patch, updated_by: p.userId, updated_at: new Date() }).where('code', '=', code).returningAll().executeTakeFirstOrThrow();
       await appendAudit(tx, req.actor(), {
         action: 'ALERT_RULE_UPDATED', resourceType: 'alert_rule', resourceId: code,
-        details: { before: { enabled: cur.enabled, severity: cur.severity, config: cur.config }, after: { enabled: r.enabled, severity: r.severity, config: r.config } },
+        details: { before: { enabled: cur.enabled, severity: cur.severity, config: cur.config, emailRecipients: cur.email_recipients }, after: { enabled: r.enabled, severity: r.severity, config: r.config, emailRecipients: r.email_recipients } },
       });
       return r;
     });
-    return { code: updated.code, name: updated.name, enabled: updated.enabled, severity: updated.severity, config: updated.config, updatedAt: updated.updated_at };
+    return { code: updated.code, name: updated.name, enabled: updated.enabled, severity: updated.severity, config: updated.config, emailRecipients: updated.email_recipients, updatedAt: updated.updated_at };
   });
 
   app.get('/alerts/:id', {
@@ -186,8 +190,8 @@ export default async function alerts(fastify: FastifyInstance) {
   }, async (req) => {
     const p = req.requirePrincipal();
     const r = await loadAlert(p, req.params.id);
-    const deliveries = await db.selectFrom('alert_deliveries').select(['channel', 'status', 'recipients', 'detail', 'created_at']).where('alert_id', '=', r.id).orderBy('id').execute();
-    return { ...dto(r, p), deliveries: deliveries.map((d) => ({ channel: d.channel, status: d.status, recipients: d.recipients, detail: d.detail, at: d.created_at })) };
+    const deliveries = await db.selectFrom('alert_deliveries').select(['channel', 'status', 'attempt', 'next_attempt_at', 'recipients', 'detail', 'created_at']).where('alert_id', '=', r.id).orderBy('id').execute();
+    return { ...dto(r, p), deliveries: deliveries.map((d) => ({ channel: d.channel, status: d.status, attempt: d.attempt, nextAttemptAt: d.next_attempt_at, recipients: d.recipients, detail: d.detail, at: d.created_at })) };
   });
 
   const transition = (to: 'ACKNOWLEDGED' | 'RESOLVED') => async (p: Principal, id: string, note: string | undefined, actor: AuditActor) => {

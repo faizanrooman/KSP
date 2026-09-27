@@ -112,7 +112,12 @@ export function AlertDetailPage() {
       <Card title="Notification deliveries">
         {a.deliveries?.length ? (
           <ul className="space-y-1 text-sm">
-            {a.deliveries.map((d, i) => <li key={i}><span className="font-mono text-xs">{d.channel}</span> · <StatusBadge status={d.status} /> {d.recipients !== null && `· ${d.recipients} recipient(s)`} {d.detail && <span className="text-ink-600">· {d.detail}</span>} · {formatDateTime(d.at)}</li>)}
+            {a.deliveries.map((d, i) => (
+              <li key={i}>
+                <span className="font-mono text-xs">{d.channel}</span> · <StatusBadge status={d.status} />{d.attempt > 1 && ` · attempt ${d.attempt}`} {d.recipients !== null && `· ${d.recipients} recipient(s)`} {d.detail && <span className="text-ink-600">· {d.detail}</span>} · {formatDateTime(d.at)}
+                {d.status === 'RETRYING' && d.nextAttemptAt && <span className="text-ink-600"> · next attempt {formatDateTime(d.nextAttemptAt)}</span>}
+              </li>
+            ))}
           </ul>
         ) : <p className="text-sm text-ink-600">{a.severity === 'INFO' ? 'INFO alerts are not fanned out.' : 'Not yet dispatched (the alert evaluator runs every minute).'}</p>}
       </Card>
@@ -144,9 +149,11 @@ function RuleCard({ rule, canEdit }: { rule: AlertRule; canEdit: boolean }) {
   const [severity, setSeverity] = useState(rule.severity);
   const fields = RULE_FIELDS[rule.code] ?? [];
   const [cfg, setCfg] = useState<Record<string, string>>(Object.fromEntries(fields.map((f) => [f.key, rule.config[f.key] !== undefined ? String(rule.config[f.key]) : ''])));
+  const [emails, setEmails] = useState((rule.emailRecipients ?? []).join(', '));
   const save = useMutation({
     mutationFn: () => api.put<AlertRule>(`/alerts/rules/${rule.code}`, {
       enabled, severity, config: Object.fromEntries(Object.entries(cfg).filter(([, v]) => v.trim() !== '').map(([k, v]) => [k, Number(v)])),
+      emailRecipients: emails.split(/[\s,;]+/).filter(Boolean),
     }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['alert-rules'] }),
   });
@@ -162,6 +169,9 @@ function RuleCard({ rule, canEdit }: { rule: AlertRule; canEdit: boolean }) {
             <Input id={`${rule.code}-${f.key}`} type="number" min={0} value={cfg[f.key] ?? ''} disabled={!canEdit} onChange={(e) => setCfg({ ...cfg, [f.key]: e.target.value })} />
           </Field>
         ))}
+        <Field label="Extra e-mail recipients" hint="Comma-separated. In addition to alert managers in scope and the Alert delivery settings." htmlFor={`${rule.code}-emails`}>
+          <Input id={`${rule.code}-emails`} value={emails} disabled={!canEdit} onChange={(e) => setEmails(e.target.value)} />
+        </Field>
         <p className="text-xs text-ink-600">Last evaluated: {rule.lastEvaluatedAt ? formatDateTime(rule.lastEvaluatedAt) : 'never'} · updated {formatDateTime(rule.updatedAt)}{rule.updatedBy ? ` by ${rule.updatedBy}` : ''}</p>
         {save.error && <Alert tone="red">{errorMessage(save.error)}</Alert>}
         {save.isSuccess && <Alert tone="green">Saved.</Alert>}

@@ -115,6 +115,28 @@ describe('alert rules', () => {
     expect(audit.details).toMatchObject({ before: { severity: 'CRITICAL' }, after: { severity: 'WARNING', config: { failuresPer15Min: 50 } } });
     await admin.put('/api/v1/alerts/rules/AUTH_BRUTE_FORCE', { severity: 'CRITICAL', config: { failuresPer15Min: 20 } });
   });
+
+  it('per-rule e-mail recipients are validated, normalised and audited; delivery log shows attempts', async () => {
+    expect((await admin.put('/api/v1/alerts/rules/INTEGRITY_FAILURE', { emailRecipients: ['not-an-address'] })).status).toBe(400);
+    const ok = await admin.put('/api/v1/alerts/rules/INTEGRITY_FAILURE', { emailRecipients: ['SOC@ksp.example', 'soc@ksp.example', 'ops@ksp.example'] });
+    expect(ok.status).toBe(200);
+    expect(ok.body.emailRecipients).toEqual(['soc@ksp.example', 'ops@ksp.example']);
+    const list = await admin.get('/api/v1/alerts/rules');
+    expect(list.body.items.find((r: { code: string }) => r.code === 'INTEGRITY_FAILURE').emailRecipients).toEqual(['soc@ksp.example', 'ops@ksp.example']);
+    const audit = await app.db.selectFrom('audit_events').select('details').where('action', '=', 'ALERT_RULE_UPDATED').where('resource_id', '=', 'INTEGRITY_FAILURE').orderBy('seq', 'desc').executeTakeFirstOrThrow();
+    expect(audit.details).toMatchObject({ before: { emailRecipients: [] }, after: { emailRecipients: ['soc@ksp.example', 'ops@ksp.example'] } });
+    await admin.put('/api/v1/alerts/rules/INTEGRITY_FAILURE', { emailRecipients: [] });
+    const next = new Date(Date.now() + 60_000);
+    await app.db.insertInto('alert_deliveries').values([
+      { alert_id: ids.system!, channel: 'EMAIL', status: 'RETRYING', attempt: 1, detail: 'connect ECONNREFUSED', next_attempt_at: next },
+      { alert_id: ids.system!, channel: 'EMAIL', status: 'SENT', attempt: 2, recipients: 3 },
+    ]).execute();
+    const d = await admin.get(`/api/v1/alerts/${ids.system}`);
+    expect(d.body.deliveries).toEqual(expect.arrayContaining([
+      expect.objectContaining({ channel: 'EMAIL', status: 'RETRYING', attempt: 1, nextAttemptAt: next.toISOString(), detail: 'connect ECONNREFUSED' }),
+      expect.objectContaining({ channel: 'EMAIL', status: 'SENT', attempt: 2, recipients: 3 }),
+    ]));
+  });
 });
 
 describe('notifications (own only)', () => {

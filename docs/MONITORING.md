@@ -20,7 +20,7 @@ Aggregates, with `status ok | degraded | down` and human-readable `reasons[]`:
 * `auditLedger` — head seq/time, last signed checkpoint, events since, last incremental/full chain
   verification from the alert evaluator (`firstBadSeq` → degraded);
 * `storage` — latest snapshot per bucket, by tier, % of declared capacity, 30-day trend, growth/day;
-* `openAlerts` by severity; `alertChannels` (in-app / webhook configured? / e-mail NOT_IMPLEMENTED).
+* `openAlerts` by severity; `alertChannels` (in-app / webhook configured? / e-mail configured?).
 
 `/health/live` and `/health/ready` (public, unchanged) remain the load-balancer probes.
 

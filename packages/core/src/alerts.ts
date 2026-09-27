@@ -16,7 +16,10 @@
  */
 import { createHmac } from 'node:crypto';
 import { sql } from 'kysely';
+import { DEFAULT_SETTINGS, QUEUES, type AlertDeliverPayload, type AlertDeliveryPolicy } from '@ksp/shared';
 import type { Database, Tx } from './db/index.js';
+import { cleanRecipients, createMailer, type MailMessage, type Mailer } from './mailer.js';
+import { enqueue } from './queue.js';
 
 export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
 const RANK: Record<AlertSeverity, number> = { INFO: 0, WARNING: 1, CRITICAL: 2 };
@@ -118,8 +121,12 @@ export async function alertRecipients(db: Database | Tx, orgUnitId: string | nul
 export interface AlertChannel {
   readonly name: 'WEBHOOK' | 'EMAIL';
   readonly configured: boolean;
-  send(alert: AlertPayload): Promise<void>;
+  /** Deliver one alert; resolves to the number of recipients reached. Throw `DeliverySkipped` for "nothing to do". */
+  send(alert: AlertPayload, db: Database): Promise<number>;
 }
+
+/** Thrown by a channel when the delivery is intentionally not made (e.g. no recipients) — recorded SKIPPED, never retried. */
+export class DeliverySkipped extends Error {}
 
 export interface AlertPayload {
   id: string;
@@ -153,31 +160,134 @@ export function webhookChannel(env: NodeJS.ProcessEnv = process.env): AlertChann
       if (secret) headers['x-ksp-signature'] = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
       const res = await fetch(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(timeoutMs), redirect: 'error' });
       if (!res.ok) throw new Error(`webhook responded HTTP ${res.status}`);
+      return 1;
     },
   };
 }
 
+export async function loadAlertDeliveryPolicy(db: Database | Tx): Promise<AlertDeliveryPolicy> {
+  const r = await db.selectFrom('system_settings').select('value').where('key', '=', 'alertDeliveryPolicy').executeTakeFirst();
+  return { ...DEFAULT_SETTINGS.alertDeliveryPolicy, ...((r?.value as Partial<AlertDeliveryPolicy> | undefined) ?? {}) };
+}
+
 /**
- * E-mail channel placeholder. SMTP delivery is NOT implemented (no SMTP relay/library is configured in this
- * deployment); when ALERT_SMTP_URL is set the delivery is recorded as FAILED with an explicit reason rather
- * than pretending to send. See docs/DASHBOARDS-REPORTS-ALERTS.md.
+ * E-mail recipients of an alert: e-mail addresses of the in-scope alerts:manage holders (users.email, when
+ * alertDeliveryPolicy.emailAlertManagers), the rule's own `email_recipients`, and the per-severity lists
+ * (warningRecipients for WARNING+CRITICAL, criticalRecipients for CRITICAL).
  */
-export function emailChannel(env: NodeJS.ProcessEnv = process.env): AlertChannel {
-  const configured = !!env.ALERT_SMTP_URL?.trim();
+export async function alertEmailRecipients(db: Database | Tx, a: Pick<AlertPayload, 'ruleCode' | 'severity' | 'orgUnitId'>, policy?: AlertDeliveryPolicy): Promise<string[]> {
+  const pol = policy ?? (await loadAlertDeliveryPolicy(db));
+  const out: Array<string | null> = [];
+  if (pol.emailAlertManagers) {
+    const ids = await alertRecipients(db, a.orgUnitId);
+    if (ids.length) out.push(...(await db.selectFrom('users').select('email').where('id', 'in', ids).where('email', 'is not', null).execute()).map((u) => u.email));
+  }
+  const rule = await db.selectFrom('alert_rules').select('email_recipients').where('code', '=', a.ruleCode).executeTakeFirst();
+  out.push(...(rule?.email_recipients ?? []));
+  if (a.severity === 'WARNING' || a.severity === 'CRITICAL') out.push(...pol.warningRecipients);
+  if (a.severity === 'CRITICAL') out.push(...pol.criticalRecipients);
+  return cleanRecipients(out);
+}
+
+/** Plain-text alert e-mail (metadata + sign-in link only; never evidence content or credentials). */
+export function alertEmail(alert: AlertPayload, baseUrl: string): Omit<MailMessage, 'to'> {
+  const link = `${baseUrl.replace(/\/+$/, '')}/alerts/${alert.id}`;
+  const lines = [
+    `${alert.severity} alert: ${alert.title}`,
+    '',
+    alert.message,
+    '',
+    `Rule:        ${alert.ruleCode}`,
+    `Severity:    ${alert.severity}`,
+    `Occurrences: ${alert.occurrences}`,
+    `First seen:  ${alert.firstSeenAt}`,
+    `Last seen:   ${alert.lastSeenAt}`,
+    ...(alert.resourceType ? [`Resource:    ${alert.resourceType} ${alert.resourceId ?? ''}`.trimEnd()] : []),
+    '',
+    `Open in KSP VMS (sign-in required): ${link}`,
+    '',
+    'This is an automated message from the KSP Video Evidence Management System. Do not reply.',
+  ];
+  return { subject: `[KSP VMS] ${alert.severity}: ${alert.title}`, text: lines.join('\n'), headers: { 'X-KSP-Alert-Id': alert.id, 'X-KSP-Alert-Rule': alert.ruleCode } };
+}
+
+/** SMTP e-mail channel (ALERT_SMTP_URL / ALERT_EMAIL_FROM, see mailer.ts). */
+export function emailChannel(env: NodeJS.ProcessEnv = process.env, mailer: Mailer = createMailer(env)): AlertChannel {
+  const baseUrl = env.APP_BASE_URL ?? 'http://localhost:5173';
   return {
     name: 'EMAIL',
-    configured,
-    async send() {
-      throw new Error('SMTP delivery not implemented (UNVERIFIED channel)');
+    configured: mailer.configured,
+    async send(alert, db) {
+      const to = await alertEmailRecipients(db, alert);
+      if (!to.length) throw new DeliverySkipped('no e-mail recipients');
+      const r = await mailer.send({ ...alertEmail(alert, baseUrl), to });
+      return r.accepted.length || to.length;
     },
   };
+}
+
+export function toAlertPayload(a: { id: string; rule_code: string; severity: string; title: string; message: string; resource_type: string | null; resource_id: string | null; org_unit_id: string | null; occurrences: number; first_seen_at: Date | string; last_seen_at: Date | string }): AlertPayload {
+  return {
+    id: a.id, ruleCode: a.rule_code, severity: a.severity, title: a.title, message: a.message, resourceType: a.resource_type,
+    resourceId: a.resource_id, orgUnitId: a.org_unit_id, occurrences: a.occurrences,
+    firstSeenAt: new Date(a.first_seen_at).toISOString(), lastSeenAt: new Date(a.last_seen_at).toISOString(),
+  };
+}
+
+export type ScheduleRetry = (payload: AlertDeliverPayload, delaySeconds: number) => Promise<unknown>;
+const defaultScheduleRetry: ScheduleRetry = (payload, delaySeconds) =>
+  enqueue(QUEUES.ALERT_DELIVER, payload, { startAfter: delaySeconds, singletonKey: `${payload.alertId}:${payload.channel}:${payload.attempt}` });
+
+export interface DeliverResult { status: 'SENT' | 'FAILED' | 'SKIPPED' | 'RETRYING'; attempt: number; nextAttemptAt?: Date; detail?: string }
+
+/**
+ * One delivery attempt of an alert on an external channel. Every attempt is an alert_deliveries row.
+ * A failure schedules the next attempt (alerts.deliver queue) after baseDelaySeconds·2^(attempt-1) until
+ * alertDeliveryPolicy.maxAttempts is reached; the last failure is recorded FAILED. A retry for an alert that
+ * has meanwhile been resolved is recorded SKIPPED.
+ */
+export async function deliverAlert(db: Database, alertId: string, channel: AlertChannel, attempt = 1, opts: { scheduleRetry?: ScheduleRetry; policy?: AlertDeliveryPolicy } = {}): Promise<DeliverResult | null> {
+  const a = await db.selectFrom('alerts').selectAll().where('id', '=', alertId).executeTakeFirst();
+  if (!a) return null;
+  const record = (status: DeliverResult['status'], extra: { recipients?: number | null; detail?: string | null; next_attempt_at?: Date | null } = {}) =>
+    db.insertInto('alert_deliveries').values({ alert_id: alertId, channel: channel.name, status, attempt, recipients: extra.recipients ?? null, detail: extra.detail?.slice(0, 500) ?? null, next_attempt_at: extra.next_attempt_at ?? null }).execute();
+  if (!channel.configured) {
+    await record('SKIPPED', { detail: 'channel not configured' });
+    return { status: 'SKIPPED', attempt, detail: 'channel not configured' };
+  }
+  if (attempt > 1 && a.status === 'RESOLVED') {
+    await record('SKIPPED', { detail: 'alert resolved before retry' });
+    return { status: 'SKIPPED', attempt, detail: 'alert resolved before retry' };
+  }
+  try {
+    const n = await channel.send(toAlertPayload(a), db);
+    await record('SENT', { recipients: n });
+    return { status: 'SENT', attempt };
+  } catch (e) {
+    const detail = (e as Error).message || String(e);
+    if (e instanceof DeliverySkipped) {
+      await record('SKIPPED', { detail });
+      return { status: 'SKIPPED', attempt, detail };
+    }
+    const policy = opts.policy ?? (await loadAlertDeliveryPolicy(db));
+    if (attempt < policy.maxAttempts) {
+      const delay = Math.min(policy.baseDelaySeconds * 2 ** (attempt - 1), 24 * 3600);
+      const next = new Date(Date.now() + delay * 1000);
+      await record('RETRYING', { detail, next_attempt_at: next });
+      await (opts.scheduleRetry ?? defaultScheduleRetry)({ alertId, channel: channel.name, attempt: attempt + 1 }, delay);
+      return { status: 'RETRYING', attempt, nextAttemptAt: next, detail };
+    }
+    await record('FAILED', { detail: attempt > 1 ? `${detail} (after ${attempt} attempts)` : detail });
+    return { status: 'FAILED', attempt, detail };
+  }
 }
 
 /**
  * Fan out OPEN alerts not yet notified: WARNING/CRITICAL → in-app notifications for alerts:manage holders in
- * scope, plus outbound channels. INFO alerts are marked notified without fan-out. Returns alerts processed.
+ * scope, plus the first attempt on every outbound channel (failures are retried via alerts.deliver).
+ * INFO alerts are marked notified without fan-out. Returns alerts processed.
  */
-export async function dispatchPendingAlerts(db: Database, channels: AlertChannel[] = [], limit = 200): Promise<number> {
+export async function dispatchPendingAlerts(db: Database, channels: AlertChannel[] = [], limit = 200, opts: { scheduleRetry?: ScheduleRetry } = {}): Promise<number> {
   const pending = await db
     .selectFrom('alerts')
     .selectAll()
@@ -186,12 +296,15 @@ export async function dispatchPendingAlerts(db: Database, channels: AlertChannel
     .orderBy('first_seen_at')
     .limit(limit)
     .execute();
+  const policy = channels.length ? await loadAlertDeliveryPolicy(db) : undefined;
   for (const a of pending) {
     const notify = a.severity === 'WARNING' || a.severity === 'CRITICAL';
+    let claimedIt = false;
     await db.transaction().execute(async (tx) => {
       // Claim the alert (another dispatcher may race); skip if already claimed.
       const claimed = await tx.updateTable('alerts').set({ notified_at: new Date() }).where('id', '=', a.id).where('notified_at', 'is', null).executeTakeFirst();
-      if (!Number(claimed.numUpdatedRows ?? 0) || !notify) return;
+      claimedIt = Number(claimed.numUpdatedRows ?? 0) > 0;
+      if (!claimedIt || !notify) return;
       const users = await alertRecipients(tx, a.org_unit_id);
       if (users.length) {
         await tx
@@ -201,24 +314,8 @@ export async function dispatchPendingAlerts(db: Database, channels: AlertChannel
       }
       await tx.insertInto('alert_deliveries').values({ alert_id: a.id, channel: 'IN_APP', status: 'SENT', recipients: users.length }).execute();
     });
-    if (!notify) continue;
-    const payload: AlertPayload = {
-      id: a.id, ruleCode: a.rule_code, severity: a.severity, title: a.title, message: a.message, resourceType: a.resource_type,
-      resourceId: a.resource_id, orgUnitId: a.org_unit_id, occurrences: a.occurrences,
-      firstSeenAt: new Date(a.first_seen_at).toISOString(), lastSeenAt: new Date(a.last_seen_at).toISOString(),
-    };
-    for (const ch of channels) {
-      if (!ch.configured) {
-        await db.insertInto('alert_deliveries').values({ alert_id: a.id, channel: ch.name, status: 'SKIPPED', detail: 'channel not configured' }).execute();
-        continue;
-      }
-      try {
-        await ch.send(payload);
-        await db.insertInto('alert_deliveries').values({ alert_id: a.id, channel: ch.name, status: 'SENT', recipients: 1 }).execute();
-      } catch (e) {
-        await db.insertInto('alert_deliveries').values({ alert_id: a.id, channel: ch.name, status: 'FAILED', detail: (e as Error).message.slice(0, 500) }).execute();
-      }
-    }
+    if (!notify || !claimedIt) continue;
+    for (const ch of channels) await deliverAlert(db, a.id, ch, 1, { policy, scheduleRetry: opts.scheduleRetry });
   }
   return pending.length;
 }

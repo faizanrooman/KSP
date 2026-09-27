@@ -60,7 +60,7 @@ Owner is a role, not a person.
 
 | ID | Area | Issue | Sev | Status |
 |---|---|---|---|---|
-| FN-1 | Alerts | E-mail channel not implemented (deliveries recorded FAILED "not implemented"); webhook tested only against a local server; failed external deliveries are not retried | MEDIUM | open |
+| FN-1 | Alerts | **Fixed**: SMTP e-mail channel (nodemailer; manager/rule/severity recipients) and retried external deliveries (`alerts.deliver`, exponential backoff, every attempt in `alert_deliveries`), tested against a local SMTP sink and HTTP server. Delivery through a real SMTP relay / real webhook receiver remains UNVERIFIED | LOW | fixed / UNVERIFIED |
 | FN-2 | Reports | Scheduled (recurring) reports not implemented | LOW | open |
 | FN-3 | Monitoring | AI worker has no service metrics/heartbeat (only per-job heartbeat); availability SLO probe and Prometheus alert rules authored, not deployed | MEDIUM | open / UNVERIFIED |
 | FN-4 | Ingestion | Quarantine release re-hashes the object inside the HTTP request (slow for multi-GB files) | LOW | open |
