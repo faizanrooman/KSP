@@ -8,6 +8,14 @@ import { HeadBucketCommand } from '@aws-sdk/client-s3';
  * logged; details are available to `system:monitor` holders at GET /api/v1/system/health.
  */
 export default async function health(app: FastifyInstance) {
+  // The API has no UI: someone opening the API origin in a browser is sent to the web app (it serves the SPA and
+  // proxies /api). Non-production also mentions the OpenAPI docs.
+  app.get('/', { config: { public: true }, schema: { hide: true } }, async (_req, reply) => {
+    if (app.cfg.NODE_ENV === 'production') return reply.redirect(app.cfg.APP_BASE_URL, 302);
+    return reply.type('text/html; charset=utf-8').send(
+      `<!doctype html><title>KSP VMS API</title><p>This is the KSP VMS <strong>API</strong> server. Open the web application at <a href="${app.cfg.APP_BASE_URL}">${app.cfg.APP_BASE_URL}</a>.</p><p>API documentation: <a href="/api/docs">/api/docs</a></p>`,
+    );
+  });
   app.get('/health/live', { config: { public: true }, schema: { hide: true } }, async () => ({ status: 'ok' }));
   app.get('/health/ready', { config: { public: true }, schema: { hide: true } }, async (req, reply) => {
     const checks: Record<string, 'ok' | 'fail'> = {};
