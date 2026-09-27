@@ -20,7 +20,7 @@ Owner is a role, not a person.
 | EXT-7 | Production S3 IAM separation (AI worker → derived bucket only; app/backup/replicate identities) cannot be shown on versitygw (single account); policies in `deploy/s3/policies/` | HIGH | UNVERIFIED | Infra: apply on the production store, run negative tests |
 | EXT-8 | Object Lock runs in GOVERNANCE mode in dev (bypassable by privileged credentials); production should use COMPLIANCE | MEDIUM | decision | Custodian + infra: choose mode/retention per bucket |
 | EXT-9 | CPU transcoding of the full HLS ladder at state-wide volume (~40 000 footage-hours/day) needs ~1 100 4-vCPU workers — GPU / proxy-only default / on-demand HLS decision | HIGH | decision | Infra / product: capacity decision (INFRASTRUCTURE.md) |
-| EXT-10 | Should EVIDENCE_CUSTODIAN hold `export:approve`? Default matrix gives it only to SUPERVISOR | MEDIUM | decision | Product owner |
+| EXT-10 | Should EVIDENCE_CUSTODIAN hold `export:approve`? Default matrix gives it only to SUPERVISOR (unchanged) | MEDIUM | decision | Product owner. Mechanism ready: grant `export:approve` to EVIDENCE_CUSTODIAN in Roles admin (no separate setting — ADMIN-GUIDE.md § Export approval policy); tested incl. SoD (`exports.test.ts`) |
 | EXT-11 | react-router 6.30.x advisories (`npm audit --omit=dev`: 2 moderate — GHSA-wrjc-x8rr-h8h6 open redirect via backslash in `<Link>`/`useNavigate`, GHSA-337j-9hxr-rhxg SSR hydration, SSR not used) fixed only in 7.18 (major upgrade); 0 high/critical | MEDIUM | open | Web: plan react-router 7 upgrade |
 
 ## Deployment, DR & operations
