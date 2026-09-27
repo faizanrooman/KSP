@@ -16,7 +16,12 @@ API_PORT="$(port API_PORT)"; WEB_URL="$(port APP_BASE_URL)"
 web_start() {
   if [ "$MODE" = "--dev-web" ]; then "$ROOT/scripts/dev/run.sh" start web; return; fi
   if [ -f "$RUN/web-preview.pid" ] && kill -0 "$(cat "$RUN/web-preview.pid")" 2>/dev/null; then echo "web-preview: running"; return; fi
-  if ! (cd "$ROOT/apps/web" && npx vite build --logLevel warn >"$LOGS/web-build.log" 2>&1); then
+  # Up to 3 attempts: the shared dev host crashes build processes intermittently (KNOWN-ISSUES ENV-1).
+  local built=false
+  for _ in 1 2 3; do
+    if (cd "$ROOT/apps/web" && npx vite build --logLevel warn >"$LOGS/web-build.log" 2>&1); then built=true; break; fi
+  done
+  if [ "$built" != true ]; then
     echo "web build failed (see .local/logs/web-build.log) — falling back to the Vite dev server"; tail -3 "$LOGS/web-build.log"
     "$ROOT/scripts/dev/run.sh" start web; return
   fi
