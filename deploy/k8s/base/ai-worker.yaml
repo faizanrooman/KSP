@@ -73,7 +73,10 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: { drop: [ALL] }
-          # No HTTP surface by design: liveness = the process is running (it exits non-zero on fatal errors).
+          # Only HTTP surface: the internal Prometheus endpoint (METRICS_PORT + 2 = 9466), reachable from the
+          # monitoring namespace only (NetworkPolicy). Liveness = the process is running + heartbeat alert.
+          ports:
+            - { name: metrics, containerPort: 9466, protocol: TCP }
           volumeMounts:
             - { name: models, mountPath: /models, readOnly: true }
             - { name: work, mountPath: /work }

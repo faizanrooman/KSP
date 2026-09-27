@@ -30,6 +30,14 @@ re-enabled on existing buckets). If the primary site is lost, switch `S3_ENDPOIN
 Scale workers; check dead-letter queues (`<queue>.dead`) for poison jobs; look at worker logs for FFmpeg errors.
 Disk full in `/work` (transcode scratch) → see *Disk full*.
 
+## AI worker down / heartbeat stale {#ai-worker-down}
+`KspAiWorkerDown` (no scrapeable AI worker on :9466), `KspAiWorkerHeartbeatStale` (no `worker_heartbeats` write for
+> 2 min — process alive but PostgreSQL unreachable as `ksp_ai`?), `KspAiQueueWaitHigh` (p90 queue wait > 30 min).
+System health shows "AI workers" and the reason "no live AI worker heartbeat" while AI jobs are queued. Check the
+pod/container logs (`component: ai-worker`), model verification init container, `DATABASE_AI_URL` credentials and
+the derived-bucket identity. Queued jobs wait safely; RUNNING jobs of a dead worker are failed by the stale-job
+reaper (`WORKER_LOST`) and can be re-requested. Add capacity (`AI_WORKER_CONCURRENCY` / replicas) for queue wait.
+
 ## Integrity failure alert
 A fixity check found SHA-256 ≠ registered hash. **Do not modify or re-upload.** Record the evidence number,
 compare with the DR copy (`s3-replicate.ts --verify-only`), check `evidence_storage_copies` for another verified

@@ -232,10 +232,12 @@ services:
       SIGNING_CERTIFICATE: unused-by-ai-worker
       AI_MODELS_DIR: /models
       AI_WORKER_CONCURRENCY: ${AI_WORKER_CONCURRENCY:-1}
+      METRICS_HOST: 0.0.0.0
+      METRICS_PORT: "9464" # metrics on 9466 (METRICS_PORT + 2)
       WORK_DIR: /work
     volumes: ["aimodels:/models:ro"]
     tmpfs: ["/work:size=1g,uid=1000,gid=1000", "/tmp:size=64m"]
-    networks: [ai]
+    networks: [ai, monitoring] # monitoring: Prometheus scrape only (internal network)
     depends_on:
       migrate: { condition: service_completed_successfully }
     profiles: [ai]

@@ -14,7 +14,9 @@ Aggregates, with `status ok | degraded | down` and human-readable `reasons[]`:
 * `objectStorage` — HeadBucket on all seven buckets with latency;
 * `queues` — per pg-boss queue: waiting (created+retry), active, completed/failed 24 h, age of oldest due job;
   dead-letter depth (`*.dead`) is a degraded reason;
-* `workers` — `worker_heartbeats` rows (≤ 1 day), alive if seen within 90 s; no live worker → degraded;
+* `workers` — `worker_heartbeats` rows (≤ 1 day), alive if seen within 90 s; no live (pg-boss) worker →
+  degraded; `workers.aiWorker` = AI worker alive/stale count, queued AI jobs and oldest queued age — no live AI
+  worker while one was seen in the last day or AI jobs wait > 5 min → degraded ("no live AI worker heartbeat");
 * `backups` — `backup_runs` (populated by the backup/DR tooling): last successful run and age; no run
   recorded or none successful within 26 h → degraded;
 * `auditLedger` — head seq/time, last signed checkpoint, events since, last incremental/full chain
@@ -33,9 +35,10 @@ Web: `/system/health` (Administration → System health) renders all of the abov
 ## Heartbeats
 `worker_heartbeats (id = <service>:<host>:<pid>, service, hostname, pid, version, started_at, last_seen_at,
 info)`. The worker (`apps/worker/src/lib/monitoring.ts`, started from `main.ts`) upserts every 30 s.
-**AI worker hook** (not wired by this workstream — `apps/ai-worker` is owned elsewhere): `ksp_ai` has
-`SELECT, INSERT, UPDATE` on the table; call `writeHeartbeat(db, {id, service: 'ksp-ai-worker', …})` from
-`@ksp/core` on a 30 s interval.
+The **AI worker** (`apps/ai-worker/src/metrics.ts`, started by `startAiWorker`) upserts its row
+`ksp-ai-worker:<host>:<pid>` every 30 s as `ksp_ai` (grant: `SELECT, INSERT, UPDATE` on `worker_heartbeats` only —
+exercised by `apps/ai-worker/test/observability.test.ts`), `info` = concurrency, running, jobsProcessed, jobsFailed,
+lastJobAt, uptime.
 
 ## Prometheus metrics
 API — served on `127.0.0.1:METRICS_PORT` (not via the public ingress):
@@ -63,8 +66,25 @@ Worker — `127.0.0.1:METRICS_PORT+1`:
 | `ksp_fixity_checks_24h` | gauge | result (ok, failed) |
 | `ksp_worker_heartbeat_timestamp_seconds` | gauge | — |
 
-AI worker hooks (documented, not implemented here): `ksp_ai_jobs_processed_total{task,outcome}`,
-`ksp_ai_inference_duration_seconds{model}` on its own metrics port.
+AI worker — own registry on `METRICS_HOST:METRICS_PORT+2` (9466; path `/metrics`), tested by scraping during a
+real job:
+
+| Metric | Type | Labels |
+|---|---|---|
+| `ksp_ai_jobs_processed_total` | counter | outcome (COMPLETED, FAILED, CANCELLED) |
+| `ksp_ai_job_duration_seconds` | histogram | — |
+| `ksp_ai_frames_processed_total` | counter | — (`rate()` = frames/s) |
+| `ksp_ai_last_job_frames_per_second` | gauge | — |
+| `ksp_ai_inference_duration_seconds` | histogram | model, task (per frame) |
+| `ksp_ai_queue_claim_latency_seconds` | histogram | — (QUEUED → claimed) |
+| `ksp_ai_jobs_running` | gauge | — |
+| `ksp_ai_worker_heartbeat_timestamp_seconds` | gauge | — (set after a successful DB heartbeat) |
+| `ksp_ai_worker_*` | default process metrics | — |
+
+Prometheus: job `ksp-ai-worker` (compose `deploy/monitoring/prometheus/prometheus.yml`; k8s PodMonitor in
+`deploy/k8s/base/servicemonitor.yaml`, NetworkPolicy allows the monitoring namespace to 9466 only). Rules:
+`KspAiWorkerDown`, `KspAiWorkerHeartbeatStale` (> 120 s), `KspAiQueueWaitHigh` (p90 wait > 30 min) — authored,
+**not deployed (UNVERIFIED)**.
 
 ## SLO: 99.5 % monthly availability
 * **Measurement**: an external synthetic probe (Prometheus blackbox exporter or equivalent, outside the

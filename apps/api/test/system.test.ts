@@ -43,6 +43,14 @@ describe('GET /system/health', () => {
     const live = h.workers.items.find((w: { id: string }) => w.id === 'ksp-worker:test-host:1');
     expect(live).toMatchObject({ alive: true, service: 'ksp-worker', info: { concurrency: 2 } });
     expect(h.workers.items.find((w: { id: string }) => w.id === 'ksp-ai-worker:old:2')).toMatchObject({ alive: false });
+    // the AI worker is summarised separately (a stale AI worker degrades health; it never counts as a pg-boss worker)
+    expect(h.workers.aiWorker).toMatchObject({ alive: 0, stale: 1, queuedJobs: expect.any(Number) });
+    expect(h.reasons).toContain('no live AI worker heartbeat');
+    await writeHeartbeat(app.db, { id: 'ksp-ai-worker:test-host:3', service: 'ksp-ai-worker', hostname: 'test-host', pid: 3, startedAt: new Date() }, { concurrency: 1 });
+    const h2 = (await admin.get('/api/v1/system/health')).body;
+    expect(h2.workers.aiWorker).toMatchObject({ alive: 1, stale: 1 });
+    expect(h2.workers.alive).toBe(h.workers.alive);
+    expect(h2.reasons).not.toContain('no live AI worker heartbeat');
     expect(h.backups.lastSuccessful).toMatchObject({ kind: 'DB_BASE', status: 'SUCCEEDED', sizeBytes: 123456 });
     expect(h.auditLedger.headSeq).toBeGreaterThan(0);
     expect(h.storage).toHaveProperty('byTier');

@@ -106,7 +106,11 @@ metadata: { name: ai-worker }
 spec:
   podSelector: { matchLabels: { app.kubernetes.io/name: ksp-ai-worker } }
   policyTypes: [Ingress, Egress]
-  ingress: []
+  ingress:
+    # Prometheus scrape of the internal metrics port only (METRICS_PORT + 2).
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } }
+      ports: [{ protocol: TCP, port: 9466 }]
   egress: []
 ---
 apiVersion: networking.k8s.io/v1

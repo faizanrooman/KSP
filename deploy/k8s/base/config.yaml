@@ -58,6 +58,8 @@ data:
   OBJECT_LOCK_MODE: GOVERNANCE
   AI_MODELS_DIR: /models
   AI_WORKER_CONCURRENCY: "1"
+  METRICS_HOST: 0.0.0.0
+  METRICS_PORT: "9464"   # AI worker listens on METRICS_PORT + 2
   WORK_DIR: /work
   FFMPEG_PATH: /usr/local/bin/ffmpeg
   FFPROBE_PATH: /usr/local/bin/ffprobe

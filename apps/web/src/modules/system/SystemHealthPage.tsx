@@ -12,7 +12,7 @@ interface Health {
   database: { ok: boolean; ms: number; error?: string; version: string | null; sizeBytes: number | null; inRecovery: boolean | null; connections: { total: number; active: number; max: number } | null; pool: { total: number; idle: number; waiting: number }; replication: Array<{ client: string | null; state: string | null; lagSeconds: number | null }> | null };
   objectStorage: { ok: boolean; ms: number; buckets: Array<{ role: string; ok: boolean; ms: number; error?: string }> };
   queues: { summary: { totalQueued: number; totalActive: number; failed24h: number; deadLettered: number; oldestQueuedSeconds: number | null }; items: QueueStat[] };
-  workers: { staleAfterSeconds: number; alive: number; items: Array<{ id: string; service: string; hostname: string; pid: number; version: string | null; startedAt: string; lastSeenAt: string; ageSeconds: number; alive: boolean }> } | null;
+  workers: { staleAfterSeconds: number; alive: number; aiWorker?: { alive: number; stale: number; lastSeenAt: string | null; queuedJobs: number; oldestQueuedSeconds: number | null }; items: Array<{ id: string; service: string; hostname: string; pid: number; version: string | null; startedAt: string; lastSeenAt: string; ageSeconds: number; alive: boolean }> } | null;
   backups: { recorded: boolean; lastSuccessful: { kind: string; finishedAt: string; sizeBytes: number | null; sha256: string | null; location: string | null } | null; lastSuccessfulAgeHours: number | null; recent: Array<{ id: string; kind: string; status: string; startedAt: string; finishedAt: string | null; sizeBytes: number | null; error: string | null }> } | null;
   auditLedger: { headSeq: number; headAt: string | null; lastCheckpoint: { headSeq: number; createdAt: string; keyId: string } | null; eventsSinceCheckpoint: number; verification: { verifiedThroughSeq: number | null; lastRunAt: string; lastFullAt: string | null; lastMode: string | null; firstBadSeq: number | null } | null } | null;
   storage: StorageUtilisation | null;
@@ -69,6 +69,10 @@ export function SystemHealthPage() {
             <Stat label="Database" value={<Ok ok={h.database.ok} text={h.database.ok ? `${h.database.ms} ms` : 'Down'} />} sub={h.database.version ? `PostgreSQL ${h.database.version}` : h.database.error} />
             <Stat label="Object storage" value={<Ok ok={h.objectStorage.ok} text={h.objectStorage.ok ? `${h.objectStorage.ms} ms` : 'Failing'} />} sub={`${h.objectStorage.buckets.filter((b) => b.ok).length}/${h.objectStorage.buckets.length} buckets reachable`} />
             <Stat label="Workers alive" value={h.workers?.alive ?? 0} tone={h.workers && h.workers.alive === 0 ? 'red' : undefined} sub={`stale after ${h.workers?.staleAfterSeconds ?? 90}s`} />
+            {h.workers?.aiWorker && (
+              <Stat label="AI workers alive" value={h.workers.aiWorker.alive} tone={h.workers.aiWorker.alive === 0 && (h.workers.aiWorker.stale > 0 || h.workers.aiWorker.queuedJobs > 0) ? 'red' : undefined}
+                sub={`${h.workers.aiWorker.queuedJobs} AI job(s) queued${h.workers.aiWorker.oldestQueuedSeconds !== null ? `, oldest ${Math.round(h.workers.aiWorker.oldestQueuedSeconds / 60)} min` : ''}`} />
+            )}
             <Stat label="Open alerts" value={(h.openAlerts.CRITICAL ?? 0) + (h.openAlerts.WARNING ?? 0) + (h.openAlerts.INFO ?? 0)} sub={`${h.openAlerts.CRITICAL ?? 0} critical`} tone={h.openAlerts.CRITICAL ? 'red' : undefined} />
           </div>
 
