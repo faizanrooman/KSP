@@ -35,6 +35,7 @@ done
 # --- runtime-base + app stage: only package.json + dist of the packages in use, plus db/migrations
 for p in apps/web tools/station-client; do rm -rf "${OUT:?}/$p"; done
 for p in packages/shared packages/core "$DIR"; do cp -r "$ROOT/$p/dist" "$OUT/$p/dist"; done
+cp -r "$ROOT/packages/core/assets" "$OUT/packages/core/assets"   # PDF fonts
 mkdir -p "$OUT/db"; cp -r "$ROOT/db/migrations" "$OUT/db/migrations"
 mkdir -p "$OUT/scripts/ops"
 case "$APP" in

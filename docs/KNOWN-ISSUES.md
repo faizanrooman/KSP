@@ -68,7 +68,6 @@ Owner is a role, not a person.
 | FN-6 | Integrity | Nightly fixity sweep samples 100 items/night (≈36k/year) — too small for state-wide volume; secondary copies not fixity-checked | MEDIUM | open |
 | FN-7 | Video | Reprocess deletes old derivatives before new ones exist; reprocess enqueues even when already processing | LOW | open |
 | FN-8 | Video | Snapshot extraction runs in the API process (rate-limited, 90 s timeout) — move to queue at scale | LOW | open |
-| FN-9 | Export / custody | PDFs use standard fonts: Kannada / non-Latin text not rendered | MEDIUM | open |
 | FN-10 | Sharing | Locked external share cannot be unlocked or extended; no e-mail/SMS delivery of link/code; revoke does not delete per-share watermarked variants | LOW | open |
 | FN-11 | Sharing | `maxViews` counts portal opens and is not applied to internal-user shares | LOW | open |
 | FN-12 | Investigation | Manual timeline events are hard-deleted (audit row remains), unlike annotations | LOW | open |
@@ -111,3 +110,4 @@ Owner is a role, not a person.
 | **Final audit:** after a lockout expired, one wrong password re-locked the account (failure count never reset) | expired lock restarts the count (login + MFA) + test (`auth.test.ts`) |
 | **Final audit:** `restore.sh` interpolated DB role passwords into SQL text | `roles.sql` uses psql `:'var'` quoting; all callers pass raw values |
 | **Final audit:** `npm run db:migrate` / `db:codegen` failed on a fresh clone before `npm run build` | scripts run from source (`--conditions=ksp-src`) |
+| FN-9 PDFs used standard fonts (Kannada / non-Latin not rendered) | bundled Noto Sans + Noto Sans Kannada (OFL, SHA-256 pinned), HarfBuzz shaping, /ActualText; tests compare glyph runs with HarfBuzz, pdftotext round-trip and a 300 dpi raster (CHAIN-OF-CUSTODY.md). Other non-Latin scripts still print `?` |

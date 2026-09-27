@@ -1,27 +1,50 @@
 /**
- * Minimal PDF layout helpers over pdfkit (A4, standard Helvetica/Courier fonts — WinAnsi only; characters
- * outside it are transliterated). `compress: false` keeps content and attachments byte-searchable, which lets
- * the signed JSON payload attached to reports be extracted and verified with plain tools.
+ * Minimal PDF layout helpers over pdfkit (A4). Text is drawn with the bundled Unicode fonts (Noto Sans + Noto Sans
+ * Kannada, HarfBuzz-shaped — see pdf-text.ts); identifiers/hashes in `mono` use Courier. `compress: false` keeps
+ * content and attachments byte-searchable, which lets the signed JSON payload attached to reports be extracted and
+ * verified with plain tools.
  */
 import PDFDocument from 'pdfkit';
+import { cleanText, drawText, loadPdfFonts, measureText, type DrawOptions } from './pdf-text.js';
 
 export type Doc = InstanceType<typeof PDFDocument>;
 
-const REPLACE: Record<string, string> = { '–': '-', '—': '-', '‘': "'", '’': "'", '“': '"', '”': '"', '…': '...', '≠': '!=', '→': '->', '•': '*', ' ': ' ' };
+/** "Karnataka State Police" in Kannada (document headers). */
+export const KSP_KN = 'ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್';
+export { drawText, measureText, loadPdfFonts } from './pdf-text.js';
 
-/** Restrict to printable Latin-1 so the standard PDF fonts render every character. */
+/** Normalise a value for the PDF (NFC, no control characters). Characters no bundled font covers print as '?'. */
 export function pdfText(v: unknown): string {
-  const s = v === null || v === undefined ? '' : String(v);
-  return s.replace(/[^\x20-\x7e\xa0-\xff\n]/g, (c) => REPLACE[c] ?? '?');
+  return cleanText(v);
 }
 
-export function createDoc(info: { title: string; subject?: string; createdAt: Date }): Doc {
+export interface DocOptions {
+  title: string;
+  subject?: string;
+  author?: string;
+  createdAt?: Date;
+  layout?: 'portrait' | 'landscape';
+  margins?: { top: number; bottom: number; left: number; right: number };
+  /** Default false (content streams stay byte-searchable). */
+  compress?: boolean;
+}
+
+/** A4 pdfkit document with the bundled Unicode fonts loaded (draw text with drawText/para/keyValues/table). */
+export async function createDoc(info: DocOptions): Promise<Doc> {
+  await loadPdfFonts();
   return new PDFDocument({
     size: 'A4',
-    margins: { top: 50, bottom: 50, left: 45, right: 45 },
-    compress: false,
+    layout: info.layout ?? 'portrait',
+    margins: info.margins ?? { top: 50, bottom: 50, left: 45, right: 45 },
+    compress: info.compress ?? false,
     bufferPages: true,
-    info: { Title: info.title, Subject: info.subject ?? info.title, Author: 'KSP Video Evidence Management System', Creator: 'KSP VMS', CreationDate: info.createdAt, ModDate: info.createdAt },
+    info: {
+      Title: info.title,
+      Subject: info.subject ?? info.title,
+      Author: info.author ?? 'KSP Video Evidence Management System',
+      Creator: 'KSP VMS',
+      ...(info.createdAt ? { CreationDate: info.createdAt, ModDate: info.createdAt } : {}),
+    },
   });
 }
 
@@ -34,11 +57,7 @@ export function finish(doc: Doc, footer: string): Promise<Buffer> {
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
-      const bottom = doc.page.margins.bottom;
-      doc.page.margins.bottom = 0;
-      doc.font('Helvetica').fontSize(7).fillColor('#555555')
-        .text(pdfText(`${footer}  |  Page ${i + 1} of ${range.count}`), doc.page.margins.left, doc.page.height - 30, { width: doc.page.width - doc.page.margins.left - doc.page.margins.right, align: 'center', lineBreak: false });
-      doc.page.margins.bottom = bottom;
+      drawText(doc, `${footer}  |  Page ${i + 1} of ${range.count}`, doc.page.margins.left, doc.page.height - 32, { size: 7, color: '#555555', width: contentWidth(doc), align: 'center', maxHeight: 9 });
     }
     doc.end();
   });
@@ -52,15 +71,24 @@ export function ensureSpace(doc: Doc, h: number): void {
 
 export function heading(doc: Doc, text: string, size = 12): void {
   ensureSpace(doc, size * 3);
-  doc.moveDown(0.6).font('Helvetica-Bold').fontSize(size).fillColor('#0b2a4a').text(pdfText(text), doc.page.margins.left);
+  doc.y += size * 0.8;
+  drawText(doc, text, doc.page.margins.left, doc.y, { size, bold: true, color: '#0b2a4a', width: contentWidth(doc) });
   const y = doc.y + 2;
   doc.moveTo(doc.page.margins.left, y).lineTo(doc.page.width - doc.page.margins.right, y).lineWidth(0.5).strokeColor('#8899aa').stroke();
-  doc.moveDown(0.4).fillColor('#000000');
+  doc.y += size * 0.5;
+  doc.fillColor('#000000');
 }
 
-export function para(doc: Doc, text: string, opts: { size?: number; bold?: boolean; mono?: boolean; color?: string } = {}): void {
-  doc.font(opts.mono ? 'Courier' : opts.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(opts.size ?? 9).fillColor(opts.color ?? '#000000')
-    .text(pdfText(text), doc.page.margins.left, doc.y, { width: contentWidth(doc) });
+/** A flowing paragraph at the left margin (paginates). */
+export function para(doc: Doc, text: string, opts: { size?: number; bold?: boolean; mono?: boolean; color?: string; align?: DrawOptions['align'] } = {}): void {
+  const o: DrawOptions = { size: opts.size ?? 9, bold: opts.bold, mono: opts.mono, color: opts.color ?? '#000000', align: opts.align, width: contentWidth(doc), paginate: true };
+  ensureSpace(doc, o.size * 1.4);
+  drawText(doc, text, doc.page.margins.left, doc.y, o);
+}
+
+/** Vertical gap in multiples of a 9 pt line. */
+export function gap(doc: Doc, lines = 1): void {
+  doc.y += lines * 12;
 }
 
 /** Two-column label/value rows. Values in `mono` render in Courier (hashes, identifiers). */
@@ -69,12 +97,13 @@ export function keyValues(doc: Doc, rows: Array<[string, unknown, boolean?]>, la
   const w = contentWidth(doc) - labelWidth;
   for (const [label, value, mono] of rows) {
     const v = pdfText(value === null || value === undefined || value === '' ? '-' : value);
-    doc.font(mono ? 'Courier' : 'Helvetica').fontSize(mono ? 8 : 9);
-    const h = Math.max(doc.heightOfString(v, { width: w }), 11);
+    const vo: DrawOptions = { size: mono ? 8 : 9, mono, width: w };
+    const lo: DrawOptions = { size: 9, bold: true, color: '#333333', width: labelWidth - 6 };
+    const h = Math.max(measureText(doc, v, vo), measureText(doc, label, lo), 11);
     ensureSpace(doc, h + 2);
     const y = doc.y;
-    doc.font('Helvetica-Bold').fontSize(9).fillColor('#333333').text(pdfText(label), left, y, { width: labelWidth - 6 });
-    doc.font(mono ? 'Courier' : 'Helvetica').fontSize(mono ? 8 : 9).fillColor('#000000').text(v, left + labelWidth, y, { width: w });
+    drawText(doc, label, left, y, lo);
+    drawText(doc, v, left + labelWidth, y, vo);
     doc.y = y + h + 2;
   }
 }
@@ -92,21 +121,19 @@ export function table(doc: Doc, cols: TableCol[], rows: string[][], fontSize = 7
   const drawHeader = () => {
     ensureSpace(doc, 20);
     const y = doc.y;
-    doc.rect(left, y - 2, total, 13).fill('#e8edf3');
+    const h = Math.max(...cols.map((c, i) => measureText(doc, c.header, { size: fontSize, bold: true, width: widths[i]! - 4 })), 11) + 2;
+    doc.rect(left, y - 2, total, h).fill('#e8edf3');
     let x = left;
     cols.forEach((c, i) => {
-      doc.font('Helvetica-Bold').fontSize(fontSize).fillColor('#0b2a4a').text(pdfText(c.header), x + 2, y, { width: widths[i]! - 4, lineBreak: false });
+      drawText(doc, c.header, x + 2, y, { size: fontSize, bold: true, color: '#0b2a4a', width: widths[i]! - 4 });
       x += widths[i]!;
     });
-    doc.y = y + 13;
+    doc.y = y + h;
     doc.fillColor('#000000');
   };
   drawHeader();
   for (const r of rows) {
-    const heights = r.map((cell, i) => {
-      doc.font(cols[i]!.mono ? 'Courier' : 'Helvetica').fontSize(fontSize);
-      return doc.heightOfString(pdfText(cell), { width: widths[i]! - 4 });
-    });
+    const heights = r.map((cell, i) => measureText(doc, cell, { size: fontSize, mono: cols[i]!.mono, width: widths[i]! - 4 }));
     const h = Math.max(...heights, 9) + 3;
     if (doc.y + h > doc.page.height - doc.page.margins.bottom) {
       doc.addPage();
@@ -115,7 +142,7 @@ export function table(doc: Doc, cols: TableCol[], rows: string[][], fontSize = 7
     const y = doc.y;
     let x = left;
     r.forEach((cell, i) => {
-      doc.font(cols[i]!.mono ? 'Courier' : 'Helvetica').fontSize(fontSize).fillColor('#000000').text(pdfText(cell), x + 2, y + 1, { width: widths[i]! - 4 });
+      drawText(doc, cell, x + 2, y + 1, { size: fontSize, mono: cols[i]!.mono, width: widths[i]! - 4 });
       x += widths[i]!;
     });
     doc.moveTo(left, y + h).lineTo(left + total, y + h).lineWidth(0.3).strokeColor('#cccccc').stroke();

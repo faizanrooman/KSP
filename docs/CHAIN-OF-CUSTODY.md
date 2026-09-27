@@ -61,5 +61,15 @@ hash / previous hash / details, and **Signed report (PDF)**.
 * Viewing the custody timeline is not itself audited (it would append to the very chain being viewed on every
   refresh); generating the signed report is audited.
 * Timeline is capped at 20 000 events per item.
-* PDF fonts are the standard PDF fonts (Latin-1); non-Latin names are transliterated to `?`. UNVERIFIED for
-  Kannada text — embed a Unicode TTF if needed.
+* PDF text (custody report, export Fact Sheet, report PDFs) uses the bundled **Noto Sans** and **Noto Sans
+  Kannada** (SIL OFL 1.1; `packages/core/assets/fonts/`, licence files alongside, SHA-256 pinned in `fonts.json`
+  and checked every time the fonts are loaded; `node packages/core/scripts/fetch-fonts.mjs --check` re-verifies,
+  without `--check` it re-downloads from the pinned upstream commit). Kannada runs are shaped with **HarfBuzz**
+  (`harfbuzzjs`) because pdfkit's fontkit shaper picks one script per line and misses Indic ligatures (e.g. ಜ್ಞಾ);
+  each Kannada word carries `/ActualText`, so copy/paste and `pdftotext` return the original Unicode. Mixed
+  Latin/Kannada lines are laid out by `packages/core/src/custody/pdf-text.ts` (script runs, shared baseline,
+  word wrap). Hashes/identifiers stay in Courier. Characters of other scripts (Devanagari, CJK, …) print as `?`
+  — add the matching Noto face to extend coverage. Tests: `packages/core/test/pdf-kannada.test.ts` (glyph runs
+  identical to HarfBuzz for a conjunct corpus, pdftotext round-trip, embedded subset fonts, 300 dpi raster vs an
+  outline reference), plus Kannada assertions in `apps/api/test/custody.test.ts` and `apps/worker/test/reports.test.ts`.
+  Images ship the fonts (`deploy/docker/Dockerfile` copies `packages/core/assets`; override with `PDF_FONTS_DIR`).

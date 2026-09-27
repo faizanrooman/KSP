@@ -5,6 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createHash, createPublicKey, verify, X509Certificate } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { rm } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import { Agent, closeApp, login } from './helpers.js';
@@ -116,5 +117,16 @@ describe('signed custody report', () => {
     const after = await auditRows({ evidenceId: ev.id, action: 'CUSTODY_REPORT_GENERATED' });
     expect(after.length).toBe(before + 1);
     expect((after[after.length - 1]!.details as { payloadSha256: string }).payloadSha256).toBe(res.headers['x-payload-sha256']);
+  });
+
+  it('prints Kannada evidence metadata as real text (bundled Noto fonts, FN-9)', async () => {
+    const title = 'ಕಬ್ಬನ್ ಪಾರ್ಕ್ ಠಾಣೆ ಸಾಕ್ಷ್ಯ ಜ್ಞಾಪನ';
+    expect((await meera.patch(`/api/v1/evidence/${ev.id}`, { title })).status).toBe(200);
+    const res = await app.inject({ method: 'GET', url: `/api/v1/custody/evidence/${ev.id}/report.pdf`, headers: { cookie: [...meera.cookies].map(([k, v]) => `${k}=${v}`).join('; ') } });
+    expect(res.statusCode).toBe(200);
+    const text = execFileSync('pdftotext', ['-raw', '-', '-'], { input: res.rawPayload, encoding: 'utf8' }).normalize('NFC');
+    expect(text).toContain(title);
+    expect(text).toContain('ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್');
+    expect(execFileSync('pdffonts', ['-'], { input: res.rawPayload, encoding: 'utf8' })).toMatch(/NotoSansKannada/);
   });
 });

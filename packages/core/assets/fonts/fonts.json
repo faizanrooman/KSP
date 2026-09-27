@@ -1,0 +1,35 @@
+{
+  "licence": "OFL-1.1",
+  "baseUrl": "https://raw.githubusercontent.com/notofonts/notofonts.github.io",
+  "commit": "f145d86c53996717bc4c25d4602eb9294e43dccc",
+  "files": [
+    {
+      "file": "NotoSans-Regular.ttf",
+      "path": "fonts/NotoSans/unhinted/ttf/NotoSans-Regular.ttf",
+      "bytes": 431364,
+      "sha256": "f3961a9cde016d41a4879aecda1474d3a36d6bf54fa0e4643de029cc2248b0e8",
+      "gitBlobSha1": "cb427d582a6eec36a8fc64783f1ce6a022aa4f39"
+    },
+    {
+      "file": "NotoSans-Bold.ttf",
+      "path": "fonts/NotoSans/unhinted/ttf/NotoSans-Bold.ttf",
+      "bytes": 432376,
+      "sha256": "87cb2d84472a7d66da659ee47b6cdb9552326e8c128245231f191b6ac72529d9",
+      "gitBlobSha1": "b7f829099b38fc4004821559b1f5811ddbddada1"
+    },
+    {
+      "file": "NotoSansKannada-Regular.ttf",
+      "path": "fonts/NotoSansKannada/unhinted/ttf/NotoSansKannada-Regular.ttf",
+      "bytes": 135488,
+      "sha256": "2870274619c2a4abe5d6b11fcb7c4a372eba765b6b7881d459b0eb0a609a68eb",
+      "gitBlobSha1": "9e644e23d80f2a1b5ac84c4f5e86b752d7fcf647"
+    },
+    {
+      "file": "NotoSansKannada-Bold.ttf",
+      "path": "fonts/NotoSansKannada/unhinted/ttf/NotoSansKannada-Bold.ttf",
+      "bytes": 133868,
+      "sha256": "e989c72f6fec5a0b3366af5f90e3ce8b2b8a350fc5286c6374f0353937e513f5",
+      "gitBlobSha1": "1a4ffba8e91f2043a6db296a060ae307a05925cd"
+    }
+  ]
+}
