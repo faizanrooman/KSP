@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { appendAudit } from '@ksp/core';
 import { loadEvidenceFor } from '../../lib/access.js';
 import { conflict, forbidden, notFound } from '../../lib/errors.js';
-import type { Principal } from '../../lib/principal.js';
+import { hasPermission, type Principal } from '../../lib/principal.js';
 import { auditCriteria, criteriaObject, criteriaSchema, refineCriteria } from './criteria.js';
 import { runSearch, SEARCH_SORTS } from './service.js';
 import { relatedEvidence } from './related.js';
@@ -48,6 +48,11 @@ export default async function search(fastify: FastifyInstance) {
     async (req) => {
       const p = req.requirePrincipal();
       const { sort, page, pageSize, includeFacets, ...criteria } = req.body;
+      // SEC-R9: unreviewed AI output is only searchable for holders of an AI permission.
+      if (criteria.ai?.reviewStatus === 'ANY_NON_REJECTED' && !hasPermission(p, 'ai:review') && !hasPermission(p, 'ai:request')) {
+        await appendAudit(app.db, req.actor(), { action: 'ACCESS_DENIED', outcome: 'DENIED', resourceType: 'route', resourceId: 'POST /api/v1/search/evidence', details: { reason: 'ai.reviewStatus=ANY_NON_REJECTED', missingAnyOf: ['ai:review', 'ai:request'] } });
+        throw forbidden('Searching unreviewed AI results requires ai:review or ai:request');
+      }
       const result = await runSearch(app.db, p, criteria, { sort, page, pageSize, includeFacets });
       await appendAudit(app.db, req.actor(), {
         action: 'SEARCH_PERFORMED',

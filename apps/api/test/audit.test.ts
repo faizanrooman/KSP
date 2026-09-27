@@ -111,7 +111,7 @@ describe('audit export', () => {
     expect(createHash('sha256').update(dl.rawPayload).digest('hex')).toBe(r.body.sha256);
     expect(dl.headers['x-content-sha256']).toBe(r.body.sha256);
     const lines = dl.rawPayload.toString('utf8').trim().split('\n');
-    expect(lines[0]).toBe('seq,event_id,occurred_at,actor_type,actor_id,actor_name,actor_ip,action,category,outcome,resource_type,resource_id,evidence_id,case_id,org_unit_id,details,prev_hash,hash');
+    expect(lines[0]).toBe('seq,event_id,occurred_at,actor_type,actor_id,actor_name,actor_ip,action,category,outcome,resource_type,resource_id,evidence_id,case_id,org_unit_id,details,prev_hash,hash,hash_version');
     expect(lines.length).toBe(r.body.rowCount + 1);
     const audit = await app.db.selectFrom('audit_events').select(['details']).where('action', '=', 'AUDIT_EXPORTED').where('resource_id', '=', r.body.id).executeTakeFirstOrThrow();
     expect((audit.details as { sha256: string }).sha256).toBe(r.body.sha256);

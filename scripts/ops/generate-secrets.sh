@@ -66,6 +66,11 @@ if want signing_private_key; then
     -subj "/C=IN/ST=Karnataka/O=Karnataka State Police/OU=PLACEHOLDER NOT FOR COURT USE/CN=$CN"
   put signing_key_id "ksp-$ENV_NAME-signing-$(date -u +%Y%m%d)"
 fi
+if want backup_signing_key; then
+  # OPS-8: Ed25519 key signing backup manifests (private: backup job only; public: verify job + restore operator).
+  openssl genpkey -algorithm ed25519 -out "$OUT/backup_signing_key" 2>/dev/null
+  openssl pkey -in "$OUT/backup_signing_key" -pubout -out "$OUT/backup_signing_pubkey"
+fi
 if want backup_age_identity; then
   if [ -n "$AGE_KEYGEN" ]; then
     "$AGE_KEYGEN" -o "$OUT/backup_age_identity" 2>/dev/null
@@ -125,6 +130,7 @@ if [ "$FORMAT" = k8s ] || [ "$FORMAT" = all ]; then
     echo "  BACKUP_RECORD_URL: $(printf 'postgres://ksp_app:%s@ksp-db-rw:5432/ksp?sslmode=require' "$(v ksp_app_db_password)" | base64 -w0)"
     echo "  BACKUP_S3_ACCESS_KEY: $(b64 backup_s3_access_key)"; echo "  BACKUP_S3_SECRET_KEY: $(b64 backup_s3_secret_key)"
     [ -s "$OUT/backup_age_recipients" ] && echo "  backup_age_recipients: $(b64 backup_age_recipients)"
+    [ -s "$OUT/backup_signing_key" ] && echo "  backup_signing_key: $(b64 backup_signing_key)" && echo "  backup_signing_pubkey: $(b64 backup_signing_pubkey)"
   } > "$OUT/k8s-secrets.yaml"
 fi
 echo "secrets for '$ENV_NAME' in $OUT ($(find "$OUT" -maxdepth 1 -type f | wc -l) files)."

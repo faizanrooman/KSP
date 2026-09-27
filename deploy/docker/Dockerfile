@@ -63,11 +63,13 @@ RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev -w @ksp/shared -w @ks
 FROM prod-manifests AS prod-deps-ai
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev -w @ksp/shared -w @ksp/core -w @ksp/ai-worker
 
-# runtime-base: slim Node runtime, tini as PID 1, non-root uid 1000 (the image's `node` user), no secrets.
+# runtime-base: slim Node runtime, tini as PID 1, non-root uid/gid 10001 (`ksp`, > 10000 so it never collides with a
+# host/system account — OPS-9), no secrets.
 FROM ${NODE_IMAGE} AS runtime-base
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tini ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --gid 10001 ksp && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /work --shell /usr/sbin/nologin ksp
 ENV NODE_ENV=production \
     NODE_OPTIONS=--enable-source-maps \
     API_HOST=0.0.0.0 \
@@ -85,8 +87,8 @@ COPY --from=build --chown=root:root /src/packages/core/dist packages/core/dist
 # PDF fonts (Noto Sans + Noto Sans Kannada, OFL-1.1; SHA-256 pinned in fonts.json, checked at load)
 COPY --from=build --chown=root:root /src/packages/core/assets packages/core/assets
 # /work is the only writable path the apps need (mount an emptyDir/tmpfs there with a read-only root FS).
-RUN mkdir -p /work && chown 1000:1000 /work
-USER 1000:1000
+RUN mkdir -p /work && chown 10001:10001 /work
+USER 10001:10001
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -118,7 +120,7 @@ COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
 COPY --chown=root:root scripts/ops/check-ffmpeg.sh /usr/local/bin/ksp-check-ffmpeg
 # Fail the image build if this FFmpeg lacks libass / libx264 / the camera decoders the pipeline relies on.
 RUN /usr/local/bin/ksp-check-ffmpeg /usr/local/bin/ffmpeg
-USER 1000:1000
+USER 10001:10001
 # fontconfig writes its cache under XDG_CACHE_HOME; keep it on the writable tmpfs (read-only root FS).
 ENV XDG_CACHE_HOME=/tmp
 COPY --from=prod-deps-worker --chown=root:root /app/node_modules node_modules
@@ -180,18 +182,22 @@ COPY --chown=root:root scripts/package.json scripts/package.json
 COPY --chown=root:root scripts/backup scripts/backup
 COPY --chown=root:root scripts/ops scripts/ops
 ENV BACKUP_WORK_DIR=/work NODE_ENV=production
-RUN mkdir -p /work && chown 999:999 /work
-# uid 999 = the image's `postgres` user (non-root).
-USER 999:999
+RUN groupadd --gid 10002 kspbackup && useradd --uid 10002 --gid 10002 --no-create-home --home-dir /work --shell /usr/sbin/nologin kspbackup \
+ && mkdir -p /work && chown 10002:10002 /work
+# uid/gid 10002 = dedicated non-root backup user (> 10000, OPS-9).
+USER 10002:10002
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["scripts/backup/pg-backup.sh"]
 
 # ---------------------------------------------------------------------------------------------------------------
-# web: static SPA served by unprivileged nginx (uid 101, port 8080) with the same CSP as the API; /api proxied.
+# web: static SPA served by unprivileged nginx (uid/gid 10101, > 10000 — OPS-9; port 8080) with the same CSP as the API; /api proxied.
 FROM ${NGINX_IMAGE} AS web
 COPY --chown=root:root deploy/docker/nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --chown=root:root deploy/docker/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build --chown=root:root /src/apps/web/dist /usr/share/nginx/html
+USER root
+RUN chown -R 10101:10101 /var/cache/nginx /etc/nginx/conf.d
+USER 10101:10101
 ENV API_UPSTREAM_HOSTPORT=api:4000 NGINX_ENVSUBST_FILTER=API_UPSTREAM
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 CMD ["wget", "-qO-", "http://127.0.0.1:8080/healthz"]

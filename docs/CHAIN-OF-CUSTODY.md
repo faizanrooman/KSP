@@ -24,7 +24,7 @@ Response of the timeline:
 ```
 
 **Per-event verification** (`packages/core/src/custody/ledger.ts`) is done in SQL for every row:
-`hash = sha256(prev_hash || '|' || audit_canonical(row))` (content unchanged) and
+`hash = audit_row_hash(row)` — i.e. `sha256(prev_hash || '|' || canonical(row))` with the row's own `hash_version`: v1 `audit_canonical()` (rows written before migration 1000; does not cover `user_agent`) or v2 `audit_canonical_v2()` (every column incl. `user_agent`; all rows since migration 1000). `audit_verify()` also rejects a v1 row after a v2 row (no downgrade). (content unchanged) and
 `prev_hash = hash of ledger row seq-1` (linkage unchanged). `chainIntact` is true only if every row passes.
 Details are sanitised (keys that look like secrets are redacted) before display.
 
