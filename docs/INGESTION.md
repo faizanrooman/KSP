@@ -68,8 +68,12 @@ the destination key is content-addressed, the counter/registration update runs u
    **`UNSUPPORTED_CODEC`**; duration > 0 and a clean decode (`ffmpeg -v error -xerror`) of the first and
    last 5 s (whole stream when ≤ 10 s) → else **`CORRUPT`**. Extension and declared MIME are never trusted.
 3. Metadata (`EVIDENCE_METADATA_EXTRACTED`): `duration_ms, container_format, video_codec, audio_codec,
-   width, height, frame_rate (avg), bit_rate, mime_type` (from the container), `recorded_at` = declared,
-   else container `creation_time` (epoch defaults ignored), `recorded_end_at`, GPS from ISO-6709 tags
+   width, height, frame_rate (avg), bit_rate, mime_type` (from the container), `recorded_at` = container
+   `creation_time` (camera clock in the file; epoch defaults ignored), else the declared `recordedAt` (FN-5);
+   the declared value is kept in `declared_recorded_at`, `recorded_at_source` = CONTAINER_TAG | DECLARED, and
+   `recorded_at_discrepancy_seconds` = |declared − container|; > 300 s is flagged in the metadata audit event
+   (`recordedAtDiscrepancyFlag`) and as a "Time discrepancy" badge on the evidence overview (all immutable after
+   registration, DB trigger); `recorded_end_at`, GPS from ISO-6709 tags
    (`com.apple.quicktime.location.ISO6709`, `location`, `location-eng`, …) → `gps_source CONTAINER_TAG`,
    else declared → `DECLARED`, else station coordinates → `STATION`; `device_metadata` = make/model/
    serial/firmware/encoder/software tags; `probe` = full ffprobe JSON. Stored for quarantined items too.

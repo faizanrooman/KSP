@@ -247,13 +247,20 @@ export async function finalizeUpload(deps: IngestDeps, uploadSessionId: string):
   return registerEvidence(deps, ev.id, INGEST_ACTOR);
 }
 
+/** Declared vs container recording time: differences above this are flagged (FN-5). */
+export const RECORDED_AT_TOLERANCE_SECONDS = 300;
+
 async function storeMetadata(deps: IngestDeps, ev: NonNullable<Awaited<ReturnType<typeof loadEvidence>>>, meta: ExtractedMetadata | null, probeJson: unknown): Promise<void> {
   const session = ev.upload_session_id
     ? await deps.db.selectFrom('upload_sessions').select(['declared_metadata']).where('id', '=', ev.upload_session_id).executeTakeFirst()
     : undefined;
   const declared = (session?.declared_metadata ?? {}) as { recordedAt?: string; latitude?: number; longitude?: number };
-  const declaredRecorded = declared.recordedAt ? new Date(declared.recordedAt) : null;
-  const recordedAt = declaredRecorded && !Number.isNaN(declaredRecorded.getTime()) ? declaredRecorded : meta?.creationTime ?? null;
+  const parsedDeclared = declared.recordedAt ? new Date(declared.recordedAt) : null;
+  const declaredRecorded = parsedDeclared && !Number.isNaN(parsedDeclared.getTime()) ? parsedDeclared : null;
+  // FN-5: the container's creation_time (written by the camera) wins; the declared value is kept for comparison.
+  const recordedAt = meta?.creationTime ?? declaredRecorded ?? null;
+  const recordedAtSource = meta?.creationTime ? 'CONTAINER_TAG' : declaredRecorded ? 'DECLARED' : null;
+  const discrepancy = meta?.creationTime && declaredRecorded ? Math.round(Math.abs(meta.creationTime.getTime() - declaredRecorded.getTime()) / 1000) : null;
   let gps: { lat: number | null; lon: number | null; source: string | null } = { lat: null, lon: null, source: null };
   if (meta?.gps) gps = { lat: meta.gps.lat, lon: meta.gps.lon, source: 'CONTAINER_TAG' };
   else if (typeof declared.latitude === 'number' && typeof declared.longitude === 'number') gps = { lat: declared.latitude, lon: declared.longitude, source: 'DECLARED' };
@@ -271,6 +278,9 @@ async function storeMetadata(deps: IngestDeps, ev: NonNullable<Awaited<ReturnTyp
     mime_type: meta?.mimeType ?? ev.mime_type,
     recorded_at: recordedAt,
     recorded_end_at: recordedAt && meta?.durationMs ? new Date(recordedAt.getTime() + meta.durationMs) : null,
+    declared_recorded_at: declaredRecorded,
+    recorded_at_source: recordedAtSource,
+    recorded_at_discrepancy_seconds: discrepancy,
     gps_latitude: gps.lat,
     gps_longitude: gps.lon,
     gps_source: gps.source,
@@ -293,7 +303,11 @@ async function storeMetadata(deps: IngestDeps, ev: NonNullable<Awaited<ReturnTyp
         height: values.height,
         frameRate: values.frame_rate,
         recordedAt: recordedAt?.toISOString() ?? null,
-        recordedAtSource: declaredRecorded ? 'DECLARED' : meta?.creationTime ? 'CONTAINER_TAG' : null,
+        recordedAtSource,
+        declaredRecordedAt: declaredRecorded?.toISOString() ?? null,
+        containerCreationTime: meta?.creationTime?.toISOString() ?? null,
+        recordedAtDiscrepancySeconds: discrepancy,
+        recordedAtDiscrepancyFlag: discrepancy !== null && discrepancy > RECORDED_AT_TOLERANCE_SECONDS,
         gpsSource: gps.source,
         deviceTags: Object.keys(meta?.deviceMetadata ?? {}),
       },

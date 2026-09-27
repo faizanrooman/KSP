@@ -421,6 +421,7 @@ export interface Evidence {
   category: string | null;
   container_format: string | null;
   created_at: Generated<Timestamp>;
+  declared_recorded_at: Timestamp | null;
   description: string | null;
   device_id: string | null;
   device_metadata: Generated<Json>;
@@ -451,6 +452,8 @@ export interface Evidence {
   original_filename: string;
   probe: Json | null;
   recorded_at: Timestamp | null;
+  recorded_at_discrepancy_seconds: number | null;
+  recorded_at_source: string | null;
   recorded_end_at: Timestamp | null;
   registered_at: Timestamp | null;
   retain_until: Timestamp | null;

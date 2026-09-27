@@ -193,7 +193,8 @@ describe('finalize pipeline', () => {
     const { init, complete } = await uploadAll(op, validPath, {
       orgUnitId: cubbon,
       batchId: batch.body.id,
-      metadata: { title: 'MG Road patrol', category: 'PATROL', officerBadge: 'KSP-FO-1001', notes: 'handed over by PC Ravi' },
+      // Declared time 90 min off the camera clock in the file (FN-5: container wins, discrepancy flagged).
+      metadata: { title: 'MG Road patrol', category: 'PATROL', officerBadge: 'KSP-FO-1001', notes: 'handed over by PC Ravi', recordedAt: '2026-09-01T11:30:00Z' },
     }, { order: 'shuffle' });
     expect(init.body.totalChunks).toBeGreaterThan(3);
     expect(complete.status).toBe(200);
@@ -231,6 +232,15 @@ describe('finalize pipeline', () => {
     expect(Number(ev.bit_rate)).toBeGreaterThan(0);
     expect(ev.recorded_at!.toISOString()).toBe('2026-09-01T10:00:00.000Z');
     expect(ev.recorded_end_at!.getTime()).toBe(ev.recorded_at!.getTime() + Number(ev.duration_ms));
+    expect(ev.recorded_at_source).toBe('CONTAINER_TAG');
+    expect(ev.declared_recorded_at!.toISOString()).toBe('2026-09-01T11:30:00.000Z');
+    expect(ev.recorded_at_discrepancy_seconds).toBe(5400);
+    const meta = await app.db.selectFrom('audit_events').select('details').where('evidence_id', '=', validEvidenceId).where('action', '=', 'EVIDENCE_METADATA_EXTRACTED').executeTakeFirstOrThrow();
+    expect(meta.details).toMatchObject({ recordedAtSource: 'CONTAINER_TAG', declaredRecordedAt: '2026-09-01T11:30:00.000Z', recordedAtDiscrepancySeconds: 5400, recordedAtDiscrepancyFlag: true });
+    // immutable after registration
+    await expect(app.db.updateTable('evidence').set({ declared_recorded_at: null }).where('id', '=', validEvidenceId).execute()).rejects.toThrow(/immutable/);
+    const detail = await op.get(`/api/v1/evidence/${validEvidenceId}`);
+    expect(detail.body).toMatchObject({ recordedAtSource: 'CONTAINER_TAG', recordedAtDiscrepancySeconds: 5400, recordedAtFlagged: true, declaredRecordedAt: '2026-09-01T11:30:00.000Z' });
     expect(ev.gps_latitude).toBeCloseTo(12.9716, 4);
     expect(ev.gps_longitude).toBeCloseTo(77.5946, 4);
     expect(ev.gps_source).toBe('CONTAINER_TAG');
