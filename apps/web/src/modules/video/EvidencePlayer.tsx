@@ -598,6 +598,9 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
                 </select>
               </>
             )}
+            {!info.hlsUrl && info.hlsStatus === 'PREPARING' && (
+              <span className="text-xs text-ink-300" role="status" data-testid="hls-preparing" title="The adaptive (multi-quality) stream is being prepared; the standard-quality proxy plays meanwhile.">Preparing adaptive stream…</span>
+            )}
             {canSnapshot && (
               <button type="button" className={btn} onClick={takeSnapshot} disabled={snapshot.isPending} aria-label="Take snapshot of current frame" title="Snapshot (S)">
                 {snapshot.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}

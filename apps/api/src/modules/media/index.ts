@@ -18,8 +18,8 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { appendAudit, enqueue } from '@ksp/core';
-import { QUEUES, type MediaProcessPayload, type SnapshotExtractPayload } from '@ksp/shared';
+import { appendAudit, enqueue, loadConfig } from '@ksp/core';
+import { QUEUES, type MediaHlsPayload, type MediaProcessPayload, type SnapshotExtractPayload } from '@ksp/shared';
 import { loadEvidenceFor } from '../../lib/access.js';
 import { recordInternalShareOpen } from '../../lib/share-views.js';
 import { AppError, conflict, forbidden, notFound, unprocessable } from '../../lib/errors.js';
@@ -109,8 +109,33 @@ export default async function media(fastify: FastifyInstance) {
         await appendAudit(app.db, req.actor(), { action: 'EVIDENCE_PLAYED', resourceType: 'evidence', resourceId: ev.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { via: 'playback', throttleMinutes: PLAY_AUDIT_WINDOW_MINUTES } });
       }
     }
+    // Adaptive stream state (EXT-9 MEDIA_PROFILE). on-demand-hls: the first playback of a READY item queues the ladder;
+    // the proxy MP4 plays immediately (HTTP Range) and the next playback after completion gets HLS.
+    const profile = loadConfig().MEDIA_PROFILE;
+    let hlsStatus: 'READY' | 'PREPARING' | 'FAILED' | 'NOT_BUILT' = hls ? 'READY' : 'NOT_BUILT';
+    if (ready && !hls && profile === 'on-demand-hls') {
+      const hj = await app.db.selectFrom('processing_jobs').select(['status', 'updated_at']).where('evidence_id', '=', ev.id).where('kind', '=', 'MEDIA_HLS')
+        .orderBy('created_at', 'desc').limit(1).executeTakeFirst();
+      const recentFailure = hj?.status === 'FAILED' && Date.now() - new Date(hj.updated_at).getTime() < 3600_000;
+      // A request in the last 2 h that has not produced a job row yet is still queued (pg-boss singletonKey does not
+      // dedupe on the standard queue policy, so the request audit is the de-duplication record).
+      const pending = !hj || hj.status === 'COMPLETED' ? await app.db.selectFrom('audit_events').select('seq').where('evidence_id', '=', ev.id).where('action', '=', 'MEDIA_STREAM_REQUESTED')
+        .where('occurred_at', '>', sql<Date>`now() - interval '2 hours'`).limit(1).executeTakeFirst() : undefined;
+      if (hj && ['QUEUED', 'RUNNING'].includes(hj.status)) hlsStatus = 'PREPARING';
+      else if (recentFailure) hlsStatus = 'FAILED'; // retried by a later playback after an hour
+      else if (pending && !hj) hlsStatus = 'PREPARING';
+      else {
+        const queued = await enqueue<MediaHlsPayload>(QUEUES.MEDIA_HLS, { evidenceId: ev.id }, { singletonKey: `hls:${ev.id}` });
+        if (queued) {
+          await appendAudit(app.db, req.actor(), { action: 'MEDIA_STREAM_REQUESTED', resourceType: 'evidence', resourceId: ev.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { profile, queueJobId: queued } });
+        }
+        hlsStatus = 'PREPARING';
+      }
+    }
     const progress = row.media_status === 'READY' ? 1 : job && job.status === 'RUNNING' ? job.progress : 0;
     return {
+      mediaProfile: profile,
+      hlsStatus,
       evidenceId: ev.id,
       mediaStatus: row.media_status,
       mediaError: row.media_status === 'READY' ? null : row.media_error,
