@@ -23,12 +23,12 @@ import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PassThrough, Transform, type Readable } from 'node:stream';
 import yazl from 'yazl';
-import { appendAudit, evidenceSigner, hashStream, systemActor, type AppConfig, type Database, type Signer, type Storage, type Tx } from '@ksp/core';
+import { appendAudit, evidenceSigner, hashStream, NON_EVIDENTIARY_STAMP, systemActor, type AppConfig, type Database, type Signer, type Storage, type Tx } from '@ksp/core';
 import {
   buildCustodyReport, burnWatermark, ledgerHead, loadEvidenceRecord, loadPerson, manifestBytes, MANIFEST_TYPE, raiseAlert, renderFactSheet, sha256sums, verifyInstructions,
   type EvidenceRecord, type ExportManifest, type FactSheetData, type ManifestFile, type ManifestFileRole,
 } from '@ksp/core/custody';
-import { DEFAULT_SETTINGS, type ExportBuildPayload } from '@ksp/shared';
+import { DEFAULT_SETTINGS, EXPORT_TEMPLATE_PENDING_STAMP, type ExportBuildPayload, type ExportLegalApproval } from '@ksp/shared';
 
 export const EXPORT_ACTOR = systemActor('export-worker');
 
@@ -63,6 +63,11 @@ interface Entry extends ManifestFile {
 
 export function safePart(v: string): string {
   return v.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 150) || 'item';
+}
+
+async function exportLegalApproval(db: Database): Promise<ExportLegalApproval> {
+  const r = await db.selectFrom('system_settings').select('value').where('key', '=', 'exportLegalApproval').executeTakeFirst();
+  return { ...DEFAULT_SETTINGS.exportLegalApproval, ...((r?.value as object | undefined) ?? {}) };
 }
 
 async function exportRetentionDays(db: Database): Promise<number> {
@@ -206,6 +211,9 @@ export async function runExportBuild(deps: ExportDeps, payload: ExportBuildPaylo
     }
 
     const head = await ledgerHead(db);
+    const legal = await exportLegalApproval(db);
+    // EXT-3 / EXT-6: a test signing key and an unapproved template are stamped on the Fact Sheet and VERIFY.txt.
+    const stamps = [...(signer.nonEvidentiary ? [NON_EVIDENTIARY_STAMP] : []), ...(legal.approval ? [] : [EXPORT_TEMPLATE_PENDING_STAMP])];
     if (includeFactSheet) {
       let caseInfo: FactSheetData['caseInfo'] = null;
       if (ex.case_id) {
@@ -224,11 +232,12 @@ export async function runExportBuild(deps: ExportDeps, payload: ExportBuildPaylo
         requestedAt: ex.created_at.toISOString(), approvedAt: ex.approved_at?.toISOString() ?? null, requestedBy, approvedBy, approvalNote: ex.decision_note, orgUnit: org, caseInfo,
         items: items.map((it) => ({ record: records.get(it.evidence_id)!, verifiedSha256: verified.get(it.evidence_id)!.sha256, verifiedSha512: verified.get(it.evidence_id)!.sha512, verifiedAt: verified.get(it.evidence_id)!.at.toISOString(), files: itemFiles.get(it.evidence_id)! })),
         generatedAt: generatedAt.toISOString(), ledgerHead: head, signing, includesWatermarked: includeWatermarked,
+        stamps: stamps, legalApproval: legal.approval ? { approvedBy: legal.approval.approvedBy, reference: legal.approval.reference, date: legal.approval.date } : null,
       });
       add('FACT_SHEET.pdf', 'fact_sheet', pdf);
     }
     add('signing-cert.pem', 'certificate', Buffer.from(probe.certificatePem, 'utf8'));
-    add('VERIFY.txt', 'instructions', Buffer.from(verifyInstructions({ exportNumber: ex.export_number, algorithm: signing.algorithm, keyId: signing.keyId, fingerprint: signing.certificateFingerprint256 }), 'utf8'));
+    add('VERIFY.txt', 'instructions', Buffer.from(verifyInstructions({ exportNumber: ex.export_number, algorithm: signing.algorithm, keyId: signing.keyId, fingerprint: signing.certificateFingerprint256, stamps }), 'utf8'));
     add('SHA256SUMS', 'checksums', Buffer.from(sha256sums(entries), 'utf8'));
 
     let caseNumber: string | null = null;

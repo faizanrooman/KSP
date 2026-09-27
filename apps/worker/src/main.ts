@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { createServer } from 'node:http';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import client from 'prom-client';
-import { createDb, getQueue, loadConfig, logger, stopQueue, storage } from '@ksp/core';
+import { createDb, enforcePreflight, getQueue, loadConfig, logger, stopQueue, storage } from '@ksp/core';
 import type { JobModule, WorkerContext } from './lib/context.js';
 import { heartbeatIdentity, instrumentBoss, observeFfmpeg, registerDbGauges, startHeartbeat } from './lib/monitoring.js';
 
@@ -37,6 +37,18 @@ export async function startWorker(only?: string[]): Promise<WorkerContext> {
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
   const cfg = loadConfig();
+  {
+    // Production: refuse to start with development/demo settings (docs/GO-LIVE-CHECKLIST.md). No-op in development/test.
+    const { db } = createDb(cfg.DATABASE_URL, 2);
+    try {
+      await enforcePreflight({ cfg, service: 'worker', db, log: logger() });
+    } catch (err) {
+      console.error((err as Error).message);
+      process.exit(78);
+    } finally {
+      await db.destroy().catch(() => undefined);
+    }
+  }
   const ctx = await startWorker();
   client.collectDefaultMetrics({ prefix: 'ksp_worker_' });
   registerDbGauges(ctx.db);

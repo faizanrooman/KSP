@@ -210,6 +210,19 @@ export const AUDIT_ACTIONS = {
   KEY_ROTATED: { category: 'SECURITY', custody: false },
   /** A user replaced an already-enabled MFA enrolment after re-authenticating (SEC-R6). */
   MFA_REENROLL_STARTED: { category: 'AUTH', custody: false },
+  // Production hardening
+  /** A legal approval (AI legal gate / export template) was recorded or changed in system settings. */
+  LEGAL_APPROVAL_RECORDED: { category: 'ADMIN', custody: false },
+  /** A previously recorded legal approval was withdrawn. */
+  LEGAL_APPROVAL_REVOKED: { category: 'ADMIN', custody: false },
+  /** An AI analysis request (or worker job) was refused because the task is disabled / lacks legal approval. */
+  AI_TASK_REFUSED: { category: 'AI', custody: false },
+  /** The on-demand HLS ladder of an evidence item was requested by playback (MEDIA_PROFILE=on-demand-hls). */
+  MEDIA_STREAM_REQUESTED: { category: 'MEDIA', custody: true },
+  /** ops:purge-demo-data removed development/UAT fixtures from a non-production database. */
+  DEMO_DATA_PURGED: { category: 'SYSTEM', custody: false },
+  /** ops:bootstrap-org imported org units / users from CSV. */
+  ORG_BOOTSTRAP_IMPORTED: { category: 'ADMIN', custody: false },
 } as const satisfies Record<string, { category: AuditCategory; custody: boolean }>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

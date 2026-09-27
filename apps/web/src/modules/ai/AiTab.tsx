@@ -49,7 +49,9 @@ function RequestForm({ evidence }: { evidence: EvidenceDetail }) {
   if (tasks.isLoading) return <Spinner label="Loading AI tasks…" />;
   if (tasks.error) return <ErrorState error={tasks.error} onRetry={() => void tasks.refetch()} />;
   const available = tasks.data!.items.filter((t) => t.available);
-  const unavailable = tasks.data!.items.filter((t) => !t.available);
+  // Tasks refused by the deployment / legal gates are hidden from the picker and explained (EXT-4 / EXT-5).
+  const gated = tasks.data!.items.filter((t) => t.allowed === false);
+  const unavailable = tasks.data!.items.filter((t) => !t.available && t.allowed !== false);
   const fpsNum = Number(fps);
   const fpsErr = !(fpsNum >= AI_SAMPLE_FPS.min && fpsNum <= AI_SAMPLE_FPS.max) ? `Between ${AI_SAMPLE_FPS.min} and ${AI_SAMPLE_FPS.max}` : null;
   const thrErr = Object.entries(thresholds).find(([, v]) => v !== '' && v !== undefined && !(Number(v) >= 0.05 && Number(v) <= 0.99));
@@ -66,8 +68,15 @@ function RequestForm({ evidence }: { evidence: EvidenceDetail }) {
   return (
     <Card title={<span className="inline-flex items-center gap-2"><Bot className="h-4 w-4" aria-hidden /> Request analysis</span>}>
       {!mediaReady && <Alert tone="blue">Analysis becomes available once media processing has produced the proxy (status: {evidence.mediaStatus}).</Alert>}
+      {gated.length > 0 && (
+        <Alert tone="amber" title="Some analyses are disabled on this deployment">
+          <ul className="list-disc pl-5" data-testid="ai-gated-tasks">
+            {gated.map((t) => <li key={t.task}>{t.gate.explanation ?? `${t.label} is disabled.`}</li>)}
+          </ul>
+        </Alert>
+      )}
       {available.length === 0 ? (
-        <EmptyState title="No AI models are active" description="An administrator must register and activate models before analysis can run." />
+        <EmptyState title={gated.length ? 'No AI analysis is available' : 'No AI models are active'}description="An administrator must register and activate models before analysis can run." />
       ) : (
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submit(); }}>
           <fieldset>

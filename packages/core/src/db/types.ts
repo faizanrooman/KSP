@@ -73,6 +73,10 @@ export interface AiJobs {
   tasks: string[];
 }
 
+export interface AiLegalApprovals {
+  value: Json | null;
+}
+
 export interface AiModels {
   activated_at: Timestamp | null;
   artifact_sha256: string | null;
@@ -1076,6 +1080,7 @@ export interface Workspaces {
 export interface DB {
   ai_detections: AiDetections;
   ai_jobs: AiJobs;
+  ai_legal_approvals: AiLegalApprovals;
   ai_models: AiModels;
   ai_review_events: AiReviewEvents;
   ai_training_exports: AiTrainingExports;

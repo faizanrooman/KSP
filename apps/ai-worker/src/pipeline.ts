@@ -9,7 +9,7 @@ import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pipeline as streamPipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
-import { appendAudit, sql, systemActor, type AuditActor } from '@ksp/core';
+import { aiTaskGates, appendAudit, sql, systemActor, type AuditActor } from '@ksp/core';
 import { normalizePlate, type AiJobInput, type AiJobParams, type AiJobStats, type AiTask } from '@ksp/shared';
 import type { AiContext } from './context.js';
 import { analysisSize, sampleFrames, videoInfo } from './frames.js';
@@ -60,6 +60,14 @@ export async function claimJob(ctx: AiContext): Promise<ClaimedJob | null> {
   });
 }
 
+/** Legal approvals via the read-only view ai_legal_approvals (migration 1150; ksp_ai cannot read system_settings). */
+export async function assertTasksPermitted(ctx: AiContext, tasks: readonly AiTask[]): Promise<void> {
+  const { rows } = await sql<{ value: unknown }>`SELECT value FROM ai_legal_approvals`.execute(ctx.db);
+  const gates = aiTaskGates(ctx.cfg, (rows[0]?.value ?? null) as never);
+  const refused = tasks.filter((t) => !gates[t].allowed);
+  if (refused.length) throw new JobError('TASK_NOT_PERMITTED', refused.map((t) => `${t} (${gates[t].reason})`).join(', ') + ' not permitted on this deployment');
+}
+
 interface Pending {
   id: string;
   task: AiTask;
@@ -94,6 +102,8 @@ export async function runJob(ctx: AiContext, job: ClaimedJob, opts: { signal?: A
   opts.signal?.addEventListener('abort', () => abort.abort(), { once: true });
   const stats: AiJobStats & Record<string, unknown> = { framesProcessed: 0, detections: {}, rawDetections: 0, worker: ctx.workerName };
   try {
+    // ---- deployment / legal gates (the API refuses first; this stops jobs inserted any other way) ------------
+    await assertTasksPermitted(ctx, job.tasks);
     // ---- models ---------------------------------------------------------------------------------------------
     const models = (await ctx.db.selectFrom('ai_models').selectAll().where('id', 'in', job.model_ids.length ? job.model_ids : ['00000000-0000-0000-0000-000000000000']).execute()) as unknown as ModelRow[];
     const byTask = new Map<AiTask, ModelRow>();

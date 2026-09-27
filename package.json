@@ -15,6 +15,7 @@
     "db:migrate": "npm run -w @ksp/core migrate",
     "db:seed": "npm run -w @ksp/core seed",
     "db:codegen": "npm run -w @ksp/core codegen",
+    "preflight": "npm run -w @ksp/core preflight --",
     "dev:api": "npm run -w @ksp/api dev",
     "dev:worker": "npm run -w @ksp/worker dev",
     "dev:ai": "npm run -w @ksp/ai-worker dev",

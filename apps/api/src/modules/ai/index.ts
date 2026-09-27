@@ -15,7 +15,8 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { appendAudit } from '@ksp/core';
+import { aiTaskGates, appendAudit, loadConfig } from '@ksp/core';
+import { getSettings } from '../../lib/settings.js';
 import { AI_SAMPLE_FPS, AI_TASK_INFO, AI_TASKS, REVIEW_STATUSES, type AiJobInput, type AiJobParams, type AiTask, type AiTaskDto } from '@ksp/shared';
 import { AppError, conflict, notFound, unprocessable } from '../../lib/errors.js';
 import { authenticateMediaToken } from '../media/tokens.js';
@@ -53,6 +54,11 @@ const DEPENDENCIES: Record<AiTask, AiTask[][]> = {
   CLASSIFICATION: [['OBJECT_DETECTION'], ['PERSON_DETECTION']],
 };
 
+/** Deployment (AI_TASKS_ENABLED) + legal (settings.aiLegalApprovals) gates for every task. */
+export async function currentAiGates(db: FastifyInstance['db']) {
+  return aiTaskGates(loadConfig(), (await getSettings(db)).aiLegalApprovals);
+}
+
 async function activeModels(db: FastifyInstance['db']) {
   return db.selectFrom('ai_models').selectAll().where('status', '=', 'ACTIVE').orderBy('activated_at', 'desc').execute();
 }
@@ -69,10 +75,12 @@ export default async function ai(fastify: FastifyInstance) {
     schema: { tags: ['ai'], summary: 'AI tasks and their ACTIVE models' },
   }, async () => {
     const models = await activeModels(app.db);
+    const gates = await currentAiGates(app.db);
     const has = (t: AiTask) => models.some((m) => m.task === t);
     const items: AiTaskDto[] = AI_TASKS.map((t) => ({
       task: t, label: AI_TASK_INFO[t].label, description: AI_TASK_INFO[t].description,
-      available: has(t) && (DEPENDENCIES[t].length === 0 || DEPENDENCIES[t].some((alt) => alt.every(has))),
+      available: gates[t].allowed && has(t) && (DEPENDENCIES[t].length === 0 || DEPENDENCIES[t].some((alt) => alt.every(has))),
+      allowed: gates[t].allowed, gate: gates[t],
       models: models.filter((m) => m.task === t).map((m) => ({ id: m.id, code: m.code, name: m.name, version: m.version, defaultThreshold: Number(m.default_threshold), labels: m.labels, licence: ((m.config as { licence?: string }).licence) ?? null })),
     }));
     return { items };
@@ -85,6 +93,18 @@ export default async function ai(fastify: FastifyInstance) {
     const p = req.requirePrincipal();
     const ev = await loadEvidenceForAi(app.db, req, req.params.id, 'ai:request');
     const body = req.body;
+    // Legal / deployment gates first: a refused task never reaches the queue (the worker re-checks).
+    const gates = await currentAiGates(app.db);
+    const refused = body.tasks.filter((t) => !gates[t].allowed);
+    if (refused.length) {
+      await appendAudit(app.db, req.actor(), {
+        action: 'AI_TASK_REFUSED', outcome: 'FAILURE', resourceType: 'evidence', resourceId: ev.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id,
+        details: { tasks: refused, reasons: Object.fromEntries(refused.map((t) => [t, gates[t].reason])) },
+      });
+      throw new AppError(422, 'AI_TASK_DISABLED', `Not permitted on this deployment: ${refused.map((t) => AI_TASK_INFO[t].label).join(', ')}`, {
+        tasks: refused.map((t) => ({ task: t, reason: gates[t].reason, explanation: gates[t].explanation })),
+      });
+    }
     const e = await app.db.selectFrom('evidence').select(['status', 'media_status', 'duration_ms', 'frame_rate', 'width', 'height', 'org_path']).where('id', '=', ev.id).executeTakeFirstOrThrow();
     if (!['REGISTERED', 'DISPOSAL_PENDING'].includes(e.status)) throw conflict(`Evidence in status ${e.status} cannot be analysed`);
     if (e.media_status !== 'READY') throw new AppError(409, 'MEDIA_NOT_READY', 'Media processing has not produced a playable proxy yet');

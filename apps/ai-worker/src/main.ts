@@ -5,7 +5,7 @@
 import { hostname } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
-import { createDb, loadConfig, logger, sql, Storage } from '@ksp/core';
+import { createDb, enforcePreflight, loadConfig, logger, sql, Storage } from '@ksp/core';
 import { AI_JOBS_CHANNEL } from '@ksp/shared';
 import type { AiContext } from './context.js';
 import { claimJob, runJob } from './pipeline.js';
@@ -105,6 +105,19 @@ export async function startAiWorker(opts: StartAiWorkerOptions = {}): Promise<((
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
+  // Production: refuse to start with development/demo settings (docs/GO-LIVE-CHECKLIST.md). No-op in development/test.
+  const cfg = loadConfig();
+  if (cfg.DATABASE_AI_URL) {
+    const { db } = createDb(cfg.DATABASE_AI_URL, 2);
+    try {
+      await enforcePreflight({ cfg, service: 'ai-worker', db, log: logger() });
+    } catch (err) {
+      console.error((err as Error).message);
+      process.exit(78);
+    } finally {
+      await db.destroy().catch(() => undefined);
+    }
+  }
   const stop = await startAiWorker();
   const shutdown = async () => {
     await stop();

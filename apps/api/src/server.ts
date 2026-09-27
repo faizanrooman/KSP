@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { loadConfig, logger, stopQueue } from '@ksp/core';
+import { enforcePreflight, loadConfig, logger, stopQueue } from '@ksp/core';
 import { buildApp } from './app.js';
 import { registry } from './plugins/metrics.js';
 
@@ -7,6 +7,14 @@ process.env.KSP_SERVICE ??= 'ksp-api';
 const cfg = loadConfig();
 const log = logger();
 const app = await buildApp();
+// Production: refuse to start with development/demo settings (docs/GO-LIVE-CHECKLIST.md). No-op in development/test.
+try {
+  await enforcePreflight({ cfg, service: 'api', db: app.db, log });
+} catch (err) {
+  console.error((err as Error).message);
+  await app.close().catch(() => undefined);
+  process.exit(78); // EX_CONFIG
+}
 await app.storage.ensureBuckets();
 await app.listen({ port: cfg.API_PORT, host: cfg.API_HOST });
 

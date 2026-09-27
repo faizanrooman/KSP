@@ -18,3 +18,5 @@ export * from './shares.js';
 export * from './dr.js';
 export * from './integrity.js';
 export * from './monitoring.js';
+export * from './ai-gates.js';
+export * from './preflight.js';

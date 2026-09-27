@@ -10,8 +10,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { DEFAULT_SETTINGS, SETTING_KEYS, type SettingKey, type SystemSettings } from '@ksp/shared';
-import { appendAudit } from '@ksp/core';
+import { DEFAULT_SETTINGS, SETTING_KEYS, type LegalApproval, type SettingKey, type SystemSettings } from '@ksp/shared';
+import { aiLegalGatesEnforced, aiTaskGates, appendAudit, enabledAiTasks, evidenceSigner, loadConfig, type Tx } from '@ksp/core';
 import { getSettings, invalidateSettings } from '../../lib/settings.js';
 import { invalidatePrincipals } from '../../lib/load-principal.js';
 import { notFound, validationFailed } from '../../lib/errors.js';
@@ -22,6 +22,16 @@ const GiB = 1024 ** 3;
 const MiB = 1024 ** 2;
 const int = (min: number, max: number) => z.number().int().min(min).max(max);
 const emailList = z.array(z.string().trim().toLowerCase().email().max(254)).max(50).transform((v) => [...new Set(v)]);
+
+const legalApproval = z.object({
+  approvedBy: z.string().trim().min(3).max(200),
+  reference: z.string().trim().min(3).max(200),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD').refine((d) => !Number.isNaN(Date.parse(d)) && Date.parse(d) <= Date.now() + 86_400_000, 'must be a valid date, not in the future'),
+  notes: z.string().trim().max(2000).optional(),
+  // Filled by the server; accepted (and overwritten) so a GET → PUT round trip validates.
+  recordedBy: z.string().max(200).optional(),
+  recordedAt: z.string().max(40).optional(),
+}).strict();
 
 export const SETTING_SCHEMAS = {
   passwordPolicy: z.object({
@@ -74,7 +84,56 @@ export const SETTING_SCHEMAS = {
     minPerNight: int(1, 1_000_000),
     maxPerNight: int(1, 10_000_000),
   }).strict().refine((v) => v.maxPerNight >= v.minPerNight, { message: 'Maximum per night must be at least the minimum', path: ['maxPerNight'] }),
+  aiLegalApprovals: z.object({
+    FACE_DETECTION: legalApproval.nullable(),
+    FACE_RECOGNITION: legalApproval.nullable(),
+    ANPR: legalApproval.nullable(),
+  }).strict(),
+  exportLegalApproval: z.object({ approval: legalApproval.nullable() }).strict(),
 } satisfies { [K in SettingKey]: z.ZodType<SystemSettings[K], z.ZodTypeDef, unknown> };
+
+/** Keys whose values are LegalApproval | null entries (settings key → entry names). */
+const LEGAL_KEYS: Partial<Record<SettingKey, string[]>> = { aiLegalApprovals: ['FACE_DETECTION', 'FACE_RECOGNITION', 'ANPR'], exportLegalApproval: ['approval'] };
+const same = (a: LegalApproval | null | undefined, b: LegalApproval | null | undefined) =>
+  (!a && !b) || (!!a && !!b && a.approvedBy === b.approvedBy && a.reference === b.reference && a.date === b.date && (a.notes ?? '') === (b.notes ?? ''));
+
+/** Stamp recordedBy/recordedAt on changed approvals and write one LEGAL_APPROVAL_* audit event per change. */
+async function recordLegalChanges(tx: Tx, key: SettingKey, before: Record<string, unknown>, value: Record<string, unknown>, username: string, actor: Parameters<typeof appendAudit>[1]) {
+  for (const entry of LEGAL_KEYS[key] ?? []) {
+    const old = before[entry] as LegalApproval | null | undefined;
+    const now = value[entry] as LegalApproval | null | undefined;
+    if (same(old, now)) {
+      if (old) value[entry] = old; // keep the original recorder
+      continue;
+    }
+    if (now) value[entry] = { ...now, recordedBy: username, recordedAt: new Date().toISOString() };
+    await appendAudit(tx, actor, {
+      action: now ? 'LEGAL_APPROVAL_RECORDED' : 'LEGAL_APPROVAL_REVOKED', resourceType: 'setting', resourceId: `${key}.${entry}`,
+      details: { key, entry, old: old ?? null, new: now ? value[entry] : null },
+    });
+  }
+}
+
+/** Read-only deployment facts the administrator needs next to the legal approvals (not settings; from the environment). */
+function deploymentInfo(settingsValue: SystemSettings) {
+  const cfg = loadConfig();
+  let signer: { keyId: string; provider: string; nonEvidentiary: boolean } | null = null;
+  try {
+    const s = evidenceSigner();
+    signer = { keyId: s.keyId, provider: s.provider, nonEvidentiary: s.nonEvidentiary };
+  } catch {
+    signer = null;
+  }
+  return {
+    environment: cfg.KSP_ENVIRONMENT ?? cfg.NODE_ENV,
+    aiTasksEnabled: enabledAiTasks(cfg),
+    aiLegalGatesEnforced: aiLegalGatesEnforced(cfg),
+    aiTaskGates: Object.values(aiTaskGates(cfg, settingsValue.aiLegalApprovals)),
+    exportTemplateApproved: !!settingsValue.exportLegalApproval.approval,
+    mediaProfile: cfg.MEDIA_PROFILE,
+    signing: signer,
+  };
+}
 
 const keyParam = z.object({ key: z.enum(SETTING_KEYS as [SettingKey, ...SettingKey[]]) });
 
@@ -91,6 +150,7 @@ export default async function settings(fastify: FastifyInstance) {
       settings: value,
       defaults: DEFAULT_SETTINGS,
       keys: SETTING_KEYS.map((key) => ({ key, overridden: key in meta, updatedAt: meta[key]?.updatedAt ?? null, updatedBy: meta[key]?.updatedBy ?? null })),
+      deployment: deploymentInfo(value),
     };
   }
 
@@ -115,6 +175,7 @@ export default async function settings(fastify: FastifyInstance) {
     const before = (await getSettings(db))[key];
     const p = req.requirePrincipal();
     await db.transaction().execute(async (tx) => {
+      if (LEGAL_KEYS[key]) await recordLegalChanges(tx, key, before as unknown as Record<string, unknown>, value, p.username, req.actor());
       await tx.insertInto('system_settings').values({ key, value: JSON.stringify(value), updated_by: p.userId, updated_at: new Date() })
         .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify(value), updated_by: p.userId, updated_at: new Date() })).execute();
       await appendAudit(tx, req.actor(), { action: 'SETTINGS_UPDATED', resourceType: 'setting', resourceId: key, details: { key, old: before, new: value } });
@@ -127,9 +188,11 @@ export default async function settings(fastify: FastifyInstance) {
   app.delete('/:key', { preHandler: app.authorize('settings:manage'), schema: { tags: ['settings'], summary: 'Restore one settings group to its built-in default', params: keyParam } }, async (req) => {
     const key = req.params.key;
     const before = (await getSettings(db))[key];
+    const p = req.requirePrincipal();
     const exists = await db.selectFrom('system_settings').select('key').where('key', '=', key).executeTakeFirst();
     if (!exists) throw notFound('Setting override');
     await db.transaction().execute(async (tx) => {
+      if (LEGAL_KEYS[key]) await recordLegalChanges(tx, key, before as unknown as Record<string, unknown>, { ...(DEFAULT_SETTINGS[key] as object) }, p.username, req.actor());
       await tx.deleteFrom('system_settings').where('key', '=', key).execute();
       await appendAudit(tx, req.actor(), { action: 'SETTINGS_UPDATED', resourceType: 'setting', resourceId: key, details: { key, old: before, new: DEFAULT_SETTINGS[key], reset: true } });
     });
