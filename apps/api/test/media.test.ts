@@ -306,12 +306,22 @@ describe('reprocess', () => {
     const r = await meera.post(`/api/v1/media/evidence/${ev.id}/reprocess`, { reason: 'test' });
     expect(r.status).toBe(202);
     expect(r.body.queued).toBe(true);
-    expect((await app.db.selectFrom('evidence').select('media_status').where('id', '=', ev.id).executeTakeFirstOrThrow()).media_status).toBe('PENDING');
+    // FN-7: an already processed item stays READY (playable) until the rebuilt generation replaces it
+    expect((await app.db.selectFrom('evidence').select('media_status').where('id', '=', ev.id).executeTakeFirstOrThrow()).media_status).toBe('READY');
     expect(await auditCount(ev.id, 'MEDIA_REPROCESS_REQUESTED')).toBe(1);
     const job = await app.db.selectFrom(sqlTable('pgboss.job')).select(['data']).where('name', '=', 'media.process').execute();
     expect(job.some((j) => (j.data as { evidenceId: string; force: boolean }).evidenceId === ev.id && (j.data as { force: boolean }).force)).toBe(true);
+    // FN-7: a second request while the job is queued is refused, not stacked
+    const dup = await admin.post(`/api/v1/media/evidence/${ev.id}/reprocess`);
+    expect(dup.status).toBe(409);
+    expect(await auditCount(ev.id, 'MEDIA_REPROCESS_REQUESTED')).toBe(1);
+    // ... also while the pipeline is running
+    const other = await processed('h264');
+    await app.db.updateTable('evidence').set({ media_status: 'PROCESSING' }).where('id', '=', other.id).execute();
+    expect((await meera.post(`/api/v1/media/evidence/${other.id}/reprocess`)).status).toBe(409);
+    await app.db.updateTable('evidence').set({ media_status: 'READY' }).where('id', '=', other.id).execute();
     // system monitor (no evidence media access) may also retry processing
-    expect((await admin.post(`/api/v1/media/evidence/${ev.id}/reprocess`)).status).toBe(202);
+    expect((await admin.post(`/api/v1/media/evidence/${other.id}/reprocess`)).status).toBe(202);
   });
 });
 

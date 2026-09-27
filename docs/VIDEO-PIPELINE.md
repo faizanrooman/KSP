@@ -46,10 +46,13 @@ UI. Timestamps (not frame numbers) are the authoritative link back to the origin
 * Audit (custody, `evidenceId` set, actor `SYSTEM media-worker`): `MEDIA_PROCESSING_STARTED`,
   `MEDIA_PROCESSING_COMPLETED` (kinds, renditions, per-phase timings), `MEDIA_PROCESSING_FAILED`.
 * One pipeline per evidence item (Postgres session advisory lock on `media:<id>`; a concurrent job throws a
-  retryable error). READY items are skipped unless `force`. Every non-skipped run first removes the pipeline
-  derivatives (rows of kinds PROXY_MP4/HLS/POSTER/THUMBNAIL/SPRITE and objects under
-  `evidence/<id>/{proxy,hls,poster,thumbnail,sprite}/` in the derived bucket only). SNAPSHOT rows/objects are
-  never touched. On failure partial outputs are removed again.
+  retryable error). READY items are skipped unless `force`. A first build writes to
+  `evidence/<id>/{proxy,hls,poster,thumbnail,sprite}/` (stale objects of a crashed first attempt are removed
+  first). **A rebuild (FN-7)** writes the new set under a generation prefix `evidence/<id>/r<gen>/<kind-dir>/…`
+  while the old set stays playable (media_status stays READY), switches rows in one transaction (old rows deleted,
+  new rows inserted, `MEDIA_PROCESSING_COMPLETED` with `rebuild`, `generation`, `replaced`), and only then deletes the
+  old objects. A failed rebuild deletes its own generation and keeps the old derivatives (READY, `media_error`
+  "Reprocessing failed … previous derivatives kept"). SNAPSHOT rows/objects are never touched.
 * **UNSUPPORTED** (no retry): container unreadable while the object exists (garbled / truncated MP4 without
   moov), no video stream (audio-only, cover-art only), undecodable stream (FFmpeg stderr patterns in
   `plan.ts#looksUndecodable`). `media_error` holds the reason.
@@ -89,7 +92,7 @@ Storage URLs are never returned. Browser media requests carry `?t=<media token>`
 | `GET /download/:evidenceId?t=` | public; token scope `download` | Streams the ORIGINAL (bucket/key/**version**) as `application/octet-stream`, `Content-Disposition: attachment; filename="<evidenceNumber>_<original>"`, `X-Evidence-SHA256`, Range. Custody `EVIDENCE_DOWNLOADED` (sha256, size, range, tier). |
 | `POST /evidence/:id/snapshots` `{timeMs, source:'proxy'\|'original'}` | `evidence:snapshot` | 201 snapshot `{id, timeMs, frameNumber, frameTimeMs, fps, source, sha256, width, height, sizeBytes, createdAt, createdBy, url, downloadUrl}`; custody `EVIDENCE_SNAPSHOT_CREATED`. 409 if media not ready, 422 beyond the end. |
 | `GET /evidence/:id/snapshots` | `evidence:play` | `{items: Snapshot[], total}` with 15-min image tokens. |
-| `POST /evidence/:id/reprocess` `{reason?}` | `evidence:edit_metadata` (jurisdiction) or `system:monitor` (system-wide) | 202 `{queued, jobId}`; sets PENDING; custody `MEDIA_REPROCESS_REQUESTED`. |
+| `POST /evidence/:id/reprocess` `{reason?}` | `evidence:edit_metadata` (jurisdiction) or `system:monitor` (system-wide) | 202 `{queued, jobId}`; **409** while a MEDIA_PROCESS job is queued/running or media_status is PROCESSING (checked under a per-item advisory lock; the job is tracked in `processing_jobs` from enqueue); items without derivatives go to PENDING, processed items stay READY until replaced; custody `MEDIA_REPROCESS_REQUESTED`. |
 
 Token checks: missing/invalid/tampered/expired -> 401; valid token for another evidence item, scope or
 ref -> 403; USER tokens re-check on EVERY request that the issuing session is not revoked/expired and the
@@ -145,9 +148,9 @@ nominal frame rate is used; for VFR originals the frame number is nominal.
 
 ## 5. Known issues / follow-ups
 * HLS segments are MPEG-TS; fMP4/CMAF would allow sharing segments with DASH — not needed now.
-* Reprocessing deletes the old derivatives before the new ones exist (playback unavailable while
-  re-processing). A future FK from AI tables to `evidence_derivatives` would block the delete — AI results
-  should reference derivatives by key/meta or use ON DELETE SET NULL.
+* After a rebuild switch the old proxy is deleted at once; an AI job that is reading it at that moment fails and
+  must be re-requested. A future FK from AI tables to `evidence_derivatives` would block the row delete — AI
+  results should reference derivatives by key/meta or use ON DELETE SET NULL.
 * Snapshot extraction runs inside the API process (bounded by a 90 s FFmpeg timeout and a 60/min rate limit);
   move to a worker queue if snapshot load grows.
 * Share (external) playback uses the same `/stream` endpoint with `typ:'SHARE'` tokens. Watermark burn-in is done

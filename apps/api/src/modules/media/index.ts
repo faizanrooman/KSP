@@ -363,11 +363,22 @@ export default async function media(fastify: FastifyInstance) {
       throw forbidden();
     }
     if (!PLAYABLE_STATUSES.includes(ev.status)) throw conflict('Only registered evidence can be processed');
-    await app.db.transaction().execute(async (tx) => {
-      await tx.updateTable('evidence').set({ media_status: 'PENDING', media_error: null }).where('id', '=', ev.id).where('media_status', '<>', 'PROCESSING').execute();
-      await appendAudit(tx, req.actor(), { action: 'MEDIA_REPROCESS_REQUESTED', resourceType: 'evidence', resourceId: ev.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { reason: req.body?.reason ?? null } });
+    const hasDerivatives = !!(await app.db.selectFrom('evidence_derivatives').select('id').where('evidence_id', '=', ev.id).where('kind', '=', 'PROXY_MP4').executeTakeFirst());
+    const jobId = await app.db.transaction().execute(async (tx) => {
+      // FN-7: never stack a second pipeline on one that is queued or running (serialised per item).
+      await sql`SELECT pg_advisory_xact_lock(hashtextextended(${`reprocess:${ev.id}`}, 0))`.execute(tx);
+      const busy = await tx.selectFrom('evidence as e')
+        .select(['e.media_status', sql<boolean>`EXISTS (SELECT 1 FROM processing_jobs pj WHERE pj.evidence_id = e.id AND pj.kind = 'MEDIA_PROCESS' AND pj.status IN ('QUEUED','RUNNING'))`.as('job')])
+        .where('e.id', '=', ev.id).executeTakeFirstOrThrow();
+      if (busy.media_status === 'PROCESSING' || busy.job) throw conflict('Media processing is already queued or running for this item');
+      // With existing derivatives the item stays READY (still playable) until the rebuilt set replaces it.
+      if (!hasDerivatives) await tx.updateTable('evidence').set({ media_status: 'PENDING', media_error: null }).where('id', '=', ev.id).where('media_status', '<>', 'PROCESSING').execute();
+      await appendAudit(tx, req.actor(), { action: 'MEDIA_REPROCESS_REQUESTED', resourceType: 'evidence', resourceId: ev.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { reason: req.body?.reason ?? null, rebuild: hasDerivatives } });
+      const id = await enqueue<MediaProcessPayload>(QUEUES.MEDIA_PROCESS, { evidenceId: ev.id, force: true });
+      // Tracked from the moment it is queued (the worker's ProcessingTracker reuses this row by queue job id).
+      if (id) await tx.insertInto('processing_jobs').values({ kind: 'MEDIA_PROCESS', evidence_id: ev.id, queue_job_id: id, status: 'QUEUED' }).execute();
+      return id;
     });
-    const jobId = await enqueue<MediaProcessPayload>(QUEUES.MEDIA_PROCESS, { evidenceId: ev.id, force: true });
     return reply.status(202).send({ queued: true, jobId });
   });
 }
