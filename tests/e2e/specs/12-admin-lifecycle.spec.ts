@@ -125,8 +125,9 @@ test('retention policy + disposal: create/assign policy, request, second-officer
   test.setTimeout(300_000);
   const run = uid();
   // A dedicated recording (disposal is irreversible; the shared evidence of earlier specs stays untouched).
-  const clip = makeClip(`dispose-${run}`, { seconds: 3, label: `D ${run}` });
-  const title = `E2E ${run} disposal candidate`;
+  const clip = makeClip(`dispose-${Date.now()}`, { seconds: 3, label: `D ${Date.now()}` });
+  // No run id in the title: other specs search the evidence list by run id and must never see this (DISPOSED) item.
+  const title = `E2E disposal candidate ${Date.now()}`;
   const op = await as('op.cubbon');
   await op.goto('/upload');
   await op.locator('input[type=file][aria-label="Choose files"]').setInputFiles([clip]);

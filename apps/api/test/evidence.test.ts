@@ -164,6 +164,21 @@ describe('evidence detail & list', () => {
     expect(r.body.items[0].thumbnailUrl).toMatch(new RegExp(`^/api/v1/media/image/${d.id}\\?t=`));
     expect(r.body.items[0].thumbnailUrl).not.toContain('derived');
   });
+
+  it('offers no thumbnail for DISPOSED evidence (its derived media was deleted; the row stays)', async () => {
+    const D = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: U['op.cubbon']!, title: 'Disposed thumbnail probe' });
+    await app.db
+      .insertInto('evidence_derivatives')
+      .values({ evidence_id: D.id, kind: 'THUMBNAIL', bucket: app.storage.bucket('derived'), object_key: `evidence/${D.id}/thumbnail/thumb.jpg`, mime_type: 'image/jpeg' })
+      .execute();
+    const meera = await as('io.meera');
+    expect((await meera.get(`/api/v1/evidence?q=${D.evidenceNumber}`)).body.items[0].thumbnailUrl).toMatch(/^\/api\/v1\/media\/image\//);
+    await sql`UPDATE evidence SET status = 'DISPOSAL_PENDING' WHERE id = ${D.id}::uuid`.execute(app.db);
+    await sql`UPDATE evidence SET status = 'DISPOSED', disposed_at = now() WHERE id = ${D.id}::uuid`.execute(app.db);
+    const r = await meera.get(`/api/v1/evidence?q=${D.evidenceNumber}&status=DISPOSED`);
+    expect(r.body.items[0].status).toBe('DISPOSED');
+    expect(r.body.items[0].thumbnailUrl).toBeNull();
+  });
 });
 
 describe('metadata & tags', () => {
