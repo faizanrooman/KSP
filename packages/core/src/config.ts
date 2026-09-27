@@ -26,6 +26,8 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
   COOKIE_SECURE: bool.default('false'),
   TRUST_PROXY: bool.default('false'),
+  /** Rate-limit counter store: `postgres` shares counts across API replicas (default in production), `memory` is per process (default elsewhere). */
+  RATE_LIMIT_STORE: z.enum(['memory', 'postgres']).optional(),
 
   DATABASE_URL: z.string().min(1), // ksp_app
   DATABASE_MIGRATION_URL: z.string().optional(), // schema owner, used by migrate only
