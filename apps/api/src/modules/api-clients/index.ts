@@ -12,6 +12,7 @@ import { appendAudit, hashSecret, randomToken } from '@ksp/core';
 import { INTEGRATION_SCOPES } from '@ksp/shared';
 import { hasPermissionAt, type Principal } from '../../lib/principal.js';
 import { conflict, notFound, validationFailed } from '../../lib/errors.js';
+import { invalidateApiClientCache } from '../../lib/api-client-auth.js';
 
 export const prefix = '/api-clients';
 
@@ -169,6 +170,7 @@ export default async function apiClients(fastify: FastifyInstance) {
       await tx.updateTable('api_clients').set({ revoked_at: new Date(), revoked_by: p.userId, revoke_reason: req.body.reason }).where('id', '=', cur.id).execute();
       await appendAudit(tx, req.actor(), { action: 'API_CLIENT_REVOKED', resourceType: 'api_client', resourceId: cur.id, orgUnitId: cur.org_unit_id, details: { clientId: cur.client_id, reason: req.body.reason } });
     });
+    invalidateApiClientCache(cur.id);
     return dto(await load(cur.id, p));
   });
 
@@ -182,6 +184,7 @@ export default async function apiClients(fastify: FastifyInstance) {
       await tx.updateTable('api_clients').set({ secret_hash: hash, secret_rotated_at: new Date() }).where('id', '=', cur.id).execute();
       await appendAudit(tx, req.actor(), { action: 'API_CLIENT_SECRET_ROTATED', resourceType: 'api_client', resourceId: cur.id, orgUnitId: cur.org_unit_id, details: { clientId: cur.client_id } });
     });
+    invalidateApiClientCache(cur.id);
     reply.header('cache-control', 'no-store');
     return { client: dto(await load(cur.id, p)), clientId: cur.client_id, clientSecret: secret, secretShownOnce: true };
   });

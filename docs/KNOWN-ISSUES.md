@@ -48,12 +48,12 @@ Owner is a role, not a person.
 | SEC-R4 | Rate limits used an in-memory store (per API replica) | LOW | fixed | PostgreSQL store (`apps/api/src/lib/rate-limit-store.ts`, UNLOGGED table `rate_limit_counters`, migration 1001; atomic UPSERT per request, cleanup every 60 s, fails open if the DB is unreachable); `RATE_LIMIT_STORE=memory\|postgres` (default postgres in production, memory elsewhere). Test `rate-limit-store.test.ts` (two instances share counts) |
 | SEC-R5 | `/auth/mfa/disable` checked the TOTP code without the single-use step | LOW | fixed | disable now consumes the TOTP step exactly like login (shared `consumeTotp`), failures audited (`MFA_CHALLENGE_FAILED`, context mfa-disable), rate-limited. Test `security-auth.test.ts` |
 | SEC-R6 | `/auth/mfa/setup` replaced an existing MFA secret without re-authentication | LOW | fixed | when MFA is enabled, setup requires the current password + a current TOTP code (step consumed) or a recovery code (consumed); `MFA_REENROLL_STARTED` / `MFA_CHALLENGE_FAILED` audited; old factor stays active until `/mfa/confirm`. API-only (the web UI offers no re-enrolment). Test `security-auth.test.ts` |
-| SEC-R7 | Public `/health/ready` echoes backend error text (≤ 200 chars) | LOW | open | Backend: generic message, detail in logs |
-| SEC-R8 | API-client Basic auth skips argon2 for an unknown `client_id` (timing enumeration of client ids) | LOW | open | Backend: dummy hash as in login |
-| SEC-R9 | Search `ai.reviewStatus=ANY_NON_REJECTED` needs only `search:use` (every default role with `search:use` also holds `ai:request`; only custom roles are affected) | LOW | open | Backend: require an AI permission |
-| SEC-R10 | `ksp_ai` may set any `ai_jobs.status` (no transition guard) — a compromised AI worker could revive a cancelled job | LOW | open | Backend: transition trigger |
-| SEC-R11 | Snapshot with `source: original` needs only `evidence:snapshot`, not `evidence:download_original` (output is a custody-audited still image) | LOW | decision | Product: confirm intended |
-| SEC-R12 | Dashboard `orgUnitId` filter does not check the unit is inside the viewer's jurisdiction (data stays scoped; unit existence leaks) | LOW | open | Backend |
+| SEC-R7 | Public `/health/ready` echoed backend error text | LOW | fixed | public probe returns only `ok`/`fail` per check; error detail is logged (warn) and available at authenticated `GET /system/health` (`system:monitor`). Test `security-residual.test.ts` |
+| SEC-R8 | API-client Basic auth skipped argon2 for an unknown `client_id` | LOW | fixed | unknown/expired ids verify against the dummy argon2 hash (uniform timing); positive verifications cached ≤ 60 s keyed by sha256(client_id:secret), honoured only while the row's current `secret_hash` matches (row + `revoked_at`/expiry/IP re-checked every request; rotate/revoke also evict). Test `security-residual.test.ts` |
+| SEC-R9 | Search `ai.reviewStatus=ANY_NON_REJECTED` needed only `search:use` | LOW | fixed | now also requires `ai:review` or `ai:request` (403 + `ACCESS_DENIED` audit otherwise). Test `security-residual.test.ts` |
+| SEC-R10 | `ksp_ai` could set any `ai_jobs.status` | LOW | fixed | trigger `ai_jobs_status_guard` (migration 1002): for ksp_ai only QUEUED→RUNNING→COMPLETED/FAILED/CANCELLED; no revival/re-queue (42501). Test `security-residual.test.ts` |
+| SEC-R11 | Snapshot with `source: original` needs only `evidence:snapshot`, not `evidence:download_original` (output is a custody-audited still image) | LOW | accepted | kept by decision; documented in AUTHORIZATION.md, pinned by `security-residual.test.ts` + `media.test.ts` |
+| SEC-R12 | Dashboard `orgUnitId` filter did not check the unit is inside the viewer's jurisdiction | LOW | fixed | a unit outside the viewer's `dashboard:view` grant subtrees answers 404 exactly like a non-existent unit. Test `dashboard.test.ts` |
 | SEC-R13 | Locked accounts answer 423 for any password — reveals that a username exists and is locked | LOW | accepted | trade-off |
 
 ## Functional gaps
@@ -74,7 +74,7 @@ Owner is a role, not a person.
 | FN-12 | Investigation | Manual timeline events are hard-deleted (audit row remains), unlike annotations | LOW | open |
 | FN-13 | Search | Totals use `count(*) OVER ()`; ranking over large match sets ~0.2–0.35 s state-wide | LOW | open |
 | FN-14 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | LOW | accepted |
-| FN-15 | API clients | argon2 on every Basic-auth request (no cache); IPv6 allow-list entries must be exact addresses | LOW | open |
+| FN-15 | API clients | argon2 on every Basic-auth request — fixed: ≤ 60 s positive-verification cache (SEC-R8). Open: IPv6 allow-list entries must be exact addresses | LOW | open |
 | FN-16 | AI | Accuracy figures are upstream; no evaluation on KSP footage; plate OCR not validated on Indian plates; GPU inference untested; small-face track fragmentation during pans | MEDIUM | UNVERIFIED |
 | FN-17 | Accessibility | Region annotations are pointer-only; E2E/axe in Chrome only (Firefox/Safari/Edge, screen readers, zoom/forced colours untested) — ACCESSIBILITY.md | MEDIUM | open / UNVERIFIED |
 | FN-18 | Web | Integrations, API-client, retention and disposal screens axe-scanned only, not driven by E2E | LOW | open |
