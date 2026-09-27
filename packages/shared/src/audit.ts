@@ -173,6 +173,14 @@ export const AUDIT_ACTIONS = {
   SHARE_LOCKED: { category: 'SHARE', custody: true },
   /** Watermarked playback variant generated for an external share. */
   SHARE_WATERMARK_GENERATED: { category: 'SHARE', custody: true },
+  /** The per-share watermarked variant was deleted (share revoked / expired / locked). */
+  SHARE_WATERMARK_DELETED: { category: 'SHARE', custody: true },
+  SHARE_UNLOCKED: { category: 'SHARE', custody: true },
+  SHARE_EXTENDED: { category: 'SHARE', custody: true },
+  /** The external link was re-issued (old link invalid) and/or the access code rotated. */
+  SHARE_LINK_REISSUED: { category: 'SHARE', custody: true },
+  /** Link (or, opt-in, access code) e-mailed to the external recipient; outcome FAILURE when the relay refused. */
+  SHARE_LINK_SENT: { category: 'SHARE', custody: true },
   /** Export package deleted after its retention period (cron). */
   EXPORT_EXPIRED: { category: 'EXPORT', custody: true },
   // Audit / reports / system

@@ -20,6 +20,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { appendAudit, enqueue } from '@ksp/core';
 import { QUEUES, type MediaProcessPayload } from '@ksp/shared';
 import { loadEvidenceFor } from '../../lib/access.js';
+import { recordInternalShareOpen } from '../../lib/share-views.js';
 import { AppError, conflict, forbidden, notFound, unprocessable } from '../../lib/errors.js';
 import { hasPermission, hasPermissionAt } from '../../lib/principal.js';
 import { authenticateMediaToken, DOWNLOAD_TOKEN_TTL_SECONDS, IMAGE_TOKEN_TTL_SECONDS, imageUrl, issueUserToken, streamUrl, tokenExpiry } from './tokens.js';
@@ -54,6 +55,7 @@ export default async function media(fastify: FastifyInstance) {
   }, async (req) => {
     const p = req.requirePrincipal();
     const ev = await loadEvidenceFor(app.db, p, req.params.id, 'evidence:play', req.actor());
+    await recordInternalShareOpen(app.db, p, ev, req.actor(), { ip: req.ip, userAgent: req.headers['user-agent'] ?? null, via: 'playback' });
     const row = await app.db
       .selectFrom('evidence')
       .select(['id', 'media_status', 'media_error', 'duration_ms', 'frame_rate', 'width', 'height', 'status'])

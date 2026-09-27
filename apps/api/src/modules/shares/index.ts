@@ -4,7 +4,17 @@
  *   POST /shares               share:create; each item loadEvidenceFor 'evidence:play' (+ download_original when allowDownload)
  *   GET  /shares?view=mine|all|received
  *   GET  /shares/:id           detail + access log (creator / share:manage_all in scope; recipients see a reduced view)
- *   POST /shares/:id/revoke    creator or share:manage_all in scope
+ *   POST /shares/:id/revoke    creator or share:manage_all in scope; deletes the per-share watermarked variants
+ *   POST /shares/:id/unlock    creator / share:manage_all: LOCKED → ACTIVE, failed attempts reset (SHARE_UNLOCKED)
+ *   POST /shares/:id/extend    creator / share:manage_all: new expiry ≤ now + shareExportPolicy.maxShareDays (SHARE_EXTENDED)
+ *   POST /shares/:id/reissue   creator / share:manage_all, EXTERNAL: new link (old one stops working), optionally new
+ *                              access code; optionally e-mailed (SHARE_LINK_REISSUED / SHARE_LINK_SENT)
+ *   GET  /shares/options       e-mail delivery available? policy limits (for the UI)
+ *
+ * E-mail delivery (SMTP, see @ksp/core mailer): by default only the LINK is e-mailed and the access code is given
+ * to the recipient out-of-band (phone/SMS/in person), so a compromised mailbox alone does not open the share.
+ * `emailAccessCode` sends the code in a SEPARATE message to the same address — a documented, opt-in trade-off
+ * (docs/SECURE-SHARING.md). maxViews also applies to INTERNAL shares (lib/share-views.ts).
  *
  * INTERNAL_USER shares grant visibility through the canonical access rule (lib/access.ts rule 4).
  * EXTERNAL shares: the link token and the access code are returned ONCE (stored as sha256 / argon2id) and are
@@ -14,7 +24,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { sql, type SelectQueryBuilder } from 'kysely';
-import { appendAudit, hashSecret, randomDigits, randomToken, sha256Hex, type Database, type Tx } from '@ksp/core';
+import { appendAudit, createMailer, deleteShareVariants, hashSecret, randomDigits, randomToken, sha256Hex, type AuditActor, type Database, type Tx } from '@ksp/core';
 import { SHARE_STATUSES, type Permission } from '@ksp/shared';
 import { loadEvidenceFor, orgScopeSql } from '../../lib/access.js';
 import { badRequest, conflict, forbidden, notFound, validationFailed } from '../../lib/errors.js';
@@ -42,7 +52,63 @@ export const createShareBody = z.object({
   watermark: z.boolean().default(true),
   maxViews: z.number().int().min(1).max(1000).optional(),
   expiresAt: z.coerce.date(),
+  /** EXTERNAL: e-mail the link to recipientEmail (the access code is NOT included). */
+  emailLink: z.boolean().default(false),
+  /** EXTERNAL: ALSO e-mail the access code, in a separate message (weakens the two-channel protection). */
+  emailAccessCode: z.boolean().default(false),
 }).strict();
+
+const reasonBody = z.object({ reason: z.string().trim().min(5).max(2000) }).strict();
+const extendBody = z.object({ expiresAt: z.coerce.date(), reason: z.string().trim().min(5).max(2000) }).strict();
+const reissueBody = z.object({
+  reason: z.string().trim().min(5).max(2000),
+  rotateAccessCode: z.boolean().default(false),
+  emailLink: z.boolean().default(false),
+  emailAccessCode: z.boolean().default(false),
+}).strict();
+
+type Delivery = 'SENT' | 'FAILED' | 'NOT_REQUESTED';
+
+/** E-mail the link and/or the access code (separate messages) to an external recipient; audited per item. */
+async function emailShare(db: Database, actor: AuditActor, share: { id: string; case_id: string | null; recipient_name: string | null; recipient_email: string | null; expires_at: Date }, items: Array<{ evidence_id: string; org_unit_id: string }>, sender: string, opts: { link?: string; accessCode?: string }): Promise<{ link: Delivery; accessCode: Delivery }> {
+  const mailer = createMailer();
+  const out: { link: Delivery; accessCode: Delivery } = { link: 'NOT_REQUESTED', accessCode: 'NOT_REQUESTED' };
+  const to = share.recipient_email ? [share.recipient_email] : [];
+  const expires = share.expires_at.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  const send = async (kind: 'link' | 'accessCode', subject: string, text: string) => {
+    let error: string | null = null;
+    try {
+      await mailer.send({ to, subject, text, headers: { 'X-KSP-Share-Id': share.id } });
+    } catch (e) {
+      error = (e as Error).message.slice(0, 300);
+    }
+    out[kind] = error ? 'FAILED' : 'SENT';
+    for (const i of items) {
+      await appendAudit(db, actor, {
+        action: 'SHARE_LINK_SENT', outcome: error ? 'FAILURE' : 'SUCCESS', resourceType: 'share', resourceId: share.id, evidenceId: i.evidence_id, caseId: share.case_id, orgUnitId: i.org_unit_id,
+        details: { channel: 'EMAIL', content: kind === 'link' ? 'LINK' : 'ACCESS_CODE', to: share.recipient_email, error },
+      });
+    }
+  };
+  if (opts.link) {
+    await send('link', '[KSP] Evidence shared with you', [
+      `Dear ${share.recipient_name ?? 'recipient'},`, '',
+      `${sender} of the Karnataka State Police has shared evidence with you through the KSP Video Evidence Management System.`, '',
+      `Open the secure link: ${opts.link}`, '',
+      'You will also need the 8-digit access code, which the sender gives you separately (not by this e-mail).',
+      `The share expires ${expires}. Every access is recorded; the material is watermarked and must not be redistributed.`, '',
+      'If you did not expect this message, ignore it.',
+    ].join('\n'));
+  }
+  if (opts.accessCode) {
+    await send('accessCode', '[KSP] Access code for your evidence share', [
+      `Dear ${share.recipient_name ?? 'recipient'},`, '',
+      `Your access code for the evidence share from ${sender} is: ${opts.accessCode}`, '',
+      'The link was sent to you separately. Do not forward this message.',
+    ].join('\n'));
+  }
+  return out;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Loose<T> = SelectQueryBuilder<any, any, T>;
@@ -104,6 +170,9 @@ export function shareDto(p: Principal, r: ShareRow) {
     revokeReason: r.revoke_reason,
     itemCount: Number(r.item_count),
     canRevoke: canManage(p, r) && ['ACTIVE', 'LOCKED'].includes(status),
+    canUnlock: canManage(p, r) && status === 'LOCKED',
+    canExtend: canManage(p, r) && ['ACTIVE', 'LOCKED', 'EXPIRED'].includes(status),
+    canReissue: canManage(p, r) && r.recipient_type === 'EXTERNAL' && status === 'ACTIVE',
   };
 }
 
@@ -147,6 +216,9 @@ export default async function shares(fastify: FastifyInstance) {
     } else if (!b.recipientName || !b.recipientEmail) {
       throw validationFailed('recipientName and recipientEmail are required for external shares');
     }
+    if ((b.emailLink || b.emailAccessCode) && b.recipientType !== 'EXTERNAL') throw validationFailed('E-mail delivery applies to external shares only');
+    if (b.emailAccessCode && !b.emailLink) throw validationFailed('emailAccessCode requires emailLink (the code is never the only thing sent)');
+    if ((b.emailLink || b.emailAccessCode) && !createMailer().configured) throw validationFailed('E-mail delivery is not configured on this system');
     const ids = [...new Set(b.evidenceIds)];
     const items: Array<{ id: string; org_unit_id: string; evidence_number: string | null; org_path: string }> = [];
     for (const id of ids) {
@@ -196,10 +268,15 @@ export default async function shares(fastify: FastifyInstance) {
       return s;
     });
     const row = (await baseSelect(app.db).where('s.id', '=', created.id).executeTakeFirstOrThrow()) as ShareRow;
+    const link = external ? `${app.cfg.APP_BASE_URL.replace(/\/$/, '')}/s/${token}` : undefined;
+    const delivery = external && b.emailLink
+      ? await emailShare(app.db, req.actor(), { ...row }, items.map((i) => ({ evidence_id: i.id, org_unit_id: i.org_unit_id })), p.displayName, { link, accessCode: b.emailAccessCode ? accessCode! : undefined })
+      : undefined;
     return reply.status(201).send({
       share: shareDto(p, row),
       // Returned ONCE. Send the link and the access code to the recipient through DIFFERENT channels.
-      ...(external ? { link: `${app.cfg.APP_BASE_URL.replace(/\/$/, '')}/s/${token}`, token, accessCode } : {}),
+      ...(external ? { link, token, accessCode } : {}),
+      ...(delivery ? { delivery } : {}),
     });
   });
 
@@ -272,7 +349,95 @@ export default async function shares(fastify: FastifyInstance) {
         await appendAudit(tx, req.actor(), { action: 'SHARE_REVOKED', resourceType: 'share', resourceId: r.id, evidenceId: i.evidence_id, caseId: r.case_id, orgUnitId: i.org_unit_id, details: { reason: req.body.reason, previousStatus: r.status, recipientType: r.recipient_type } });
       }
     });
+    // The per-share watermarked variants are useless now: delete them immediately (the shares.expire sweep retries failures).
+    await deleteShareVariants(app.db, app.storage, r.id, req.actor(), 'share revoked');
     const row = (await baseSelect(app.db).where('s.id', '=', r.id).executeTakeFirstOrThrow()) as ShareRow;
     return shareDto(p, row);
+  });
+
+  /** Load a share the caller manages (recipients → 403, others → 404). */
+  const loadManaged = async (p: Principal, id: string) => {
+    const r = (await baseSelect(app.db).where('s.id', '=', id).executeTakeFirst()) as ShareRow | undefined;
+    if (!r || !(canManage(p, r) || r.recipient_user_id === p.userId)) throw notFound('Share');
+    if (!canManage(p, r)) throw forbidden();
+    return r;
+  };
+  const auditItems = async (tx: Database | Tx, actor: AuditActor, r: ShareRow, action: 'SHARE_UNLOCKED' | 'SHARE_EXTENDED' | 'SHARE_LINK_REISSUED', details: Record<string, unknown>) => {
+    for (const i of await shareItems(r.id)) {
+      await appendAudit(tx, actor, { action, resourceType: 'share', resourceId: r.id, evidenceId: i.evidence_id, caseId: r.case_id, orgUnitId: i.org_unit_id, details });
+    }
+  };
+
+  app.get('/options', {
+    preHandler: anyOf('share:create', 'share:manage_all'),
+    schema: { tags: ['shares'], summary: 'Share delivery options and policy limits' },
+  }, async () => {
+    const settings = await getSettings(app.db);
+    return { emailConfigured: createMailer().configured, maxShareDays: settings.shareExportPolicy.maxShareDays };
+  });
+
+  app.post('/:id/unlock', {
+    schema: { tags: ['shares'], summary: 'Unlock a share locked by wrong access codes (resets the failed-attempt counter)', params: idParams, body: reasonBody },
+  }, async (req) => {
+    const p = req.requirePrincipal();
+    const r = await loadManaged(p, req.params.id);
+    if (r.status !== 'LOCKED') throw conflict(`Share is ${effectiveStatus(r)}, not LOCKED`);
+    if (r.expires_at <= new Date()) throw conflict('Share has expired; extend it first');
+    await app.db.transaction().execute(async (tx) => {
+      const upd = await tx.updateTable('shares').set({ status: 'ACTIVE', failed_code_attempts: 0, locked_at: null }).where('id', '=', r.id).where('status', '=', 'LOCKED').executeTakeFirst();
+      if (!upd.numUpdatedRows) throw conflict('Share changed concurrently');
+      await auditItems(tx, req.actor(), r, 'SHARE_UNLOCKED', { reason: req.body.reason, failedAttempts: r.failed_code_attempts, lockedAt: r.locked_at?.toISOString() ?? null });
+    });
+    return shareDto(p, (await baseSelect(app.db).where('s.id', '=', r.id).executeTakeFirstOrThrow()) as ShareRow);
+  });
+
+  app.post('/:id/extend', {
+    schema: { tags: ['shares'], summary: 'Extend a share’s expiry (within the share policy maximum from now)', params: idParams, body: extendBody },
+  }, async (req) => {
+    const p = req.requirePrincipal();
+    const r = await loadManaged(p, req.params.id);
+    const status = effectiveStatus(r);
+    if (!['ACTIVE', 'LOCKED', 'EXPIRED'].includes(status)) throw conflict(`Share is ${status}`);
+    const settings = await getSettings(app.db);
+    const now = Date.now();
+    const until = req.body.expiresAt;
+    if (until.getTime() <= now + 60_000) throw validationFailed('expiresAt must be in the future');
+    if (until.getTime() <= r.expires_at.getTime()) throw validationFailed('The new expiry must be later than the current one');
+    if (until.getTime() > now + settings.shareExportPolicy.maxShareDays * 86_400_000 + 60_000) throw validationFailed(`Shares may last at most ${settings.shareExportPolicy.maxShareDays} days from now`);
+    await app.db.transaction().execute(async (tx) => {
+      const upd = await tx.updateTable('shares').set({ expires_at: until, ...(r.status === 'EXPIRED' ? { status: 'ACTIVE' } : {}) })
+        .where('id', '=', r.id).where('status', '=', r.status).executeTakeFirst();
+      if (!upd.numUpdatedRows) throw conflict('Share changed concurrently');
+      await auditItems(tx, req.actor(), r, 'SHARE_EXTENDED', { reason: req.body.reason, previousExpiresAt: r.expires_at.toISOString(), expiresAt: until.toISOString(), reactivated: status === 'EXPIRED' });
+    });
+    return shareDto(p, (await baseSelect(app.db).where('s.id', '=', r.id).executeTakeFirstOrThrow()) as ShareRow);
+  });
+
+  app.post('/:id/reissue', {
+    schema: { tags: ['shares'], summary: 'Re-issue the external link (old link stops working), optionally a new access code; optionally e-mail it', params: idParams, body: reissueBody },
+  }, async (req) => {
+    const p = req.requirePrincipal();
+    const b = req.body;
+    const r = await loadManaged(p, req.params.id);
+    if (r.recipient_type !== 'EXTERNAL') throw conflict('Only external shares have a link');
+    if (effectiveStatus(r) !== 'ACTIVE') throw conflict(`Share is ${effectiveStatus(r)}`);
+    if (b.emailAccessCode && !b.emailLink) throw validationFailed('emailAccessCode requires emailLink');
+    if (b.emailAccessCode && !b.rotateAccessCode) throw validationFailed('The current access code is stored only as a hash; rotate it to e-mail a code');
+    if (b.emailLink && !createMailer().configured) throw validationFailed('E-mail delivery is not configured on this system');
+    const token = randomToken(32);
+    const accessCode = b.rotateAccessCode ? randomDigits(8) : undefined;
+    const codeHash = accessCode ? await hashSecret(accessCode) : undefined;
+    await app.db.transaction().execute(async (tx) => {
+      const upd = await tx.updateTable('shares').set({ token_hash: sha256Hex(token), ...(codeHash ? { access_code_hash: codeHash, failed_code_attempts: 0 } : {}) })
+        .where('id', '=', r.id).where('status', '=', 'ACTIVE').executeTakeFirst();
+      if (!upd.numUpdatedRows) throw conflict('Share changed concurrently');
+      await auditItems(tx, req.actor(), r, 'SHARE_LINK_REISSUED', { reason: b.reason, accessCodeRotated: !!accessCode, emailLink: b.emailLink, emailAccessCode: b.emailAccessCode });
+    });
+    // Portal sessions (stateless, ≤ 30 min) already opened with the old link stay valid until they expire.
+    const link = `${app.cfg.APP_BASE_URL.replace(/\/$/, '')}/s/${token}`;
+    const items = await shareItems(r.id);
+    const delivery = b.emailLink ? await emailShare(app.db, req.actor(), r, items, p.displayName, { link, accessCode: b.emailAccessCode ? accessCode : undefined }) : undefined;
+    const row = (await baseSelect(app.db).where('s.id', '=', r.id).executeTakeFirstOrThrow()) as ShareRow;
+    return { share: shareDto(p, row), link, token, ...(accessCode ? { accessCode } : {}), ...(delivery ? { delivery } : {}) };
   });
 }

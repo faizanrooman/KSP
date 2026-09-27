@@ -7,11 +7,15 @@
 | POST | `/shares` | `share:create`; each item `loadEvidenceFor(…, 'evidence:play')` |
 | GET | `/shares?view=mine\|received\|all&status&evidenceId&q&page&pageSize` | `all` needs `share:manage_all` (scoped) |
 | GET | `/shares/:id` | creator / in-scope manager (with access log) / internal recipient (reduced) |
-| POST | `/shares/:id/revoke {reason}` | creator or `share:manage_all` in scope |
+| POST | `/shares/:id/revoke {reason}` | creator or `share:manage_all` in scope; deletes the share's watermarked variants at once (`SHARE_WATERMARK_DELETED`) |
+| POST | `/shares/:id/unlock {reason}` | same; `LOCKED` → `ACTIVE`, failed attempts reset (`SHARE_UNLOCKED`); expired → 409 (extend first) |
+| POST | `/shares/:id/extend {expiresAt, reason}` | same; later than now/current and ≤ now + `maxShareDays`; an EXPIRED share becomes ACTIVE again (`SHARE_EXTENDED`) |
+| POST | `/shares/:id/reissue {reason, rotateAccessCode, emailLink, emailAccessCode}` | same, EXTERNAL + ACTIVE: new link (old one stops working), optionally a new code, returned once; optionally e-mailed (`SHARE_LINK_REISSUED`) |
+| GET | `/shares/options` | `share:create` / `share:manage_all`: `{emailConfigured, maxShareDays}` |
 
 Body: `{evidenceIds[], caseId?, recipientType: INTERNAL_USER|EXTERNAL, recipientUserId? | recipientName,
 recipientEmail, recipientOrg?, purpose, allowDownload=false, allowOriginal=false, allowPrint=false,
-watermark=true, maxViews?, expiresAt}`.
+watermark=true, maxViews?, expiresAt, emailLink=false, emailAccessCode=false}`.
 
 Rules: `expiresAt` in the future and ≤ `shareExportPolicy.maxShareDays`; `allowDownload` (and an unwatermarked
 external share) require the sharer to hold `evidence:download_original` over each item (403 +
@@ -26,7 +30,33 @@ external share) require the sharer to hold `evidence:download_original` over eac
   different channels.
 
 Cron `shares.expire` (every 5 min): ACTIVE shares past expiry → `EXPIRED` + `SHARE_EXPIRED` per item; watermarked
-variants of non-active shares are deleted.
+variants of non-active (expired / locked / revoked-but-not-yet-deleted) shares are deleted with `SHARE_WATERMARK_DELETED`
+per item (`deleteShareVariants`, `packages/core/src/shares.ts`). An unlocked or extended share regenerates its
+variants on demand at the next `/open`.
+
+### E-mail delivery (SMTP, `ALERT_SMTP_URL` — see DASHBOARDS-REPORTS-ALERTS.md)
+* `emailLink` sends the link to `recipientEmail` (sender name, expiry, "the access code comes separately").
+  **The access code is not in that e-mail.** Default in the UI when SMTP is configured: link by e-mail, code
+  communicated out-of-band (phone / SMS / in person).
+* `emailAccessCode` (requires `emailLink`) additionally sends the code in a **separate** message to the same
+  address. **Trade-off**: link and code were designed as two factors on two channels; e-mailing both means anyone
+  who controls or reads that mailbox (compromised account, shared office inbox, mis-typed address) can open the
+  share. The UI marks it "not recommended". Use only when no second channel exists and the share is short-lived,
+  watermarked and limited by `maxViews`.
+* Each message is audited per item as `SHARE_LINK_SENT` (`content` LINK | ACCESS_CODE, outcome FAILURE with the
+  relay error); the token and code are never written to the audit trail. Relay failures do not undo the share;
+  the response reports `delivery.link|accessCode = SENT | FAILED | NOT_REQUESTED`.
+* The stored token and code are hashes, so a "resend" is a **re-issue**: a new link (and optionally a new code).
+  Portal sessions already opened with the old link (stateless, ≤ 30 min) stay valid until they expire.
+* Tested against a local SMTP sink; a real relay is **UNVERIFIED**.
+
+### maxViews for internal shares
+`maxViews` also applies to INTERNAL_USER shares (`apps/api/src/lib/share-views.ts`): when the recipient loads the
+evidence detail or requests playback **and the item is visible to them only through shares**, the first such
+open of the item within 30 minutes counts one view (`view_count`, `share_access_log` VIEW `internal:<userId>`,
+`SHARE_ACCESSED` details `via: internal`); jurisdiction / case / own access never counts, and an unlimited share
+covering the item means nothing is counted. Once `view_count ≥ max_views` and the last counted open is older than
+30 minutes, the share stops granting visibility (rule 4 in `lib/access.ts`, also for share-based downloads).
 
 ## External portal (`/api/v1/share-portal`, all `config.public`)
 
@@ -79,9 +109,11 @@ the watermarked variant at the current position), opened in a print window.
 ## Web
 
 * Evidence action **Share** (`canShare`): internal user via `UserPicker` or external recipient; permissions;
-  expiry; max views. External link and code are shown once with copy buttons.
+  expiry; max views (internal and external); for external recipients "E-mail the link" (default on when SMTP is
+  configured) and the opt-in "Also e-mail the access code". External link and code are shown once with copy buttons.
 * **Shares** (Sharing & Export): shared by me / with me / all in jurisdiction; detail with permissions, items,
-  access log and revoke (with reason).
+  access log, revoke (with reason), **Unlock** (locked shares), **Extend** and **Re-issue / Re-send link by
+  e-mail** (external).
 * **Public portal `/s/:token`** (`publicRoutes`, no app shell): access-code form (remaining attempts, blocking
   notices), share info (purpose, sender, expiry, views), item list, watermarked player (no download control,
   no PiP, no context menu unless downloads are allowed), download / print buttons only when permitted.
@@ -91,5 +123,4 @@ the watermarked variant at the current position), opened in a print window.
 ## Known limits
 
 * Deterrence, not DRM: a recipient can still screen-record; the burned-in identity makes leaks attributable.
-* Locked shares cannot be unlocked; revoke and create a new share.
 * Internal shares do not use watermarking (internal users use the standard player and custody audit).

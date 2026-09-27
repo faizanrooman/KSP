@@ -69,8 +69,8 @@ Owner is a role, not a person.
 | FN-7 | Video | Reprocess deletes old derivatives before new ones exist; reprocess enqueues even when already processing | LOW | open |
 | FN-8 | Video | Snapshot extraction runs in the API process (rate-limited, 90 s timeout) — move to queue at scale | LOW | open |
 | FN-9 | Export / custody | PDFs use standard fonts: Kannada / non-Latin text not rendered | MEDIUM | open |
-| FN-10 | Sharing | Locked external share cannot be unlocked or extended; no e-mail/SMS delivery of link/code; revoke does not delete per-share watermarked variants | LOW | open |
-| FN-11 | Sharing | `maxViews` counts portal opens and is not applied to internal-user shares | LOW | open |
+| FN-10 | Sharing | **Fixed**: unlock (sender / share:manage_all, attempts reset, audited), extend within policy, link e-mail (code out-of-band by default; opt-in separate code e-mail, trade-off documented), link re-issue, variants deleted on revoke/expire/lock. SMS delivery not implemented; real SMTP relay UNVERIFIED | LOW | fixed |
+| FN-11 | Sharing | **Fixed**: `maxViews` applies to internal shares (share-based detail/playback opens, one per 30-min session; used-up shares stop granting visibility) | LOW | fixed |
 | FN-12 | Investigation | Manual timeline events are hard-deleted (audit row remains), unlike annotations | LOW | open |
 | FN-13 | Search | Totals use `count(*) OVER ()`; ranking over large match sets ~0.2–0.35 s state-wide | LOW | open |
 | FN-14 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | LOW | accepted |
