@@ -899,6 +899,19 @@ export interface Shares {
   watermark: Generated<boolean>;
 }
 
+export interface SnapshotRequests {
+  actor: Json;
+  created_at: Generated<Timestamp>;
+  derivative_id: string | null;
+  error: string | null;
+  evidence_id: string;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  params: Json;
+  requested_by: string;
+  status: Generated<string>;
+}
+
 export interface StorageSnapshots {
   bucket: string;
   capacity_bytes: Int8 | null;
@@ -1115,6 +1128,7 @@ export interface DB {
   share_access_log: ShareAccessLog;
   share_items: ShareItems;
   shares: Shares;
+  snapshot_requests: SnapshotRequests;
   storage_snapshots: StorageSnapshots;
   system_settings: SystemSettings;
   timeline_events: TimelineEvents;

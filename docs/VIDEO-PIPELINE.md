@@ -18,7 +18,7 @@ proxy (local temp copy under WORK_DIR)
   ├─ THUMBNAIL  evidence/<id>/thumbnail/thumb.jpg        (320 px wide)
   └─ SPRITE     evidence/<id>/sprite/sprite_NNN.jpg      (10x10 tiles, 160 px wide each)
                 evidence/<id>/sprite/thumbnails.vtt      (kind SPRITE, mime text/vtt, `#xywh=` cues)
-user snapshots  evidence/<id>/snapshot/<uuid>.png        (kind SNAPSHOT, created by the API)
+user snapshots  evidence/<id>/snapshot/<uuid>.png        (kind SNAPSHOT, extracted by the worker job media.snapshot)
 ```
 
 All outputs go to the **derived** bucket and get one `evidence_derivatives` row each (kind, bucket, key,
@@ -90,7 +90,8 @@ Storage URLs are never returned. Browser media requests carry `?t=<media token>`
 | `GET /image/:derivativeId?t=` | public; token scope `image`, `ref` = derivativeId, `eid` = derivative's evidence | THUMBNAIL/POSTER/SNAPSHOT/SPRITE/AI_FRAME/AI_CROP images; `&download=1` adds `Content-Disposition: attachment`. Token shape used by the evidence list: `signMediaToken({typ:'USER', sub, sid, eid, scope:'image', ref})`. |
 | `GET /evidence/:id/original` | `loadEvidenceFor('evidence:download_original')` | `{url:/api/v1/media/download/<id>?t=…, expiresAt, filename, sha256, sizeBytes}` (60 s token, scope `download`). |
 | `GET /download/:evidenceId?t=` | public; token scope `download` | Streams the ORIGINAL (bucket/key/**version**) as `application/octet-stream`, `Content-Disposition: attachment; filename="<evidenceNumber>_<original>"`, `X-Evidence-SHA256`, Range. Custody `EVIDENCE_DOWNLOADED` (sha256, size, range, tier). |
-| `POST /evidence/:id/snapshots` `{timeMs, source:'proxy'\|'original'}` | `evidence:snapshot` | 201 snapshot `{id, timeMs, frameNumber, frameTimeMs, fps, source, sha256, width, height, sizeBytes, createdAt, createdBy, url, downloadUrl}`; custody `EVIDENCE_SNAPSHOT_CREATED`. 409 if media not ready, 422 beyond the end. |
+| `POST /evidence/:id/snapshots` `{timeMs, source:'proxy'\|'original'}` | `evidence:snapshot` | The API validates, stores a `snapshot_requests` row (source object, frame, fps, actor) and queues **`media.snapshot`**; FFmpeg runs in the worker (FN-8). The API waits up to `SNAPSHOT_WAIT_SECONDS` (default 20): 201 snapshot `{id, timeMs, frameNumber, frameTimeMs, fps, source, sha256, width, height, sizeBytes, createdAt, createdBy, url, downloadUrl}`; custody `EVIDENCE_SNAPSHOT_CREATED` (actor = requester, written by the job with the derivative); otherwise **202** `{requestId, statusUrl}` (the web client polls). 409 if media not ready, 422 beyond the end or undecodable. |
+| `GET /snapshot-requests/:id` | requester + `evidence:snapshot` | `{status QUEUED\|RUNNING\|COMPLETED\|FAILED, error, snapshot}` |
 | `GET /evidence/:id/snapshots` | `evidence:play` | `{items: Snapshot[], total}` with 15-min image tokens. |
 | `POST /evidence/:id/reprocess` `{reason?}` | `evidence:edit_metadata` (jurisdiction) or `system:monitor` (system-wide) | 202 `{queued, jobId}`; **409** while a MEDIA_PROCESS job is queued/running or media_status is PROCESSING (checked under a per-item advisory lock; the job is tracked in `processing_jobs` from enqueue); items without derivatives go to PENDING, processed items stay READY until replaced; custody `MEDIA_REPROCESS_REQUESTED`. |
 

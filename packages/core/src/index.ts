@@ -8,6 +8,7 @@ export * from './storage.js';
 export * from './audit.js';
 export * from './queue.js';
 export * from './media.js';
+export * from './snapshot.js';
 export * from './signing.js';
 export * from './ingest/index.js';
 export * from './mailer.js';
