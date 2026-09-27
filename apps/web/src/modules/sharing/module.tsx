@@ -1,8 +1,10 @@
 import { Share2 } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { SharesPage } from './SharesPage';
-import { ShareDetailPage } from './ShareDetailPage';
-import { SharePortalPage } from './SharePortalPage';
+import { lazyPage } from '@/lib/lazy';
+
+const SharesPage = lazyPage(() => import('./SharesPage'), 'SharesPage');
+const ShareDetailPage = lazyPage(() => import('./ShareDetailPage'), 'ShareDetailPage');
+const SharePortalPage = lazyPage(() => import('./SharePortalPage'), 'SharePortalPage');
 
 const mod: WebModule = {
   id: 'sharing',

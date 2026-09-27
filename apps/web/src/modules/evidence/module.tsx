@@ -1,9 +1,11 @@
 import { Archive, FileVideo, Trash2 } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { EvidenceListPage } from './EvidenceListPage';
-import { EvidenceDetailPage } from './EvidenceDetailPage';
-import { DisposalApprovalsPage } from './DisposalApprovalsPage';
-import { RetentionPoliciesPage } from './RetentionPoliciesPage';
+import { lazyPage } from '@/lib/lazy';
+
+const EvidenceListPage = lazyPage(() => import('./EvidenceListPage'), 'EvidenceListPage');
+const EvidenceDetailPage = lazyPage(() => import('./EvidenceDetailPage'), 'EvidenceDetailPage');
+const DisposalApprovalsPage = lazyPage(() => import('./DisposalApprovalsPage'), 'DisposalApprovalsPage');
+const RetentionPoliciesPage = lazyPage(() => import('./RetentionPoliciesPage'), 'RetentionPoliciesPage');
 
 const mod: WebModule = {
   id: 'evidence',

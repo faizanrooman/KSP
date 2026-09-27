@@ -1,5 +1,7 @@
-# KSP VMS continuous integration. STATUS: UNVERIFIED — authored and validated with actionlint; never executed on
-# GitHub (no remote CI available to the development team yet).
+# KSP VMS continuous integration. STATUS: UNVERIFIED — authored and validated with actionlint (scripts/ci/validate-deploy.sh
+# --strict); never executed on GitHub (no remote CI available to the development team yet). Jobs: static (lint,
+# typecheck, build, image layouts, deploy validators), test (all vitest suites, backup verify, DR drill), e2e
+# (Playwright suite against the real stack), security.
 name: ci
 
 on:
@@ -36,15 +38,10 @@ jobs:
       - name: Production layouts start (no dev deps)
         run: |
           for app in api worker ai-worker; do scripts/ci/simulate-image.sh "$app" "$RUNNER_TEMP/img-$app"; done
-      - name: Install validators
-        run: |
-          mkdir -p .local/bin && cd .local/bin
-          curl -fsSL -o hadolint https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64 && chmod +x hadolint
-          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
-          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz | tar xz actionlint
-          curl -fsSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz | tar xz
-          curl -fsSL https://github.com/FiloSottile/age/releases/download/v1.2.1/age-v1.2.1-linux-amd64.tar.gz | tar xz --strip-components=1 age/age age/age-keygen
-      - run: scripts/ci/validate-deploy.sh
+      - name: Install validators (pinned versions, SHA-256 verified)
+        run: scripts/ci/install-tools.sh
+      - name: Validate deployment artefacts (strict — a missing validator fails)
+        run: scripts/ci/validate-deploy.sh --strict
 
   test:
     name: tests (PostgreSQL 16 + S3 + FFmpeg)
@@ -120,6 +117,71 @@ jobs:
           curl -fsSL https://github.com/versity/versitygw/releases/download/v1.8.0/versitygw_v1.8.0_Linux_x86_64.tar.gz | tar xz -C .local/bin versitygw
           npm run build
           PATH="$PWD/.local/bin:$PATH" tests/dr/drill.sh --ci
+
+  e2e:
+    name: e2e (Playwright + Chrome against the real stack)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16.10-bookworm@sha256:38471f330eb885e04de130b768d6db4e10469e2311879c7e5c699f6d2d8a1c74
+        env: { POSTGRES_PASSWORD: ci-only-password }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: ci-only-password
+      S3_ENDPOINT: http://127.0.0.1:7070
+      S3_ACCESS_KEY: kspciaccess
+      S3_SECRET_KEY: kspcisecret-not-secret
+      FFMPEG_DIR: /usr/local/bin
+      # Google Chrome ships with the ubuntu-24.04 runner image; Playwright drives it (no browser download).
+      E2E_CHROME: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
+      - name: S3 gateway with versioning + Object Lock
+        run: |
+          docker run -d --name s3 -p 7070:7070 -e ROOT_ACCESS_KEY="$S3_ACCESS_KEY" -e ROOT_SECRET_KEY="$S3_SECRET_KEY" \
+            --tmpfs /data "$VERSITYGW_IMAGE" --port :7070 posix --versioning-dir /data/v --sidecar /data/s /data/b
+          sleep 2 && docker logs s3
+      - name: FFmpeg (pinned static build)
+        run: |
+          id=$(docker create "$FFMPEG_IMAGE" /ffmpeg)
+          sudo docker cp "$id:/ffmpeg" /usr/local/bin/ffmpeg && sudo docker cp "$id:/ffprobe" /usr/local/bin/ffprobe && docker rm "$id"
+      - run: npm ci
+      - run: scripts/ci/ci-env.sh
+      - run: npm run build -w @ksp/shared && npm run build -w @ksp/core
+      - run: npm run db:migrate && npm run db:seed
+      - name: AI models (pinned, SHA-256 verified)
+        uses: actions/cache@v4
+        with: { path: .local/models, key: "ai-models-${{ hashFiles('apps/ai-worker/src/models/manifest.ts') }}" }
+      - name: Register + activate the AI models in the E2E database
+        run: npm run fetch-models -w @ksp/ai-worker
+      - run: npm run typecheck:e2e
+      - name: Start API, worker, AI worker and the built web UI
+        run: tests/e2e/scripts/stack.sh start
+      - name: Playwright (whole suite, one worker, file order)
+        run: npm run test:e2e
+      - name: axe summary
+        if: always()
+        run: node tests/e2e/scripts/axe-summary.mjs --markdown >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Stop the stack
+        if: always()
+        run: tests/e2e/scripts/stack.sh stop
+      - name: Upload traces, screenshots, report and service logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: |
+            tests/e2e/artifacts/
+            .local/logs/
+          retention-days: 14
 
   security:
     name: security (audit · SAST · secrets · SBOM · filesystem scan)

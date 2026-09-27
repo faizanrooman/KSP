@@ -1,6 +1,6 @@
 /** Share detail: recipient, permissions, items, access log, revoke. */
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { formatDateTime, titleCase } from '@/lib/format';

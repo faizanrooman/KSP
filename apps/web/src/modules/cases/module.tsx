@@ -1,10 +1,13 @@
 import { Briefcase, FileText, KeyRound, Plug } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { CasesListPage } from './CasesListPage';
-import { CaseDetailPage } from './CaseDetailPage';
-import { FirDetailPage, FirListPage } from './FirPages';
-import { IntegrationsPage } from './IntegrationsPage';
-import { ApiClientsPage } from './ApiClientsPage';
+import { lazyPage } from '@/lib/lazy';
+
+const CasesListPage = lazyPage(() => import('./CasesListPage'), 'CasesListPage');
+const CaseDetailPage = lazyPage(() => import('./CaseDetailPage'), 'CaseDetailPage');
+const FirDetailPage = lazyPage(() => import('./FirPages'), 'FirDetailPage');
+const FirListPage = lazyPage(() => import('./FirPages'), 'FirListPage');
+const IntegrationsPage = lazyPage(() => import('./IntegrationsPage'), 'IntegrationsPage');
+const ApiClientsPage = lazyPage(() => import('./ApiClientsPage'), 'ApiClientsPage');
 
 const mod: WebModule = {
   id: 'cases',

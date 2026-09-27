@@ -68,6 +68,7 @@ export default async function globalSetup(): Promise<void> {
 
   rmSync(resolve(STATE_DIR, 'mfa.json'), { force: true });
   rmSync(resolve(STATE_DIR, 'run.json'), { force: true });
+  rmSync(resolve(STATE_DIR, 'totp-steps.json'), { force: true });
   mkdirSync(STATE_DIR, { recursive: true });
   const runId = new Date().toISOString().replace(/\D/g, '').slice(2, 14);
   writeFileSync(resolve(STATE_DIR, 'run-id'), runId);

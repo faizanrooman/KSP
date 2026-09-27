@@ -5,7 +5,7 @@
  * Sakshya Adhiniyam, 2023 (formerly Section 65B(4) of the Indian Evidence Act, 1872) for the responsible
  * officer to complete and sign by hand. The template is an aid only; it does not claim legal compliance.
  */
-import { createDoc, finish, fmtBytes, fmtDuration, fmtTime, heading, keyValues, para, table, wrapToken, ensureSpace } from './pdf.js';
+import { createDoc, gap, KSP_KN, finish, fmtBytes, fmtDuration, fmtTime, heading, keyValues, para, table, wrapToken, ensureSpace } from './pdf.js';
 import { personLabel, type EvidenceRecord, type PersonRef } from './records.js';
 
 export interface FactSheetItem {
@@ -47,10 +47,11 @@ export interface FactSheetData {
 
 export async function renderFactSheet(d: FactSheetData): Promise<Buffer> {
   const at = new Date(d.generatedAt);
-  const doc = createDoc({ title: `Court Export Fact Sheet ${d.exportNumber}`, createdAt: at });
-  doc.font('Helvetica-Bold').fontSize(16).fillColor('#0b2a4a').text('EVIDENCE EXPORT FACT SHEET', { align: 'center' });
-  doc.font('Helvetica').fontSize(9).fillColor('#333333').text('Karnataka State Police - Video Evidence Management System', { align: 'center' });
-  doc.moveDown(0.3).fontSize(10).fillColor('#000000').text(`Export ${d.exportNumber}`, { align: 'center' });
+  const doc = await createDoc({ title: `Court Export Fact Sheet ${d.exportNumber}`, createdAt: at });
+  para(doc, 'EVIDENCE EXPORT FACT SHEET', { size: 16, bold: true, color: '#0b2a4a', align: 'center' });
+  para(doc, `Karnataka State Police (${KSP_KN}) - Video Evidence Management System`, { size: 9, color: '#333333', align: 'center' });
+  gap(doc, 0.3);
+  para(doc, `Export ${d.exportNumber}`, { size: 10, align: 'center' });
 
   heading(doc, '1. Export');
   keyValues(doc, [

@@ -10,7 +10,7 @@ import { closeApp, getApp, login, type Agent } from './helpers.js';
 import { evidenceTestSetup, evidenceTestTeardown, userId } from './evidence-setup.js';
 import { asOwner, insertDetections, insertEvidence, orgOf, token } from './search-support.js';
 import { loadUserPrincipal } from '../src/lib/load-principal.js';
-import { pageQuery } from '../src/modules/search/service.js';
+import { countQuery, pageQuery, runSearch } from '../src/modules/search/service.js';
 import type { Principal } from '../src/lib/principal.js';
 
 const S = '/api/v1/search/evidence';
@@ -324,6 +324,25 @@ describe('performance on ≥5k synthetic rows', () => {
     // eslint-disable-next-line no-console
     console.log(`[search perf] API text search with facets: ${apiMs.toFixed(1)}ms (server tookMs=${r.body.tookMs})`);
     expect(r.body.total).toBe(12); // g % 500 = 0 -> 12 rows, all even -> Cubbon Park
+    expect(r.body.totalApprox).toBe(false);
     expect(apiMs).toBeLessThan(1000);
+  });
+
+  it('caps the exact total (FN-13): beyond the cap the count stops and says totalApprox', async () => {
+    const app = await getApp();
+    const c = { evidenceNumber: `P5K-${ntok}-`, tagMode: 'any' as const };
+    const exact = await runSearch(app.db, p, c, { page: 1, pageSize: 25, includeFacets: true });
+    expect(exact).toMatchObject({ total: 3000, totalApprox: false, facetsTruncated: false }); // Meera sees the even half
+    const capped = await runSearch(app.db, p, c, { page: 1, pageSize: 25, includeFacets: true, totalCap: 1000 });
+    expect(capped).toMatchObject({ total: 1000, totalApprox: true, facetsTruncated: true });
+    expect(capped.items.map((i) => i.id)).toEqual(exact.items.map((i) => i.id)); // same page, only the count differs
+    const atCap = await runSearch(app.db, p, c, { page: 1, pageSize: 25, includeFacets: false, totalCap: 3000 });
+    expect(atCap).toMatchObject({ total: 3000, totalApprox: false }); // exactly cap matches is still exact
+    // The count query never scans past cap + 1 rows.
+    const compiled = countQuery(p, c, 1000).compile(app.db);
+    const res = await asOwner((cl) => cl.query(`EXPLAIN (ANALYZE, FORMAT JSON) ${compiled.sql}`, compiled.parameters as unknown[]));
+    const plan = JSON.stringify((res.rows[0] as { 'QUERY PLAN': unknown[] })['QUERY PLAN']);
+    expect(plan).toMatch(/"Node Type":"Limit"/);
+    expect(Math.max(...[...plan.matchAll(/"Actual Rows":(\d+)/g)].map((m) => Number(m[1])))).toBeLessThanOrEqual(1001);
   });
 });

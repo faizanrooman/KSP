@@ -21,14 +21,13 @@ Owner is a role, not a person.
 | EXT-8 | Object Lock runs in GOVERNANCE mode in dev (bypassable by privileged credentials); production should use COMPLIANCE | MEDIUM | decision | Custodian + infra: choose mode/retention per bucket |
 | EXT-9 | CPU transcoding of the full HLS ladder at state-wide volume (~40 000 footage-hours/day) needs ~1 100 4-vCPU workers — GPU / proxy-only default / on-demand HLS decision | HIGH | decision | Infra / product: capacity decision (INFRASTRUCTURE.md) |
 | EXT-10 | Should EVIDENCE_CUSTODIAN hold `export:approve`? Default matrix gives it only to SUPERVISOR (unchanged) | MEDIUM | decision | Product owner. Mechanism ready: grant `export:approve` to EVIDENCE_CUSTODIAN in Roles admin (no separate setting — ADMIN-GUIDE.md § Export approval policy); tested incl. SoD (`exports.test.ts`) |
-| EXT-11 | react-router 6.30.x advisories (`npm audit --omit=dev`: 2 moderate — GHSA-wrjc-x8rr-h8h6 open redirect via backslash in `<Link>`/`useNavigate`, GHSA-337j-9hxr-rhxg SSR hydration, SSR not used) fixed only in 7.18 (major upgrade); 0 high/critical | MEDIUM | open | Web: plan react-router 7 upgrade |
 
 ## Deployment, DR & operations
 
 | ID | Issue | Sev | Status | Owner / next step |
 |---|---|---|---|---|
 | OPS-1 | Container images, compose and Kubernetes never built or run (no Docker on the dev host); validated statically (`scripts/ci/validate-deploy.sh`) + runtime layout simulated (`scripts/ci/simulate-image.sh`) | HIGH | UNVERIFIED | DevOps: build images + deploy to staging |
-| OPS-2 | GitHub Actions `ci.yml` / `release.yml` never executed; versitygw release tarball name in the CI DR step assumed; CI does not run the Playwright suite | MEDIUM | UNVERIFIED | DevOps: first CI run; add E2E job |
+| OPS-2 | GitHub Actions `ci.yml` / `release.yml` never executed (incl. the new `e2e` Playwright job); versitygw release tarball name in the CI DR step assumed | MEDIUM | UNVERIFIED | DevOps: first CI run |
 | OPS-3 | 2-hour restoration and 99.5 % availability not demonstrated at production scale; local drill only (small data); CNPG failover, PITR, native replication untested | HIGH | UNVERIFIED | DevOps: staging DR drill at realistic volume |
 | OPS-4 | `s3-replicate.ts` copies get new version IDs → `--repoint` needed after failover (native replication avoids it); full re-hash is O(bytes) — use `--trust-marker` within the RTO | LOW | accepted | by design |
 | OPS-5 | **Fixed**: DR copies made by `s3-replicate.ts` are recorded (`dr_object_copies`) and deleted by the `dr.dispose-sweep` cron / CLI once the evidence is DISPOSED (governance bypass, failures recorded + audited + retried). Native store replication of deletes and COMPLIANCE-mode DR buckets (cannot delete before retain-until) UNVERIFIED | LOW | fixed / UNVERIFIED | DevOps: give the worker a delete-capable DR identity |
@@ -68,23 +67,19 @@ Owner is a role, not a person.
 | FN-6 | Integrity | **Fixed**: nightly fixity batch sized by `integrityPolicy.fullCycleDays` (+ byte budget, min/max), prioritising never-verified, recently tier-migrated and oldest-verified copies; RETAINED and recorded DR copies are verified with their own `integrity_checks` rows; coverage % and projected cycle on System health. Throughput at state-wide volume (≈ 2 TiB/night default budget) not measured | LOW | fixed |
 | FN-7 | Video | **Fixed**: rebuilds go to a new generation prefix, rows switch atomically, old objects deleted afterwards (failed rebuild keeps the old set playable); reprocess returns 409 while a job is queued/running. An AI job reading the old proxy during the switch fails and must be re-run | LOW | fixed |
 | FN-8 | Video | **Fixed**: snapshot extraction is a worker job (`media.snapshot`); the API waits ≤ 20 s (201) or returns 202 + status polling; UI unchanged for the fast path | LOW | fixed |
-| FN-9 | Export / custody | PDFs use standard fonts: Kannada / non-Latin text not rendered | MEDIUM | open |
 | FN-10 | Sharing | **Fixed**: unlock (sender / share:manage_all, attempts reset, audited), extend within policy, link e-mail (code out-of-band by default; opt-in separate code e-mail, trade-off documented), link re-issue, variants deleted on revoke/expire/lock. SMS delivery not implemented; real SMTP relay UNVERIFIED | LOW | fixed |
 | FN-11 | Sharing | **Fixed**: `maxViews` applies to internal shares (share-based detail/playback opens, one per 30-min session; used-up shares stop granting visibility) | LOW | fixed |
 | FN-12 | Investigation | **Fixed**: manual timeline events are soft-deleted (`deleted_at`/`deleted_by`; DELETE revoked from `ksp_app`) like annotations | LOW | fixed |
-| FN-13 | Search | Totals use `count(*) OVER ()`; ranking over large match sets ~0.2–0.35 s state-wide | LOW | open |
+| FN-13 | Search | Relevance ranking of very broad text queries is O(matches) (~75 ms for 10 000 matches on the dev host); totals capped at 10 000 and facets bounded (see appendix) | LOW | open |
 | FN-14 | Search | Radius search ignores antimeridian wrap (irrelevant for Karnataka) | LOW | accepted |
 | FN-15 | API clients | argon2 on every Basic-auth request — fixed: ≤ 60 s positive-verification cache (SEC-R8). Open: IPv6 allow-list entries must be exact addresses | LOW | open |
 | FN-16 | AI | Accuracy figures are upstream; no evaluation on KSP footage; plate OCR not validated on Indian plates; GPU inference untested; small-face track fragmentation during pans | MEDIUM | UNVERIFIED |
-| FN-17 | Accessibility | Region annotations are pointer-only; E2E/axe in Chrome only (Firefox/Safari/Edge, screen readers, zoom/forced colours untested) — ACCESSIBILITY.md | MEDIUM | open / UNVERIFIED |
-| FN-18 | Web | Integrations, API-client, retention and disposal screens axe-scanned only, not driven by E2E | LOW | open |
-| FN-19 | Performance | Single-host measurements only (PERFORMANCE.md); custody view unpaginated (1 000 events ≈ 0.6 MB); login ≈ 80/s per API process (argon2); audit append ≤ 1.2k/s | MEDIUM | open |
+| FN-17 | Accessibility | E2E/axe in Chrome only (Firefox/Safari/Edge, screen readers, zoom/forced colours untested) — ACCESSIBILITY.md. (Keyboard region editor done, see appendix) | MEDIUM | UNVERIFIED |
+| FN-19 | Performance | Single-host measurements only (PERFORMANCE.md); login ≈ 80/s per API process (argon2); audit append ≤ 1.2k/s. (Custody view paging done, see appendix) | MEDIUM | open |
 | FN-20 | Storage | Uploads > 5 GiB, AWS S3 / MinIO / Ceph behaviour, Safari native HLS, real 1080p30 long-footage throughput untested | MEDIUM | UNVERIFIED |
 | FN-21 | Storage | versitygw ignores Object Lock on CopyObject and refuses conditional writes to tombstoned keys — code uses multipart copy and never reuses keys | LOW | mitigated |
 | FN-22 | Station CLI | **Fixed**: the summary is refreshed from the server before printing (also with `--no-wait`) and outcome updates always replace the detail; already-uploaded files are marked | LOW | fixed |
 | FN-23 | E2E | API runs with `NODE_ENV=test` semantics during E2E (relaxed rate limits) | LOW | by design |
-| FN-25 | Tests | Intermittent: `apps/api/test/ai.test.ts` end-to-end AI job once processed 3 frames instead of ≥ 5 (fresh-clone run, final audit); passed on 3 re-runs. Investigate frame sampling under load before blaming the host | LOW | monitor |
-| FN-24 | Web | Production bundle is a single 2.6 MB JS chunk (627 kB gzip) — no route-level code splitting | LOW | open |
 
 ## Development host (ENV)
 
@@ -94,7 +89,7 @@ Owner is a role, not a person.
 | ENV-2 | Docker socket not accessible; system PostgreSQL (5432) unavailable → project cluster on 5433 | by design for dev |
 | ENV-3 | Heavy FFmpeg/upload suites slow/flaky when several agents run concurrently; green on sequential runs. Single-threaded `eslint .` crashes → lint uses `--concurrency` | monitor |
 | ENV-4 | Editing an applied migration causes checksum errors in a worktree's private DB (rebuild it) | note |
-| ENV-5 | Tools used by `validate-deploy.sh` / backup tests (hadolint, shellcheck, kustomize, kubeconform, actionlint, age, promtool) are not installed on the host; a missing validator prints SKIP and the script still passes. The final audit downloaded them into a scratch dir (promtool still skipped) | note |
+| ENV-5 | Validators are not preinstalled on the host: `scripts/ci/install-tools.sh` installs pinned, SHA-256-verified hadolint/shellcheck/kustomize/kubeconform/actionlint/age/promtool into `.local/bin`; `validate-deploy.sh --strict` (and `CI=true`) fails on a missing validator. Docker compose cannot be validated here (`--no-docker`, reported) | note |
 
 ## Appendix — resolved
 
@@ -111,3 +106,13 @@ Owner is a role, not a person.
 | **Final audit:** after a lockout expired, one wrong password re-locked the account (failure count never reset) | expired lock restarts the count (login + MFA) + test (`auth.test.ts`) |
 | **Final audit:** `restore.sh` interpolated DB role passwords into SQL text | `roles.sql` uses psql `:'var'` quoting; all callers pass raw values |
 | **Final audit:** `npm run db:migrate` / `db:codegen` failed on a fresh clone before `npm run build` | scripts run from source (`--conditions=ksp-src`) |
+| FN-9 PDFs used standard fonts (Kannada / non-Latin not rendered) | bundled Noto Sans + Noto Sans Kannada (OFL, SHA-256 pinned), HarfBuzz shaping, /ActualText; tests compare glyph runs with HarfBuzz, pdftotext round-trip and a 300 dpi raster (CHAIN-OF-CUSTODY.md). Other non-Latin scripts still print `?` |
+| FN-17 region annotations were pointer-only | keyboard region editor in AnnotationStudio (focusable frame: arrows move, Shift+arrows resize, Enter sets, Escape; X/Y/W/H % inputs; polite announcements); `91-keyboard` E2E + axe on the editor; unit tests for the geometry |
+| FN-18 integrations / API-client / retention / disposal screens not driven by E2E | `tests/e2e/specs/12-admin-lifecycle.spec.ts` (fixture system + FIR import, API client secret-once + revoke, retention create/assign, two-officer disposal to DISPOSED) |
+| FN-24 single 2.6 MB JS bundle (627 kB gzip) | route/tab `React.lazy` chunks + vendor chunks (react, charts, hls); first page loads 548 kB (157 kB gzip) — PERFORMANCE.md “Web bundle” |
+| FN-19 custody view unpaginated (1 000 events ≈ 0.6 MB per request) | keyset pages of 200 (`after`/`before`/`filter`), whole-chain verification in SQL, “Load more”; PDF complete (batched, 20 000 cap removed); 590 → 119 KiB, 57 → 116 rps |
+| FN-13 search totals via `count(*) OVER ()` | exact up to 10 000 then `totalApprox` (“10,000+”); tag/AI facets via bounded LATERAL lookups (facets 170–210 → 89–126 ms state-wide) |
+| EXT-11 / SEC-08 / SEC-18 react-router 6.30 advisories (GHSA-wrjc-x8rr-h8h6, GHSA-337j-9hxr-rhxg) | upgraded to `react-router` 7.18.4 (declarative mode; imports moved from `react-router-dom`); `npm audit --omit=dev`: 0 vulnerabilities |
+| FN-25 intermittent `ai.test.ts` job with 3 frames instead of ≥ 5 | root cause: the AI test-media cache (`.local/ai-test-media`, next to the shared model dir) is shared by every checkout on the host, and `slideshow()` reused any existing clip and built through a fixed temp name — two concurrent runs could rename a half-written clip into place (reproduced: a reader got a truncated / moov-less file). Fix: per-process temp file + atomic rename, cached clip reused only when its probed duration matches, 6 s fallback clip; the test now asserts `sourceDurationMs` ≥ 5.75 s and `framesProcessed ≥ framesTotal − 1` (FFmpeg `fps` rounding of the last frame). 10/10 consecutive runs green |
+| OPS-2 (part) CI did not run the Playwright suite | `e2e` job in `ci.yml` (services, stack.sh, Chrome, artifacts on failure); actionlint clean |
+| ENV-5 (part) missing validators printed SKIP and still passed | `scripts/ci/install-tools.sh` (pinned + checksum-verified) and strict mode in `validate-deploy.sh`; local strict run: all validators OK (compose skipped with `--no-docker`) |

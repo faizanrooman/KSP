@@ -40,6 +40,7 @@
     "@node-rs/argon2": "^2.2.1",
     "cron-parser": "^5.10.1",
     "dotenv": "^18.0.3",
+    "harfbuzzjs": "^1.6.2",
     "kysely": "^0.29.6",
     "nodemailer": "^10.0.10",
     "pdfkit": "^0.20.2",

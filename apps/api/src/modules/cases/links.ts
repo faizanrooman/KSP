@@ -165,7 +165,7 @@ export default async function linkRoutes(fastify: FastifyInstance) {
         'ce.id as link_id', 'ce.linked_at', 'ce.note', 'ce.unlinked_at', 'ce.unlink_reason', 'lb.full_name as linked_by_name', 'ub.full_name as unlinked_by_name',
         'e.id', 'e.evidence_number', 'e.title', 'e.status', 'e.media_status', 'e.recorded_at', 'e.duration_ms', 'e.sha256', 'e.legal_hold',
         'o.name as org_name', 'off.full_name as officer_name', 'off.badge_number as officer_badge',
-        sql<string | null>`(SELECT dv.id FROM evidence_derivatives dv WHERE dv.evidence_id = e.id AND dv.kind IN ('THUMBNAIL','POSTER') ORDER BY (dv.kind = 'THUMBNAIL') DESC, dv.created_at DESC LIMIT 1)`.as('thumb_id'),
+        sql<string | null>`(SELECT dv.id FROM evidence_derivatives dv WHERE dv.evidence_id = e.id AND e.status <> 'DISPOSED' AND dv.kind IN ('THUMBNAIL','POSTER') ORDER BY (dv.kind = 'THUMBNAIL') DESC, dv.created_at DESC LIMIT 1)`.as('thumb_id'),
         sql<number>`count(*) OVER ()`.as('total'),
       ])
       .orderBy('ce.linked_at', 'desc')

@@ -1,6 +1,6 @@
 /** Case detail tabs: overview/edit, status workflow, evidence links, team, diary, timeline. */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRightLeft, Link2, Pencil, Trash2, UserPlus } from 'lucide-react';
 import { CASE_MEMBER_ROLES, CASE_PRIORITIES, caseTransitionNeedsReason } from '@ksp/shared';

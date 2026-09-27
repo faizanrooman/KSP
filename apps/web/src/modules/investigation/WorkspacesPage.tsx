@@ -1,6 +1,6 @@
 /** Workspaces I own or am a member of; create new. */
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { FolderKanban, Plus } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';
 import { useUrlState } from '@/lib/hooks';

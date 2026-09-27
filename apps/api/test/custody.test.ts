@@ -5,6 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createHash, createPublicKey, verify, X509Certificate } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { rm } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import { Agent, closeApp, login } from './helpers.js';
@@ -73,6 +74,47 @@ describe('custody timeline', () => {
     expect(JSON.stringify(res.body)).not.toMatch(/storage_key|originals\/\d{4}/);
   });
 
+  it('keyset pages (after / before / filter) cover the chain exactly once; verification always spans the whole chain (FN-19)', async () => {
+    const ledger = (await auditRows({ evidenceId: ev.id })).map((r) => Number(r.seq));
+    expect(ledger.length).toBeGreaterThanOrEqual(6);
+    const U = `/api/v1/custody/evidence/${ev.id}`;
+    // Forward with a page size of 2.
+    const seen: number[] = [];
+    let after: number | null = null;
+    let pages = 0;
+    do {
+      const r = await meera.get(`${U}?limit=2${after === null ? '' : `&after=${after}`}`);
+      expect(r.status).toBe(200);
+      expect(r.body.events.length).toBeLessThanOrEqual(2);
+      expect(r.body.page.total).toBe(ledger.length);
+      expect(r.body.verification.eventsChecked).toBe(ledger.length); // whole chain, not just this page
+      expect(r.body.verification.chainIntact).toBe(true);
+      expect(r.body.page.hasEarlier).toBe(pages > 0);
+      seen.push(...r.body.events.map((e: { seq: number }) => e.seq));
+      after = r.body.page.nextAfter;
+      pages++;
+    } while (after !== null && pages < 100);
+    expect(seen).toEqual(ledger);
+    expect(pages).toBe(Math.ceil(ledger.length / 2));
+    // Backwards from the end: the page just before the last event.
+    const last = ledger[ledger.length - 1]!;
+    const back = await meera.get(`${U}?limit=3&before=${last}`);
+    expect(back.body.events.map((e: { seq: number }) => e.seq)).toEqual(ledger.slice(-4, -1));
+    expect(back.body.page.hasMore).toBe(true);
+    expect(back.body.page.prevBefore).toBe(ledger.length > 4 ? ledger[ledger.length - 4] : null);
+    // Custody-only filter is applied in SQL (a page never comes back empty just because of filtering).
+    const cust = await meera.get(`${U}?filter=custody&limit=1000`);
+    expect(cust.body.events.length).toBe(cust.body.page.total);
+    expect(cust.body.events.every((e: { custody: boolean }) => e.custody)).toBe(true);
+    expect(cust.body.page.total).toBeLessThanOrEqual(ledger.length);
+    expect(cust.body.verification.eventsChecked).toBe(ledger.length);
+    // Validation
+    expect((await meera.get(`${U}?after=1&before=9`)).status).toBe(400);
+    expect((await meera.get(`${U}?limit=0`)).status).toBe(400);
+    expect((await meera.get(`${U}?limit=5000`)).status).toBe(400);
+    expect((await meera.get(`${U}?bogus=1`)).status).toBe(400);
+  });
+
   it('authz: 401 unauthenticated, 403 without custody:read, 404 other jurisdiction, auditor allowed', async () => {
     expect((await anon().get(`/api/v1/custody/evidence/${ev.id}`)).status).toBe(401);
     expect((await ravi.get(`/api/v1/custody/evidence/${ev.id}`)).status).toBe(403);
@@ -116,5 +158,16 @@ describe('signed custody report', () => {
     const after = await auditRows({ evidenceId: ev.id, action: 'CUSTODY_REPORT_GENERATED' });
     expect(after.length).toBe(before + 1);
     expect((after[after.length - 1]!.details as { payloadSha256: string }).payloadSha256).toBe(res.headers['x-payload-sha256']);
+  });
+
+  it('prints Kannada evidence metadata as real text (bundled Noto fonts, FN-9)', async () => {
+    const title = 'ಕಬ್ಬನ್ ಪಾರ್ಕ್ ಠಾಣೆ ಸಾಕ್ಷ್ಯ ಜ್ಞಾಪನ';
+    expect((await meera.patch(`/api/v1/evidence/${ev.id}`, { title })).status).toBe(200);
+    const res = await app.inject({ method: 'GET', url: `/api/v1/custody/evidence/${ev.id}/report.pdf`, headers: { cookie: [...meera.cookies].map(([k, v]) => `${k}=${v}`).join('; ') } });
+    expect(res.statusCode).toBe(200);
+    const text = execFileSync('pdftotext', ['-raw', '-', '-'], { input: res.rawPayload, encoding: 'utf8' }).normalize('NFC');
+    expect(text).toContain(title);
+    expect(text).toContain('ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್');
+    expect(execFileSync('pdffonts', ['-'], { input: res.rawPayload, encoding: 'utf8' })).toMatch(/NotoSansKannada/);
   });
 });

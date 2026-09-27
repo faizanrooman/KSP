@@ -76,6 +76,8 @@ export type FacetName = 'station' | 'status' | 'storageTier' | 'tag' | 'aiLabel'
 export interface SearchResult {
   items: SearchItem[];
   total: number;
+  /** More than `total` matches: the server stopped counting at its cap (shown as "10,000+"). */
+  totalApprox?: boolean;
   page: number;
   pageSize: number;
   sort: SearchSort;

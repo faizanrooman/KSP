@@ -9,4 +9,5 @@ export * from './fact-sheet.js';
 export * from './checkpoint.js';
 export * from './manifest.js';
 export * from './watermark.js';
-export { pdfText } from './pdf.js';
+export { pdfText, createDoc, drawText, measureText, loadPdfFonts, KSP_KN, type Doc, type DocOptions } from './pdf.js';
+export { pdfFontsDir, type DrawOptions } from './pdf-text.js';

@@ -1,6 +1,6 @@
 /** Evidence detail action: add this evidence to one of my workspaces (editor/owner) or a new one. */
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { FolderPlus } from 'lucide-react';
 import type { EvidenceAction, EvidenceSummary } from '@/lib/extensions';
 import { api, errorMessage } from '@/lib/api';

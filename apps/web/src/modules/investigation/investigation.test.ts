@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeAt, laneTimeAt, layoutTimeline, regionFromDrag } from './geometry';
+import { activeAt, clampRegion, DEFAULT_REGION, describeRegion, laneTimeAt, layoutTimeline, nudgeRegion, regionFromDrag } from './geometry';
 import type { Timeline } from './api';
 
 describe('region drawing', () => {
@@ -15,6 +15,20 @@ describe('region drawing', () => {
     expect(activeAt({ startMs: 1000, endMs: 3000 }, 3500)).toBe(false);
     expect(activeAt({ startMs: 1000, endMs: null }, 2500)).toBe(true);
     expect(activeAt({ startMs: 1000, endMs: null }, 3500)).toBe(false);
+  });
+});
+
+describe('keyboard region editing', () => {
+  it('moves with arrows, resizes with shift+arrows, stays inside the frame', () => {
+    expect(nudgeRegion(DEFAULT_REGION, 'ArrowRight', false)).toEqual({ x: 0.41, y: 0.4, w: 0.2, h: 0.2 });
+    expect(nudgeRegion(DEFAULT_REGION, 'ArrowUp', false, 0.1)).toEqual({ x: 0.4, y: 0.3, w: 0.2, h: 0.2 });
+    expect(nudgeRegion(DEFAULT_REGION, 'ArrowRight', true)).toEqual({ x: 0.4, y: 0.4, w: 0.21, h: 0.2 });
+    expect(nudgeRegion(DEFAULT_REGION, 'ArrowUp', true)).toEqual({ x: 0.4, y: 0.4, w: 0.2, h: 0.19 });
+    expect(nudgeRegion({ x: 0.95, y: 0, w: 0.05, h: 0.05 }, 'ArrowRight', false)).toEqual({ x: 0.95, y: 0, w: 0.05, h: 0.05 });
+    expect(nudgeRegion({ x: 0.5, y: 0.5, w: 0.01, h: 0.01 }, 'ArrowLeft', true)).toEqual({ x: 0.5, y: 0.5, w: 0.01, h: 0.01 });
+    expect(nudgeRegion(DEFAULT_REGION, 'Enter', false)).toBeNull();
+    expect(clampRegion({ x: 0.9, y: -1, w: 0.5, h: 2 })).toEqual({ x: 0.5, y: 0, w: 0.5, h: 1 });
+    expect(describeRegion(DEFAULT_REGION)).toBe('left 40%, top 40%, width 20%, height 20%');
   });
 });
 

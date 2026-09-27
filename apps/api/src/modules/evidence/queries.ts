@@ -32,7 +32,8 @@ export function thumbnailUrl(p: Principal, evidenceId: string, derivativeId: str
   return `/api/v1/media/image/${derivativeId}?t=${encodeURIComponent(t)}`;
 }
 
-const thumbSql = sql<string | null>`(SELECT dv.id FROM evidence_derivatives dv WHERE dv.evidence_id = e.id AND dv.kind IN ('THUMBNAIL','POSTER')
+// Disposed evidence has no media any more (derived objects are deleted; the rows stay for the record).
+const thumbSql = sql<string | null>`(SELECT dv.id FROM evidence_derivatives dv WHERE dv.evidence_id = e.id AND e.status <> 'DISPOSED' AND dv.kind IN ('THUMBNAIL','POSTER')
   ORDER BY (dv.kind = 'THUMBNAIL') DESC, dv.created_at DESC LIMIT 1)`;
 const tagsSql = sql<string[]>`ARRAY(SELECT t.tag FROM evidence_tags t WHERE t.evidence_id = e.id ORDER BY t.tag)`;
 

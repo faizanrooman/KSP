@@ -1,6 +1,6 @@
 /** Verify a court export package (ZIP upload) or a manifest.json + manifest.sig pair. */
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import { ShieldCheck } from 'lucide-react';
 import { request, errorMessage } from '@/lib/api';

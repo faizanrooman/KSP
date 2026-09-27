@@ -1,6 +1,7 @@
 /**
  * Frontend module registry. Each feature lives in src/modules/<name>/module.tsx and default-exports a
- * WebModule. Modules are discovered automatically — no shared route file to edit.
+ * WebModule. Modules are discovered automatically — no shared route file to edit. Route elements are lazy
+ * (`lazyPage` in ./lazy.tsx): module.tsx files are metadata, their pages are separate chunks.
  */
 import type { ComponentType } from 'react';
 import type { Permission } from '@ksp/shared';

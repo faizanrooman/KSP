@@ -32,8 +32,9 @@ let aiCtx: ReturnType<typeof createAiContext>;
 
 async function testVideo(): Promise<string> {
   if (MEDIA.images) return slideshow([MEDIA.images.street, MEDIA.images.portrait, MEDIA.images.plate], [2, 2, 2], 'ai-api-6s');
-  const out = `${loadConfig().WORK_DIR}/ai-api-testsrc.mp4`;
-  await ffmpeg(['-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=25:duration=3', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', out]);
+  // Same 6 s length as the slideshow so the frame-count checks hold without the downloaded images too.
+  const out = `${loadConfig().WORK_DIR}/ai-api-testsrc-6s.mp4`;
+  await ffmpeg(['-y', '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=25:duration=6', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', out]);
   return out;
 }
 
@@ -140,6 +141,11 @@ describe('end-to-end with the isolated worker: detections and crops', () => {
     const job = (await io.get(`/api/v1/ai/jobs/${r.body.id}`)).body;
     expect(job.error).toBeNull();
     expect(job.status).toBe('COMPLETED');
+    // The worker read the whole 6 s proxy and sampled it at 1 fps: framesTotal = ceil(duration × fps); FFmpeg's fps
+    // filter may emit one frame fewer at the very end (rounding of the last timestamp) — never fewer than that.
+    expect(job.stats.sourceDurationMs).toBeGreaterThanOrEqual(5750);
+    expect(job.stats.framesTotal).toBe(Math.ceil(job.stats.sourceDurationMs / 1000));
+    expect(job.stats.framesProcessed).toBeGreaterThanOrEqual(job.stats.framesTotal - 1);
     expect(job.stats.framesProcessed).toBeGreaterThanOrEqual(5);
 
     const d = await io.get(`/api/v1/ai/evidence/${A.id}/detections?jobId=${r.body.id}`);

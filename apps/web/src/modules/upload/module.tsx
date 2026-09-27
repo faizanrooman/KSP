@@ -1,8 +1,10 @@
 import { History, ShieldAlert, UploadCloud } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { UploadPage } from './UploadPage';
-import { UploadHistoryPage } from './UploadHistoryPage';
-import { QuarantinePage } from './QuarantinePage';
+import { lazyPage } from '@/lib/lazy';
+
+const UploadPage = lazyPage(() => import('./UploadPage'), 'UploadPage');
+const UploadHistoryPage = lazyPage(() => import('./UploadHistoryPage'), 'UploadHistoryPage');
+const QuarantinePage = lazyPage(() => import('./QuarantinePage'), 'QuarantinePage');
 
 const mod: WebModule = {
   id: 'upload',

@@ -1,6 +1,6 @@
 /** Export detail: status/progress, items with verified hashes, approve/reject, download, revoke. */
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Download, XCircle } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';

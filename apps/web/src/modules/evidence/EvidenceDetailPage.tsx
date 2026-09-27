@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Lock, ShieldCheck } from 'lucide-react';
 import type { Permission } from '@ksp/shared';
@@ -6,6 +6,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useUrlState } from '@/lib/hooks';
 import { EVIDENCE_ACTIONS, EVIDENCE_TABS } from '@/lib/extensions';
+import { LazyBoundary } from '@/lib/lazy';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { Alert, Badge, CopyButton, EmptyState, ErrorState, PageHeader, Spinner, StatusBadge, Tabs } from '@/components/ui';
 import { PERMISSION_FLAGS, evidenceKey, type EvidenceDetail } from './types';
@@ -118,7 +119,7 @@ export function EvidenceDetailPage() {
         <div>
           <Tabs tabs={tabs.map((t) => ({ id: t.id, label: t.label }))} value={active.id} onChange={(tab) => setUrl({ tab: tab === tabs[0]?.id ? '' : tab })} />
           <div role="tabpanel" aria-label={active.label}>
-            {ActiveTab && <ActiveTab evidence={ev} />}
+            {ActiveTab && <LazyBoundary key={active.id}><ActiveTab evidence={ev} /></LazyBoundary>}
           </div>
         </div>
       )}

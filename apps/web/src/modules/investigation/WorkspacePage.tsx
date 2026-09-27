@@ -4,7 +4,7 @@
  * Evidence the current user cannot see is shown as a restricted placeholder — the workspace never grants access.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { Archive, ArchiveRestore, Film, Link2, Lock, Pencil, Plus, Trash2, UserMinus, UserPlus } from 'lucide-react';
 import { SyncPlayer, type SyncItem } from '@/modules/video';
 import { api, errorMessage } from '@/lib/api';

@@ -2,15 +2,18 @@
  * Single-video review: EvidencePlayer with bookmarks as markers and REGION annotations drawn as overlays
  * (percentage coordinates inside the frame box, so they follow zoom/pan). Create bookmarks/annotations at the
  * current time; drag a region box on the paused frame; click any list entry to seek.
+ * Keyboard alternative for regions (WCAG 2.1.1): the frame is focusable while a region draft is open — arrow keys
+ * move the box, Shift+arrow keys resize it, Enter sets it, Escape stops drawing — and X/Y/W/H inputs (percent of
+ * the frame) edit it numerically. Changes are announced in a polite live region.
  */
-import { useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from 'react';
 import { BookmarkPlus, Pencil, Square, StickyNote, Trash2, X } from 'lucide-react';
 import { EvidencePlayer, type EvidencePlayerHandle, type PlayerMarker } from '@/modules/video';
 import { api, errorMessage } from '@/lib/api';
 import { formatTimecode } from '@/lib/format';
 import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Field, Input, Select, Spinner, Textarea, useToast } from '@/components/ui';
 import { useAnnotations, useBookmarks, useWsMutation, type AnnotationRow, type Region } from './api';
-import { activeAt, regionFromDrag } from './geometry';
+import { activeAt, clampRegion, DEFAULT_REGION, describeRegion, nudgeRegion, regionFromDrag } from './geometry';
 
 const COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7'];
 
@@ -44,6 +47,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
   const overlayRef = useRef<HTMLDivElement>(null);
   const [bmLabel, setBmLabel] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<AnnotationRow | null>(null);
+  const [announce, setAnnounce] = useState('');
 
   const addBookmark = useWsMutation((v: { label: string; timeMs: number }) => api.post('/workspaces/bookmarks', { evidenceId, workspaceId, ...v }));
   const delBookmark = useWsMutation((id: string) => api.delete(`/workspaces/bookmarks/${id}`));
@@ -117,6 +121,39 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
     return draft?.kind === 'REGION' ? draft.region : null;
   })();
 
+  const regionDraft = draft?.kind === 'REGION';
+  const setRegion = (region: Region, message: string) => {
+    setDraft((d) => (d ? { ...d, region } : d));
+    setAnnounce(`${message}: ${describeRegion(region)}`);
+  };
+  /** Keyboard editing on the focused frame. Handled keys stop here so the player's shortcuts do not fire. */
+  const onRegionKey = (e: RKeyboardEvent<HTMLDivElement>) => {
+    if (!draft || draft.kind !== 'REGION' || e.ctrlKey || e.metaKey || e.altKey) return;
+    const cur = draft.region;
+    if (e.key === 'Enter' || e.key === ' ') {
+      const reg = cur ?? DEFAULT_REGION;
+      setRegion(reg, 'Region set');
+      setDrawing(false);
+      document.getElementById('an-body')?.focus();
+    } else if (e.key === 'Escape') {
+      setDrawing(false);
+      setAnnounce(cur ? `Region kept: ${describeRegion(cur)}` : 'No region set');
+    } else {
+      const next = cur ? nudgeRegion(cur, e.key, e.shiftKey) : e.key.startsWith('Arrow') ? DEFAULT_REGION : null;
+      if (!next) return;
+      player.current?.pause();
+      setRegion(next, cur ? (e.shiftKey ? 'Resized' : 'Moved') : 'Region created');
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const onRegionInput = (k: keyof Region, raw: string) => {
+    const v = Number(raw);
+    if (raw.trim() === '' || !Number.isFinite(v)) return;
+    const next = clampRegion({ ...(draft?.region ?? DEFAULT_REGION), [k]: v / 100 });
+    setDraft((d) => (d ? { ...d, region: next } : d));
+  };
+
   const box = (reg: Region, color: string, label?: string, dashed?: boolean) => (
     <div
       className="pointer-events-none absolute border-2"
@@ -129,12 +166,16 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
   const overlays = (
     <div
       ref={overlayRef}
-      className={`absolute inset-0 ${drawing ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+      className={`absolute inset-0 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-400 ${drawing ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
-      role={drawing ? 'application' : undefined}
-      aria-label={drawing ? 'Drag to draw a region on the frame' : undefined}
+      onKeyDown={regionDraft ? onRegionKey : undefined}
+      tabIndex={regionDraft ? 0 : undefined}
+      role={regionDraft ? 'application' : undefined}
+      aria-roledescription={regionDraft ? 'region editor' : undefined}
+      aria-label={regionDraft ? 'Region editor: drag to draw a region on the frame, or use arrow keys to move and Shift+arrow keys to resize; Enter sets the region, Escape stops drawing' : undefined}
+      aria-keyshortcuts={regionDraft ? 'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Enter Escape' : undefined}
     >
       {visibleRegions.map((a) => <div key={a.id}>{box(a.region!, a.color ?? '#ef4444', a.body ?? 'Region')}</div>)}
       {liveRegion && box(liveRegion, draft?.color ?? '#ef4444', 'New region', true)}
@@ -193,12 +234,32 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
               </div>
             </div>
             {draft.kind === 'REGION' && (
-              <div className="mt-2 flex items-center gap-2 text-sm">
-                {draft.region ? <Badge tone="green">Region set ({Math.round(draft.region.w * 100)}% × {Math.round(draft.region.h * 100)}%)</Badge> : <Badge tone="amber">No region yet</Badge>}
-                <Button size="sm" variant="secondary" onClick={() => { player.current?.pause(); setDrawing(true); }} aria-pressed={drawing}>
-                  {drawing ? 'Drag on the frame…' : draft.region ? 'Redraw region' : 'Draw region'}
-                </Button>
-              </div>
+              <>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                  {draft.region ? <Badge tone="green">Region set ({Math.round(draft.region.w * 100)}% × {Math.round(draft.region.h * 100)}%)</Badge> : <Badge tone="amber">No region yet</Badge>}
+                  <Button size="sm" variant="secondary" onClick={() => { player.current?.pause(); setDrawing(true); }} aria-pressed={drawing}>
+                    {drawing ? 'Drag on the frame…' : draft.region ? 'Redraw region' : 'Draw region'}
+                  </Button>
+                  <span className="text-xs text-ink-500">Keyboard: focus the frame, arrows move, Shift+arrows resize, Enter sets — or type the values below.</span>
+                </div>
+                <fieldset className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+                  <legend className="sr-only">Region position and size (percent of the frame)</legend>
+                  {(['x', 'y', 'w', 'h'] as const).map((k) => (
+                    <Field key={k} label={{ x: 'Region left (%)', y: 'Region top (%)', w: 'Region width (%)', h: 'Region height (%)' }[k]} htmlFor={`an-region-${k}`}>
+                      <Input
+                        id={`an-region-${k}`}
+                        type="number"
+                        min={k === 'w' || k === 'h' ? 1 : 0}
+                        max={100}
+                        step={0.1}
+                        value={draft.region ? String(Math.round(draft.region[k] * 1000) / 10) : ''}
+                        placeholder={String(DEFAULT_REGION[k] * 100)}
+                        onChange={(e) => onRegionInput(k, e.target.value)}
+                      />
+                    </Field>
+                  ))}
+                </fieldset>
+              </>
             )}
             {saveAnn.error && <div className="mt-2"><Alert tone="red">{errorMessage(saveAnn.error)}</Alert></div>}
             <div className="mt-3 flex justify-end">
@@ -252,6 +313,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
           )}
         </Card>
       </div>
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announce}</div>
       <ConfirmDialog
         open={!!confirmDelete}
         title="Delete annotation"

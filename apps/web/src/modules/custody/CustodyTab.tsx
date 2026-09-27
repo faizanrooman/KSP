@@ -1,6 +1,9 @@
-/** Evidence tab "Chain of custody": ledger-verified timeline + signed PDF report download. */
+/**
+ * Evidence tab "Chain of custody": ledger-verified timeline (keyset pages of 200, "Load more"; the whole chain is
+ * verified server-side on every request) + signed PDF report download (always complete).
+ */
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { CheckCircle2, Download, ShieldAlert, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatDateTime, shortHash, titleCase } from '@/lib/format';
@@ -29,19 +32,29 @@ export interface CustodyEvent {
 export interface CustodyResponse {
   evidence: { id: string; evidenceNumber: string | null; sha256: string | null; sha512: string | null; status: string };
   events: CustodyEvent[];
+  page: { limit: number; filter: 'all' | 'custody'; total: number; hasMore: boolean; hasEarlier: boolean; nextAfter: number | null; prevBefore: number | null };
   verification: { chainIntact: boolean; eventsChecked: number; brokenSeqs: number[]; ledgerHead: { seq: number; hash: string } | null; verifiedAt: string };
 }
+
+const PAGE_SIZE = 200;
 
 const ACTOR_LABEL: Record<string, string> = { USER: 'User', SYSTEM: 'System', API_CLIENT: 'API client', EXTERNAL_RECIPIENT: 'External recipient' };
 
 export function CustodyTab({ evidence }: { evidence: EvidenceSummary }) {
   const [filter, setFilter] = useState<'custody' | 'all'>('custody');
   const [open, setOpen] = useState<CustodyEvent | null>(null);
-  const q = useQuery({ queryKey: ['custody', evidence.id], queryFn: () => api.get<CustodyResponse>(`/custody/evidence/${evidence.id}`) });
+  const q = useInfiniteQuery({
+    queryKey: ['custody', evidence.id, filter],
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam }) => api.get<CustodyResponse>(`/custody/evidence/${evidence.id}`, { filter, limit: PAGE_SIZE, after: pageParam ?? undefined }),
+    getNextPageParam: (last) => last.page.nextAfter,
+  });
   if (q.isLoading) return <Spinner label="Verifying chain of custody…" />;
-  if (q.error) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
-  const d = q.data!;
-  const events = filter === 'custody' ? d.events.filter((e) => e.custody) : d.events;
+  if (q.error && !q.data) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
+  const pages = q.data!.pages;
+  const d = pages[pages.length - 1]!;
+  const events = pages.flatMap((p) => p.events);
+  const total = d.page.total;
   const v = d.verification;
   return (
     <div className="space-y-4">
@@ -59,7 +72,7 @@ export function CustodyTab({ evidence }: { evidence: EvidenceSummary }) {
         actions={
           <div className="flex items-center gap-2">
             <label className="sr-only" htmlFor="custody-filter">Show</label>
-            <select id="custody-filter" className="rounded-md border border-ink-300 px-2 py-1 text-xs" value={filter} onChange={(e) => setFilter(e.target.value as 'custody' | 'all')}>
+            <select id="custody-filter" className="rounded-md border border-ink-300 px-2 py-1 text-xs" value={filter} onChange={(e) => setFilter(e.target.value as 'custody' | 'all')} aria-label="Show">
               <option value="custody">Custody events</option>
               <option value="all">All linked events</option>
             </select>
@@ -99,6 +112,15 @@ export function CustodyTab({ evidence }: { evidence: EvidenceSummary }) {
             ))}
           </ol>
         )}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-600">
+          <span role="status" aria-live="polite">Showing {events.length} of {total} {filter === 'custody' ? 'custody' : 'linked'} events</span>
+          {q.hasNextPage && (
+            <Button size="sm" variant="secondary" loading={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
+              Load more ({Math.min(PAGE_SIZE, total - events.length)} of {total - events.length} remaining)
+            </Button>
+          )}
+        </div>
+        {q.error && q.data ? <div className="mt-2"><Alert tone="red">Could not load more events. <Button size="sm" variant="ghost" onClick={() => void q.fetchNextPage()}>Retry</Button></Alert></div> : null}
       </Card>
       {open && (
         <Modal open onClose={() => setOpen(null)} title={`Ledger event #${open.seq}`} size="lg">

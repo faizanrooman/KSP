@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { ShieldAlert, SearchX } from 'lucide-react';
 import { EmptyState } from '@/components/ui';
 

@@ -1,7 +1,9 @@
 import { ScrollText, ShieldCheck } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { AuditLogPage } from './AuditLogPage';
-import { LedgerPage } from './LedgerPage';
+import { lazyPage } from '@/lib/lazy';
+
+const AuditLogPage = lazyPage(() => import('./AuditLogPage'), 'AuditLogPage');
+const LedgerPage = lazyPage(() => import('./LedgerPage'), 'LedgerPage');
 
 const mod: WebModule = {
   id: 'audit',

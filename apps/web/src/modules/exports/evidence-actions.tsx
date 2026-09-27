@@ -1,5 +1,5 @@
 /** Evidence detail action "Export for court" (shown when the API's canExport flag allows it). */
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Gavel } from 'lucide-react';
 import type { EvidenceAction, EvidenceSummary } from '@/lib/extensions';
 import { Button } from '@/components/ui';

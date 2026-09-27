@@ -1,5 +1,5 @@
 /** Shares list: created by me, received (internal), all in jurisdiction (share:manage_all). */
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { SHARE_STATUSES } from '@ksp/shared';
 import { api } from '@/lib/api';

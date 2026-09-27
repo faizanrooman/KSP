@@ -25,9 +25,18 @@ export function saveMfa(user: string, entry: MfaEntry): void {
 }
 // The server accepts each TOTP time-step at most once per user (SEC-12) and a ±1 step window. Hand out codes for a
 // strictly increasing step per secret, waiting (synchronously; the suite runs with workers: 1) when the next step is
-// not yet acceptable.
+// not yet acceptable. The last step is persisted in the state dir: Playwright restarts the worker process after a
+// failed test, and an in-memory record would then hand out an already-used step again.
 const STEP_MS = 30_000;
-const lastStep = new Map<string, number>();
+const STEP_FILE = resolve(STATE_DIR, 'totp-steps.json');
+const lastStep = {
+  get: (secret: string): number | undefined => (existsSync(STEP_FILE) ? (JSON.parse(readFileSync(STEP_FILE, 'utf8')) as Record<string, number>)[secret] : undefined),
+  set: (secret: string, step: number): void => {
+    mkdirSync(STATE_DIR, { recursive: true });
+    const all = existsSync(STEP_FILE) ? (JSON.parse(readFileSync(STEP_FILE, 'utf8')) as Record<string, number>) : {};
+    writeFileSync(STEP_FILE, JSON.stringify({ ...all, [secret]: step }));
+  },
+};
 function sleepSync(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }

@@ -2,7 +2,8 @@
 
 **Status:** container images, compose and Kubernetes manifests are authored and statically validated
 (`scripts/ci/validate-deploy.sh`: hadolint, shellcheck, kustomize + kubeconform, actionlint, `docker compose
-config`). They have **never been built or run** (no Docker access on the development host) — UNVERIFIED.
+config`, promtool; install the pinned, checksum-verified tools with `scripts/ci/install-tools.sh`, run with `--strict`
+so a missing validator fails). They have **never been built or run** (no Docker access on the development host) — UNVERIFIED.
 What *is* verified: `npm run build` and every production entrypoint (`node …/dist/…`) running from a reproduction
 of the image file layout with production-only dependencies (`scripts/ci/simulate-image.sh`), in `NODE_ENV=production`,
 including a full DR drill (docs/DISASTER-RECOVERY.md).

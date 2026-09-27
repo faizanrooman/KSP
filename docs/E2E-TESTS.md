@@ -21,6 +21,10 @@ node tests/e2e/scripts/axe-summary.mjs [--rules] [--markdown]    # per-page axe 
 ```
 
 * Chrome: `/opt/google/chrome/chrome` (override with `E2E_CHROME`) — no browser download needed.
+* CI: job `e2e` in `.github/workflows/ci.yml` (PostgreSQL service, versitygw + pinned FFmpeg containers,
+  `scripts/ci/ci-env.sh`, migrate + seed, `fetch-models` registration, `stack.sh start`, `npm run test:e2e` with the
+  runner's Google Chrome via `E2E_CHROME=/usr/bin/google-chrome`, axe summary in the job summary; on failure
+  `tests/e2e/artifacts/` and `.local/logs/` are uploaded). **UNVERIFIED** — never executed on GitHub.
 * The API runs with `NODE_ENV=test` semantics against the checkout's `.env` (`KSP_ENV_FILE`). The only
   behavioural difference is relaxed rate limits (login 10/min/IP in development would throttle ~60 logins per run).
   Account lockout, the IP failed-login throttle, CSRF, MFA and every authorization rule are unchanged.
@@ -58,8 +62,9 @@ header, or the final DOM of each page. (It found physical bucket names in the da
 | `09-share` | Internal share to another officer (visible in “Shared with me”); external share → fresh context `/s/:token` → wrong code (attempts left) → right code → watermarked playback, `nodownload`, no download button; access log |
 | `10-admin` | Create user → one-time password shown once → first login forced change → grant role → disable → login refused; roles matrix; org unit; device; settings change + restore; alerts acknowledge; report run + CSV download; system health (roles, not bucket names); dashboards |
 | `11-authz` | Other-station IO: evidence URL → not-found (404, never 403), not in search; field-officer nav; direct admin URLs → access denied; unknown route → not found |
+| `12-admin-lifecycle` | Integrations: admin adds a `fixture` CCTNS system, enables it, health check + contract test with a probe FIR, IO imports that FIR (lands on the FIR, fixture warning shown), sync log shows `FIR_IMPORT`, system disabled again · API clients: create → secret shown once (works for Basic auth on `/api/v1/integration/evidence`, never shown/listed again) → revoke with reason → 401 · Retention: custodian creates a policy, assigns it on a fresh upload's Lifecycle tab (evidence count 1) · Disposal: custodian requests (cannot approve own request) → supervisor approves with a note → worker executes → evidence `DISPOSED`, request under *Executed* with the disposal time |
 | `90-a11y` | axe-core WCAG 2.1 A/AA (+ best-practice, reported only) on ~50 page states incl. every evidence/case/workspace tab and the share portal; fails on serious/critical WCAG violations |
-| `91-keyboard` | Keyboard-only: login, skip link, nav, list row, tabs (arrows), player controls/shortcuts, review queue shortcuts, dialog focus trap/restore, typing reasons does not fire shortcuts |
+| `91-keyboard` | Keyboard-only: login, skip link, nav, list row, tabs (arrows), player controls/shortcuts, review queue shortcuts, dialog focus trap/restore, typing reasons does not fire shortcuts; region annotation created/moved/resized with arrow keys + numeric input, live-region announcements, axe on the editor |
 | `92-responsive` | 1280 px and 768 px: no horizontal page scroll on 11 main pages, menu button below 1024 px, screenshots |
 
 ## Results
@@ -75,4 +80,7 @@ isolation before being treated as a product bug.
   public pages. Declare intentional failures with `guard.expectFailure(/regex/, status)`.
 * Locate by role/label (`getByRole('region', { name: 'Fixity' })` works because `Card` titles name their section).
 * Wait on the product (status toasts, polling UI), not on timeouts. Use `apiGet` only to *read* state.
-* Unique names: include `runId()`; never depend on data a previous run left behind.
+* Unique names: include `runId()`; never depend on data a previous run left behind. Specs meant to be re-run with
+  `E2E_REUSE=1` add a time suffix (see `12-admin-lifecycle`), because the run id is reused.
+* TOTP steps handed out per secret are persisted in `.state/totp-steps.json`: Playwright restarts the worker after
+  a failed test and an in-memory record would replay an already-used step (the server rejects it, SEC-12).

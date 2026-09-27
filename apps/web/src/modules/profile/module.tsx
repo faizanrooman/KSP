@@ -1,6 +1,8 @@
 import { UserCircle2 } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { ProfilePage } from './ProfilePage';
+import { lazyPage } from '@/lib/lazy';
+
+const ProfilePage = lazyPage(() => import('./ProfilePage'), 'ProfilePage');
 
 const mod: WebModule = {
   id: 'profile',

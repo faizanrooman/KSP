@@ -68,7 +68,7 @@ CVSS-style ratings are the assessor's estimates (CVSS v3.1 base vector reasoning
 | SEC-05 | AES-256-GCM decryption accepted truncated auth tags (verified: Node 22 accepts a 4-byte tag) | Low (requires DB write access) | core crypto | Fixed | `df6e219` · `security-crypto.test.ts` |
 | SEC-06 | `evidence.org_unit_id`/`org_path` writable by `ksp_app` after registration — silent jurisdiction move possible from a compromised app connection | Medium (defence in depth) | DB | Fixed (migration 0990) | `f61b035` · `security-db-privileges.test.ts` |
 | SEC-07 | Watchlist `embeddingError` returned server filesystem paths to watchlist managers | Low (info disclosure) | ai-worker | Fixed | `f61b035` · `security-watchlist.test.ts` |
-| SEC-08 | npm advisories: `react-router` (open redirect via backslash; SSR deserialisation — SSR not used), `vitest`/`@vitest/mocker` (dev only) | Moderate | dependencies | Open — upgrade `react-router-dom` when a fixed minor is available; vitest is dev-only | — |
+| SEC-08 | npm advisories: `react-router` (open redirect via backslash; SSR deserialisation — SSR not used), `vitest`/`@vitest/mocker` (dev only) | Moderate | dependencies | **Fixed** 2026-09-27 — web moved to `react-router` 7.18.4 (declarative mode, `BrowserRouter`/`Routes` unchanged); `npm audit --omit=dev`: 0 vulnerabilities; vitest is dev-only | web tests + full E2E |
 | SEC-09 | Operators with `system:monitor` can trigger reprocessing of any evidence id and learn existence (202 vs 404) outside their jurisdiction | Low | media reprocess | **Fixed in round 2** — scoped to the jurisdiction of the `system:monitor` grant; out of scope = 404 | `security-media.test.ts` |
 
 Also found and fixed during setup: HEAD at the time broke `npm ci` (`EOVERRIDE`); main has since removed the override block.
@@ -156,7 +156,7 @@ test; all API suites green (`npm test -w @ksp/api`).
 | SEC-14 | `/exports/verify` had no inflate limits (a 1.3 MB zip inflated 300 MB per request) and looked up every manifest item in the DB (50 000 items = 5.6 s per request) — authenticated DoS for any export / audit role | Medium | exports | Fixed — ≤ 10 000 entries, ≤ 256 MiB inflated (declared sizes enforced by yauzl `validateEntrySizes`), ratio ≤ 100 for entries > 1 MiB, backslash names refused, manifests > 1 000 items / 10 000 files not looked up | `7c53d1d` · `security-export-verify.test.ts` |
 | SEC-15 | Upload initiation had no per-route rate limit (only the global 1200/min/IP) although each initiation creates an S3 multipart upload | Low | uploads | Fixed — 120/min/IP in production | `185fc84` · `security-production.test.ts` |
 | SEC-16 | A PostgreSQL backend dying under a checked-out connection (DB restart, crash recovery, failover, admin kill) emitted an unhandled `'error'` on the pg Client and **terminated the API process** (observed during load testing when the DB restarted). Same pool code is used by worker and AI worker | Medium (availability) | core db | Fixed — error listeners on the pool and on every client; in-flight queries still reject, the pool reconnects | `7f8be0a` · the API then survived 4 PostgreSQL crash-restarts during load runs (`docs/PERFORMANCE.md`) |
-| SEC-18 | Trivy: `react-router` 6.30.6 CVE-2026-53666 / CVE-2026-53669 (MEDIUM, fixed only in 7.18.0 — a major upgrade); same package as SEC-08 | Moderate | web deps | Open — plan the react-router 7 migration (SSR not used; the open redirect needs a crafted in-app link) | — |
+| SEC-18 | Trivy: `react-router` 6.30.6 CVE-2026-53666 / CVE-2026-53669 (MEDIUM, fixed only in 7.18.0 — a major upgrade); same package as SEC-08 | Moderate | web deps | **Fixed** — `react-router` 7.18.4 (≥ 7.18.0 carries both fixes); `react-router-dom` removed | web tests + full E2E |
 | — | Mass assignment | — | all bodies | **No finding** — Zod already stripped unknown keys before every handler; hardening only (`.strict()` on the security-relevant bodies) | `67cde2e` · `security-mass-assignment.test.ts` |
 
 SEC-09 (round 1) is fixed in this round: reprocess by `system:monitor` holders is limited to the jurisdiction of that
@@ -168,6 +168,7 @@ grant (`185fc84`). SEC-17 is intentionally unused.
 `trivy config deploy/`:
 
 * **Vulnerabilities** (package-lock.json, production dependencies): 2 × MEDIUM, both `react-router` (SEC-18); 0 HIGH / CRITICAL.
+  *Update 2026-09-27:* both fixed by the react-router 7 upgrade (`npm audit --omit=dev` → 0; Trivy not re-run here).
 * **Secrets**: none.
 * **Dockerfile** (`deploy/docker/Dockerfile`): 0 misconfigurations.
 * **Kubernetes** (raw base manifests, before kustomize): KSV-0013 `:latest` and KSV-0125 untrusted registry — false

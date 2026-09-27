@@ -1,12 +1,16 @@
 import { Building2, Camera, Settings, ShieldCheck, Users } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { UsersListPage } from './UsersListPage';
-import { UserCreatePage } from './UserCreatePage';
-import { UserDetailPage } from './UserDetailPage';
-import { RoleDetailPage, RolesListPage } from './RolesPage';
-import { OrgUnitsPage } from './OrgUnitsPage';
-import { DeviceDetailPage, DevicesPage } from './DevicesPage';
-import { SettingsPage } from './SettingsPage';
+import { lazyPage } from '@/lib/lazy';
+
+const UsersListPage = lazyPage(() => import('./UsersListPage'), 'UsersListPage');
+const UserCreatePage = lazyPage(() => import('./UserCreatePage'), 'UserCreatePage');
+const UserDetailPage = lazyPage(() => import('./UserDetailPage'), 'UserDetailPage');
+const RoleDetailPage = lazyPage(() => import('./RolesPage'), 'RoleDetailPage');
+const RolesListPage = lazyPage(() => import('./RolesPage'), 'RolesListPage');
+const OrgUnitsPage = lazyPage(() => import('./OrgUnitsPage'), 'OrgUnitsPage');
+const DeviceDetailPage = lazyPage(() => import('./DevicesPage'), 'DeviceDetailPage');
+const DevicesPage = lazyPage(() => import('./DevicesPage'), 'DevicesPage');
+const SettingsPage = lazyPage(() => import('./SettingsPage'), 'SettingsPage');
 
 const mod: WebModule = {
   id: 'admin',

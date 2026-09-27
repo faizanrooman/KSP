@@ -1,13 +1,12 @@
 /** Evidence detail tabs: "Bookmarks & annotations" (all I can see on this item) and "Related evidence". */
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import type { EvidenceSummary, EvidenceTab } from '@/lib/extensions';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { formatTimecode, titleCase } from '@/lib/format';
+import { formatTimecode, parseTimeInput, titleCase } from '@/lib/format';
 import { Alert, Badge, Button, Card, EmptyState, ErrorState, Field, Input, Select, Spinner, Textarea } from '@/components/ui';
 import { useRelated } from '@/modules/search/api';
-import { parseTimeInput } from '@/modules/video/tabs';
 import { useAnnotations, useBookmarks, useRelations, useWsMutation } from './api';
 
 const at = (id: string, ms: number) => `/evidence/${id}?tab=playback&t=${Math.max(1, Math.round(ms))}`;

@@ -112,7 +112,9 @@ Dev users (seeded): `admin`, `fo.ravi`, `op.cubbon`, `io.meera`, `io.arjun`, `su
 
 * Module: `apps/web/src/modules/<name>/module.tsx` default-exports `WebModule` (`routes`, `nav`, optional
   `publicRoutes`). Contribute evidence-page tabs/actions via `evidence-tabs.tsx` / `evidence-actions.tsx`,
-  case tabs via `case-tabs.tsx` (see `src/lib/extensions.ts`).
+  case tabs via `case-tabs.tsx` (see `src/lib/extensions.ts`). Registries stay small and eager: reference page and
+  tab components through `lazyPage(() => import('./XPage'), 'XPage')` (`src/lib/lazy.tsx`) so each page is its own
+  chunk; do not import heavy modules (player, charts) from registry files.
 * Data: TanStack Query + `api` from `@/lib/api`. Permissions: `useAuth().can(...)` / `canAny(...)`.
 * UI: use `@/components/ui` (Button, Field, Input, Select, DataTable, Pagination, Modal, ConfirmDialog,
   Tabs, StatusBadge, EmptyState, ErrorState, Spinner, Alert, KeyValue, Stat, ProgressBar, useToast).

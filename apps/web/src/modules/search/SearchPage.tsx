@@ -4,7 +4,7 @@
  * only included when the user ticks "Include unreviewed AI results", and is labelled as such.
  */
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Bookmark, Film, Filter, Lock, MapPin, Save, Search, Sparkles, Trash2, X } from 'lucide-react';
 import { AI_TASKS, EVIDENCE_STATUSES, MEDIA_STATUSES, STORAGE_TIERS } from '@ksp/shared';
 import { useUrlState } from '@/lib/hooks';
@@ -412,7 +412,7 @@ export function SearchPage() {
         <section aria-label="Results" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-ink-600" aria-live="polite">
-              {data ? `${data.total.toLocaleString('en-IN')} result${data.total === 1 ? '' : 's'}` : ' '}
+              {data ? `${data.total.toLocaleString('en-IN')}${data.totalApprox ? '+' : ''} result${data.total === 1 && !data.totalApprox ? '' : 's'}` : ' '}
               {data && <span className="text-ink-500"> · {data.tookMs} ms</span>}
               {q.isFetching && !q.isLoading && <span className="ml-2 text-ink-500">Updating…</span>}
             </p>

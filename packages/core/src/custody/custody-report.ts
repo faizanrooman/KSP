@@ -15,7 +15,7 @@ import QRCode from 'qrcode';
 import type { Database, Tx } from '../db/index.js';
 import { evidenceSigner, type SignatureResult, type Signer } from '../signing.js';
 import { canonicalJson, loadCustodyEvents, verifyCustody, type CustodyEvent, type CustodyVerification } from './ledger.js';
-import { createDoc, finish, fmtBytes, fmtDuration, fmtTime, heading, keyValues, para, table, wrapToken } from './pdf.js';
+import { createDoc, drawText, gap, KSP_KN, finish, fmtBytes, fmtDuration, fmtTime, heading, keyValues, para, table, wrapToken } from './pdf.js';
 import { loadEvidenceRecord, personLabel, type EvidenceRecord } from './records.js';
 
 export const CUSTODY_REPORT_TYPE = 'KSP-CUSTODY-REPORT';
@@ -67,10 +67,11 @@ export async function buildCustodyReport(
 
 async function renderCustodyPdf(p: CustodyReportPayload, canonical: string, payloadSha256: string, sig: SignatureResult, at: Date): Promise<Buffer> {
   const ev = p.evidence;
-  const doc = createDoc({ title: `Chain of Custody Report ${ev.evidenceNumber ?? ev.id}`, createdAt: at });
-  doc.font('Helvetica-Bold').fontSize(16).fillColor('#0b2a4a').text('CHAIN OF CUSTODY REPORT', { align: 'center' });
-  doc.font('Helvetica').fontSize(9).fillColor('#333333').text('Karnataka State Police - Video Evidence Management System', { align: 'center' });
-  doc.moveDown(0.3).fontSize(8).text(`Generated ${fmtTime(p.generatedAt)} by ${p.generatedBy.name ?? p.generatedBy.id ?? p.generatedBy.type}`, { align: 'center' });
+  const doc = await createDoc({ title: `Chain of Custody Report ${ev.evidenceNumber ?? ev.id}`, createdAt: at });
+  para(doc, 'CHAIN OF CUSTODY REPORT', { size: 16, bold: true, color: '#0b2a4a', align: 'center' });
+  para(doc, `Karnataka State Police (${KSP_KN}) - Video Evidence Management System`, { size: 9, color: '#333333', align: 'center' });
+  gap(doc, 0.3);
+  para(doc, `Generated ${fmtTime(p.generatedAt)} by ${p.generatedBy.name ?? p.generatedBy.id ?? p.generatedBy.type}`, { size: 8, color: '#333333', align: 'center' });
 
   heading(doc, '1. Evidence identity');
   keyValues(doc, [
@@ -149,8 +150,7 @@ async function renderCustodyPdf(p: CustodyReportPayload, canonical: string, payl
   doc.moveDown(0.5);
   const y = doc.y;
   doc.image(qr, doc.page.margins.left, y, { width: 170 });
-  doc.font('Helvetica').fontSize(8).fillColor('#333333')
-    .text('Verification QR: evidence number, evidence SHA-256, payload SHA-256, key id, certificate fingerprint and signature.', doc.page.margins.left + 185, y + 10, { width: 300 });
+  drawText(doc, 'Verification QR: evidence number, evidence SHA-256, payload SHA-256, key id, certificate fingerprint and signature.', doc.page.margins.left + 185, y + 10, { size: 8, color: '#333333', width: 300 });
   doc.y = y + 180;
   para(doc, 'This report was generated automatically from the tamper-evident audit ledger. It is a record of system events and does not by itself constitute a certificate under Section 63 of the Bharatiya Sakshya Adhiniyam, 2023.', { size: 7.5, color: '#555555' });
 

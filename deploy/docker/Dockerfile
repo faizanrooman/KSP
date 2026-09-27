@@ -84,6 +84,8 @@ COPY --from=build --chown=root:root /src/packages/shared/package.json packages/s
 COPY --from=build --chown=root:root /src/packages/shared/dist packages/shared/dist
 COPY --from=build --chown=root:root /src/packages/core/package.json packages/core/package.json
 COPY --from=build --chown=root:root /src/packages/core/dist packages/core/dist
+# PDF fonts (Noto Sans + Noto Sans Kannada, OFL-1.1; SHA-256 pinned in fonts.json, checked at load)
+COPY --from=build --chown=root:root /src/packages/core/assets packages/core/assets
 # /work is the only writable path the apps need (mount an emptyDir/tmpfs there with a read-only root FS).
 RUN mkdir -p /work && chown 10001:10001 /work
 USER 10001:10001
@@ -173,6 +175,8 @@ COPY --from=build --chown=root:root /src/packages/shared/package.json packages/s
 COPY --from=build --chown=root:root /src/packages/shared/dist packages/shared/dist
 COPY --from=build --chown=root:root /src/packages/core/package.json packages/core/package.json
 COPY --from=build --chown=root:root /src/packages/core/dist packages/core/dist
+# PDF fonts (Noto Sans + Noto Sans Kannada, OFL-1.1; SHA-256 pinned in fonts.json, checked at load)
+COPY --from=build --chown=root:root /src/packages/core/assets packages/core/assets
 COPY --chown=root:root db db
 COPY --chown=root:root scripts/package.json scripts/package.json
 COPY --chown=root:root scripts/backup scripts/backup
