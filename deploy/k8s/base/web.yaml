@@ -19,9 +19,9 @@ spec:
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
-        runAsUser: 101
-        runAsGroup: 101
-        fsGroup: 101
+        runAsUser: 10101
+        runAsGroup: 10101
+        fsGroup: 10101
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: web

@@ -145,6 +145,20 @@ describe('SEC-R10 ai_jobs status transitions for ksp_ai', () => {
   });
 });
 
+describe('OPS-9 AI worker config without key-shaped placeholders', () => {
+  it('KSP_SERVICE=ksp-ai-worker loads without JWT/signing/media/data-encryption secrets; other services still require them', async () => {
+    const { AI_WORKER_UNUSED_SECRETS } = await import('@ksp/core');
+    loadConfig(); // ensure .env.test is in process.env
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    for (const k of [...AI_WORKER_UNUSED_SECRETS, 'DATA_ENCRYPTION_KEY', 'DATA_ENCRYPTION_KEYS']) delete env[k];
+    expect(() => loadConfig({ ...env, KSP_SERVICE: 'ksp-api' })).toThrow(/JWT_PRIVATE_KEY/);
+    const cfg = loadConfig({ ...env, KSP_SERVICE: 'ksp-ai-worker' });
+    expect(cfg.MEDIA_TOKEN_SECRET).toHaveLength(64);
+    expect(cfg.MEDIA_TOKEN_SECRET).not.toBe(loadConfig().MEDIA_TOKEN_SECRET);
+    expect(cfg.DATA_ENCRYPTION_KEY).toBeUndefined();
+  });
+});
+
 describe('SEC-R11 (decision: keep) snapshot from the original', () => {
   it('evidence:snapshot alone permits a still from the original — no evidence:download_original needed', async () => {
     // Behaviour is exercised end-to-end in media.test.ts ("extracts the exact frame (proxy and original)") by io.meera,

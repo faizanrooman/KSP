@@ -61,12 +61,9 @@ data:
   WORK_DIR: /work
   FFMPEG_PATH: /usr/local/bin/ffmpeg
   FFPROBE_PATH: /usr/local/bin/ffprobe
-  JWT_PRIVATE_KEY: unused-by-ai-worker
-  JWT_PUBLIC_KEY: unused-by-ai-worker
-  SIGNING_PRIVATE_KEY: unused-by-ai-worker
-  SIGNING_CERTIFICATE: unused-by-ai-worker
-  DATA_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-  MEDIA_TOKEN_SECRET: unused-by-ai-worker-unused-by-ai-worker
+  # No JWT / signing / media-token / data-encryption values here (OPS-9): with KSP_SERVICE=ksp-ai-worker the shared
+  # config loader does not require them (packages/core/src/config.ts AI_WORKER_UNUSED_SECRETS).
+  KSP_SERVICE: ksp-ai-worker
 ---
 apiVersion: v1
 kind: ConfigMap

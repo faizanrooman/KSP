@@ -79,8 +79,8 @@ m=$(copy_backup unsigned); rm -f "$m.sig"
 expect fail manifest-signature-missing "$m"
 
 m=$(copy_backup legacy-unsigned-no-pubkey); rm -f "$m.sig"
-BACKUP_SIGNING_PUBKEY_FILE= expect ok legacy-unsigned-without-pubkey "$m"
-BACKUP_SIGNING_PUBKEY_FILE= BACKUP_REQUIRE_SIGNATURE=1 expect fail unsigned-with-require-signature "$m"
+BACKUP_SIGNING_PUBKEY_FILE='' expect ok legacy-unsigned-without-pubkey "$m"
+BACKUP_SIGNING_PUBKEY_FILE='' BACKUP_REQUIRE_SIGNATURE=1 expect fail unsigned-with-require-signature "$m"
 
 m=$(copy_backup headseq-injection); edit_manifest "$m" 'j.audit.headSeq = "1; DROP TABLE evidence; --"'; resign "$m"
 expect fail manifest-headseq-not-integer "$m"

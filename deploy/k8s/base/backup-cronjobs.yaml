@@ -28,9 +28,9 @@ spec:
           restartPolicy: OnFailure
           securityContext:
             runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
-            fsGroup: 999
+            runAsUser: 10002
+            runAsGroup: 10002
+            fsGroup: 10002
             seccompProfile: { type: RuntimeDefault }
           containers:
             - name: pg-backup
@@ -92,9 +92,9 @@ spec:
           restartPolicy: Never
           securityContext:
             runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
-            fsGroup: 999
+            runAsUser: 10002
+            runAsGroup: 10002
+            fsGroup: 10002
             seccompProfile: { type: RuntimeDefault }
           containers:
             - name: verify
@@ -162,9 +162,9 @@ spec:
           restartPolicy: OnFailure
           securityContext:
             runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
-            fsGroup: 999
+            runAsUser: 10002
+            runAsGroup: 10002
+            fsGroup: 10002
             seccompProfile: { type: RuntimeDefault }
           containers:
             - name: replicate
