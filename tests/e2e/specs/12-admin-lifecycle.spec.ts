@@ -106,7 +106,7 @@ test('API clients: create → secret shown once and works → revoke → refused
   await cred.getByRole('button', { name: 'I have stored the secret' }).click();
   await expect(cred).toHaveCount(0);
   const row = admin.getByRole('table', { name: 'API clients' }).getByRole('row').filter({ hasText: name });
-  await expect(row).toContainText('ACTIVE');
+  await expect(row).toContainText('Active');
   await expect(admin.getByText(secret)).toHaveCount(0); // never displayed again
   expect(JSON.stringify(await apiGet(admin, '/api-clients'))).not.toContain(secret); // nor returned by the API
 
@@ -115,7 +115,7 @@ test('API clients: create → secret shown once and works → revoke → refused
   await rv.getByRole('textbox', { name: /Reason/ }).fill('E2E: end of test');
   await rv.getByRole('button', { name: 'Revoke' }).click();
   await expect(admin.getByRole('status').filter({ hasText: 'Client revoked' })).toBeVisible();
-  await expect(row).toContainText('REVOKED');
+  await expect(row).toContainText('Revoked');
   await expect(row.getByRole('button', { name: 'Revoke' })).toHaveCount(0);
   const refused = await request.get('/api/v1/integration/evidence?pageSize=1', { headers: basic });
   expect(refused.status()).toBe(401);
