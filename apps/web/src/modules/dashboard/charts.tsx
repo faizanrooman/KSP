@@ -83,6 +83,12 @@ export function CategoryBars<T extends Record<string, unknown>>({ title, rows, l
   title: string; rows: T[]; label: keyof T & string; value: keyof T & string; summary: string; format?: (v: number) => string; colorOf?: (r: T) => string; height?: number;
 }) {
   const h = height ?? Math.max(90, rows.length * 30 + 20);
+  // Category axis sized to its labels (a fixed 120 px clipped long ones, e.g. API routes on System health — UI-B-12);
+  // very long labels are shortened with an ellipsis (the full text is in the data table and the tooltip).
+  const MAX_CHARS = 42;
+  const longest = rows.reduce((n, r) => Math.max(n, Math.min(MAX_CHARS, String(r[label] ?? '').length)), 0);
+  const yWidth = Math.min(300, Math.max(80, Math.round(longest * 6.4) + 12));
+  const shorten = (v: unknown) => { const s = String(v ?? ''); return s.length > MAX_CHARS ? `…${s.slice(s.length - MAX_CHARS + 1)}` : s; };
   return (
     <ChartFigure title={title} summary={summary}>
       <div role="img" aria-label={`${title} bar chart. ${summary}`} style={{ height: h }}>
@@ -90,7 +96,7 @@ export function CategoryBars<T extends Record<string, unknown>>({ title, rows, l
           <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 48, bottom: 0, left: 0 }}>
             <CartesianGrid horizontal={false} stroke={GRID} />
             <XAxis type="number" tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} tickFormatter={format} />
-            <YAxis type="category" dataKey={label as never} tick={AXIS} tickLine={false} axisLine={false} width={120} />
+            <YAxis type="category" dataKey={label as never} tick={AXIS} tickLine={false} axisLine={false} width={yWidth} tickFormatter={shorten} />
             <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} formatter={(v: unknown) => [(format ?? String)(Number(v)), title]} />
             <Bar dataKey={value as never} fill={SERIES[0]} radius={[0, 4, 4, 0]} maxBarSize={18} isAnimationActive={false}
               label={{ position: 'right', fontSize: 11, fill: '#0b0b0b', formatter: (v: unknown) => (format ?? String)(Number(v)) }}>

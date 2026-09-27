@@ -44,7 +44,7 @@ export function ShareManageActions({ share }: { share: ShareDetail }) {
         <div className="space-y-3 text-sm">
           <p>Currently expires {formatDateTime(share.expiresAt)}. At most {opts.data?.maxShareDays ?? 30} days from now.</p>
           <Field label="New expiry" htmlFor="sx-until" required><Input id="sx-until" type="datetime-local" value={until} max={localInput(max)} onChange={(e) => setUntil(e.target.value)} /></Field>
-          <Field label="Reason" htmlFor="sx-reason" required hint="Recorded in the chain of custody."><Textarea id="sx-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+          <Field label="Reason" htmlFor="sx-reason" required hint="At least 5 characters; recorded in the chain of custody."><Textarea id="sx-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
           {extend.error ? <Alert tone="red">{errorMessage(extend.error)}</Alert> : null}
         </div>
       </Modal>
@@ -67,7 +67,7 @@ export function ShareManageActions({ share }: { share: ShareDetail }) {
             {opts.data?.emailConfigured && re.emailLink && re.rotateAccessCode && (
               <Checkbox label="Also e-mail the new access code (separate message)" description="Not recommended: anyone with access to that mailbox could then open the share. Prefer phone/SMS for the code." checked={re.emailAccessCode} onChange={(v) => setRe({ ...re, emailAccessCode: v })} />
             )}
-            <Field label="Reason" htmlFor="sr-reason" required><Textarea id="sr-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+            <Field label="Reason" htmlFor="sr-reason" required hint="At least 5 characters; recorded in the chain of custody."><Textarea id="sr-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
             {reissue.error ? <Alert tone="red">{errorMessage(reissue.error)}</Alert> : null}
           </div>
         )}

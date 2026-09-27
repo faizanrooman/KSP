@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { EXPORT_STATUSES } from '@ksp/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { useUrlState } from '@/lib/hooks';
+import { useDebounced, useUrlState } from '@/lib/hooks';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { Button, Card, DataTable, EmptyState, Field, Input, PageHeader, Pagination, Select, StatusBadge, Tabs, type Column } from '@/components/ui';
 import type { ExportSummary, Paged } from './types';
@@ -21,9 +21,10 @@ export function ExportsPage() {
     ...(can('export:approve') ? [{ id: 'pending', label: 'Awaiting my approval' }, { id: 'all', label: 'All in my jurisdiction' }] : []),
   ] as Array<{ id: string; label: string }>;
   const view = views.some((v) => v.id === s.view) ? s.view : (views[0]?.id ?? 'mine');
+  const search = useDebounced(s.q.trim());
   const q = useQuery({
-    queryKey: ['exports', 'list', view, s.status, s.q, s.page],
-    queryFn: () => api.get<Paged<ExportSummary>>('/exports', { view, status: s.status || undefined, q: s.q || undefined, page: s.page, pageSize: 25 }),
+    queryKey: ['exports', 'list', view, s.status, search, s.page],
+    queryFn: () => api.get<Paged<ExportSummary>>('/exports', { view, status: s.status || undefined, q: search || undefined, page: s.page, pageSize: 25 }),
     placeholderData: keepPreviousData,
     refetchInterval: (query) => (query.state.data?.items.some((x) => ['APPROVED', 'PROCESSING'].includes(x.status)) ? 4000 : false),
   });
@@ -67,7 +68,7 @@ export function ExportsPage() {
           onRowClick={(r) => navigate(`/exports/${r.id}`)}
           empty={<EmptyState title={view === 'pending' ? 'Nothing awaiting your approval' : 'No exports'} description={canAny('export:create') && view === 'mine' ? 'Start an export from an evidence item ("Export for court") or with New export.' : undefined} />}
         />
-        {q.data && q.data.total > q.data.pageSize && <div className="border-t border-ink-100 p-3"><Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onPage={(p) => set({ page: String(p) })} /></div>}
+        {q.data && q.data.total > q.data.pageSize && <Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onPage={(p) => set({ page: String(p) })} />}
       </Card>
     </div>
   );

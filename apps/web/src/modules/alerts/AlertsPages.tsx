@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { ALERT_RULE_CODES } from '@ksp/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, titleCase } from '@/lib/format';
 import { useUrlState } from '@/lib/hooks';
 import {
   Alert, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, EmptyState, ErrorState, Field, Input, KeyValue, PageHeader, Pagination, Select, Spinner, StatusBadge, useToast, type Column,
@@ -18,7 +18,7 @@ export function SeverityBadge({ severity }: { severity: string }) {
   return (
     <span className="inline-flex items-center gap-1">
       <SeverityIcon severity={severity} />
-      <Badge tone={severity === 'CRITICAL' ? 'red' : severity === 'WARNING' ? 'amber' : 'blue'}>{severity}</Badge>
+      <Badge tone={severity === 'CRITICAL' ? 'red' : severity === 'WARNING' ? 'amber' : 'blue'}>{titleCase(severity)}</Badge>
     </span>
   );
 }
@@ -49,8 +49,8 @@ export function AlertsListPage() {
       <PageHeader title="Alerts" subtitle="Failed uploads, processing errors, storage thresholds and policy violations within your jurisdiction." />
       <Card>
         <div className="flex flex-wrap items-end gap-3">
-          <Field label="Status" htmlFor="al-status"><Select id="al-status" value={q.status} onChange={(e) => setQ({ status: e.target.value })}><option value="">Any</option><option>OPEN</option><option>ACKNOWLEDGED</option><option>RESOLVED</option></Select></Field>
-          <Field label="Severity" htmlFor="al-sev"><Select id="al-sev" value={q.severity} onChange={(e) => setQ({ severity: e.target.value })}><option value="">Any</option><option>CRITICAL</option><option>WARNING</option><option>INFO</option></Select></Field>
+          <Field label="Status" htmlFor="al-status"><Select id="al-status" value={q.status} onChange={(e) => setQ({ status: e.target.value })}><option value="">Any</option><option value="OPEN">Open</option><option value="ACKNOWLEDGED">Acknowledged</option><option value="RESOLVED">Resolved</option></Select></Field>
+          <Field label="Severity" htmlFor="al-sev"><Select id="al-sev" value={q.severity} onChange={(e) => setQ({ severity: e.target.value })}><option value="">Any</option><option value="CRITICAL">Critical</option><option value="WARNING">Warning</option><option value="INFO">Info</option></Select></Field>
           <Field label="Rule" htmlFor="al-rule"><Select id="al-rule" value={q.rule} onChange={(e) => setQ({ rule: e.target.value })}><option value="">Any</option>{ALERT_RULE_CODES.map((c) => <option key={c}>{c}</option>)}</Select></Field>
           <Field label="From" htmlFor="al-from"><Input id="al-from" type="date" value={q.from} onChange={(e) => setQ({ from: e.target.value })} /></Field>
           <Field label="To" htmlFor="al-to"><Input id="al-to" type="date" value={q.to} onChange={(e) => setQ({ to: e.target.value })} /></Field>
@@ -162,7 +162,7 @@ function RuleCard({ rule, canEdit }: { rule: AlertRule; canEdit: boolean }) {
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
         <Checkbox label="Enabled" checked={enabled} onChange={setEnabled} disabled={!canEdit} />
         <Field label="Severity" htmlFor={`sev-${rule.code}`}>
-          <Select id={`sev-${rule.code}`} value={severity} disabled={!canEdit} onChange={(e) => setSeverity(e.target.value as AlertRule['severity'])}><option>CRITICAL</option><option>WARNING</option><option>INFO</option></Select>
+          <Select id={`sev-${rule.code}`} value={severity} disabled={!canEdit} onChange={(e) => setSeverity(e.target.value as AlertRule['severity'])}><option value="CRITICAL">Critical</option><option value="WARNING">Warning</option><option value="INFO">Info</option></Select>
         </Field>
         {fields.map((f) => (
           <Field key={f.key} label={f.label} hint={f.hint} htmlFor={`${rule.code}-${f.key}`}>
@@ -175,7 +175,7 @@ function RuleCard({ rule, canEdit }: { rule: AlertRule; canEdit: boolean }) {
         <p className="text-xs text-ink-600">Last evaluated: {rule.lastEvaluatedAt ? formatDateTime(rule.lastEvaluatedAt) : 'never'} · updated {formatDateTime(rule.updatedAt)}{rule.updatedBy ? ` by ${rule.updatedBy}` : ''}</p>
         {save.error && <Alert tone="red">{errorMessage(save.error)}</Alert>}
         {save.isSuccess && <Alert tone="green">Saved.</Alert>}
-        {canEdit && <Button type="submit" loading={save.isPending}>Save</Button>}
+        {canEdit && <div className="flex justify-end"><Button type="submit" loading={save.isPending}>Save</Button></div>}
       </form>
     </Card>
   );

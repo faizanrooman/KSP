@@ -49,7 +49,7 @@ export function CaseDetailPage() {
     <div className="space-y-4">
       <PageHeader
         breadcrumb={<Link to="/cases" className="text-brand-700 hover:underline">Cases</Link>}
-        title={<span><span className="mono">{c.caseNumber}</span> · {c.title}</span>}
+        title={<span><span className="font-mono">{c.caseNumber}</span> · {c.title}</span>}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <StatusBadge status={c.status} /> <PriorityBadge priority={c.priority} /> {c.orgUnit.name} · opened {formatDate(c.openedAt)}

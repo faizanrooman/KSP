@@ -5,7 +5,7 @@ import { INTEGRATION_SCOPES } from '@ksp/shared';
 import { api, errorMessage } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { OrgUnitSelect } from '@/components/pickers';
-import { Alert, Badge, Button, Card, Checkbox, ConfirmDialog, CopyButton, DataTable, EmptyState, Field, Input, Modal, PageHeader, Textarea, useToast, type Column } from '@/components/ui';
+import { Alert, Badge, Button, Card, Checkbox, ConfirmDialog, CopyButton, DataTable, EmptyState, Field, Input, Modal, PageHeader, StatusBadge, Textarea, useToast, type Column } from '@/components/ui';
 import type { ApiClient } from './types';
 
 interface SecretResult { client: ApiClient; clientId: string; clientSecret: string }
@@ -40,7 +40,7 @@ export function ApiClientsPage() {
     { key: 'org', header: 'Jurisdiction', render: (r) => r.orgUnit.name },
     { key: 'ips', header: 'Allowed IPs', render: (r) => <span className="mono text-xs">{r.allowedIps.length ? r.allowedIps.join(', ') : 'any'}</span> },
     { key: 'rate', header: 'Rate', render: (r) => <span className="text-xs">{r.rateLimitPerMinute}/min</span> },
-    { key: 'status', header: 'Status', render: (r) => <Badge tone={r.status === 'ACTIVE' ? 'green' : 'red'}>{r.status}</Badge> },
+    { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'used', header: 'Last used', render: (r) => <span className="text-xs">{formatDateTime(r.lastUsedAt)}</span> },
     {
       key: 'act', header: <span className="sr-only">Actions</span>,

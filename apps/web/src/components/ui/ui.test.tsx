@@ -1,4 +1,5 @@
 /** Regression tests for UI primitives fixed during the E2E / accessibility pass. */
+import { useState } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Card, ConfirmDialog, EmptyState, Field, Input, Modal, ProgressBar, Tabs, Textarea } from './index';
@@ -20,6 +21,53 @@ describe('Modal focus', () => {
       <ConfirmDialog open title="Place legal hold" message="Why?" requireReason onConfirm={() => undefined} onCancel={() => undefined} />,
     );
     expect(screen.getByRole('textbox', { name: /Reason/ })).toHaveFocus();
+  });
+
+  // UI-B-01: the focus effect depended on `onClose`; callers pass an inline arrow and own the form state, so every
+  // keystroke re-ran the effect, which restored focus to the opener and then moved it to the FIRST field — typing a
+  // reason into the second field jumped to the first one after one character.
+  it('keeps focus in the field being typed into when the parent re-renders with a new onClose', () => {
+    function Host() {
+      const [open, setOpen] = useState(false);
+      const [reason, setReason] = useState('');
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>opener</button>
+          <Modal open={open} title="Extend share" onClose={() => setOpen(false)}>
+            <Input aria-label="New expiry" />
+            <Textarea aria-label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+          </Modal>
+        </>
+      );
+    }
+    render(<Host />);
+    const opener = screen.getByRole('button', { name: 'opener' });
+    act(() => opener.focus());
+    fireEvent.click(opener);
+    const reason = screen.getByRole('textbox', { name: 'Reason' });
+    act(() => reason.focus());
+    fireEvent.change(reason, { target: { value: 'a' } });
+    expect(reason).toHaveFocus();
+    fireEvent.change(reason, { target: { value: 'ab' } });
+    expect(reason).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(opener).toHaveFocus();
+  });
+
+  it('locks page scrolling while open and restores it on close', () => {
+    const { rerender } = render(<Modal open title="T" onClose={() => undefined}><p>x</p></Modal>);
+    expect(document.body.style.overflow).toBe('hidden');
+    rerender(<Modal open={false} title="T" onClose={() => undefined}><p>x</p></Modal>);
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  // UI-B-08: rendered in place, the fixed overlay picked up `space-y-*` sibling margins (uncovered strip at the top).
+  it('portals the overlay to <body>, outside page layout containers', () => {
+    render(<div className="space-y-4" data-testid="page"><p>x</p><Modal open title="T" onClose={() => undefined}><p>y</p></Modal></div>);
+    const overlay = screen.getByRole('dialog').parentElement!;
+    expect(screen.getByTestId('page').contains(overlay)).toBe(false);
+    expect(overlay.parentElement).toBe(document.body);
   });
 
   it('falls back to the first focusable control', () => {

@@ -78,7 +78,9 @@ export function UserCreatePage() {
       setCreated(r);
     },
   });
-  const valid = /^[a-z0-9][a-z0-9._-]{2,63}$/.test(username.trim().toLowerCase()) && f.fullName.trim().length >= 2 && !!f.homeOrgUnitId;
+  // Incomplete role rows used to be dropped silently on submit (UI-B-10): they now block the submit with a hint.
+  const incompleteGrants = grants.some((g) => !g.roleId || !g.orgUnitId);
+  const valid = /^[a-z0-9][a-z0-9._-]{2,63}$/.test(username.trim().toLowerCase()) && f.fullName.trim().length >= 2 && !!f.homeOrgUnitId && !incompleteGrants;
   const fieldErrors = m.error instanceof ApiError && m.error.code === 'VALIDATION_FAILED' ? m.error.details : null;
 
   return (
@@ -126,7 +128,8 @@ export function UserCreatePage() {
             {Array.isArray(fieldErrors) && <ul className="mt-1 list-disc pl-5">{(fieldErrors as Array<{ message?: string; instancePath?: string }>).map((d, i) => <li key={i}>{d.instancePath ? `${d.instancePath}: ` : ''}{d.message}</li>)}</ul>}
           </Alert>
         ) : null}
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {incompleteGrants && <span className="mr-auto text-sm text-amber-800">Choose a role and a unit for every role row, or remove the row.</span>}
           <Button variant="secondary" onClick={() => navigate('/admin/users')}>Cancel</Button>
           <Button type="submit" disabled={!valid} loading={m.isPending}>Create user</Button>
         </div>

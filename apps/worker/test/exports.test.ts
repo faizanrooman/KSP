@@ -13,6 +13,7 @@ import { QUEUES } from '@ksp/shared';
 import { createMediaEvidence, type MediaEvidence } from '../../api/test/fixtures/media-evidence.js';
 import { startWorker } from '../src/main.js';
 import { processMedia } from '../src/jobs/media/process.js';
+import { runShareWatermark } from '../src/jobs/shares/index.js';
 import type { WorkerContext } from '../src/lib/context.js';
 
 let ctx: WorkerContext;
@@ -131,4 +132,26 @@ describe('share.watermark via the queue', () => {
     expect(Number(d.size_bytes)).toBeGreaterThan(10_000);
     expect(await ctx.storage.head(d.bucket, d.object_key)).not.toBeNull();
   });
+
+  // Regression: the portal enqueues one job per playback/stream/print request, so the same (share, evidence) pair
+  // ran twice concurrently; both used one work directory and the loser failed ("SHARE_WATERMARK failed for ..." alerts).
+  it('concurrent jobs for the same share item: exactly one burns the variant, none fails', async () => {
+    const org = await db.selectFrom('org_units').select('id').where('code', '=', 'ps_cubbonpark').executeTakeFirstOrThrow();
+    const s = await db
+      .insertInto('shares')
+      .values({ created_by: ids['sup.kavya']!, org_unit_id: org.id, recipient_type: 'EXTERNAL', recipient_name: 'Race Test', recipient_email: 'race@example.org', purpose: 'worker race test', token_hash: sha256Hex(randomToken()), access_code_hash: await hashSecret('12345678'), expires_at: new Date(Date.now() + 86_400_000) })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    await db.insertInto('share_items').values({ share_id: s.id, evidence_id: clip.id }).execute();
+    const since = new Date();
+    const deps = { db, storage: ctx.storage, cfg: ctx.cfg };
+    const results = await Promise.all([1, 2, 3].map(() => runShareWatermark(deps, { shareId: s.id, evidenceId: clip.id })));
+    const statuses = results.map((r) => r.status).sort();
+    expect(statuses.filter((x) => x === 'CREATED')).toHaveLength(1);
+    expect(statuses.every((x) => x === 'CREATED' || x === 'EXISTS' || x === 'SKIPPED')).toBe(true);
+    const failed = await db.selectFrom('processing_jobs').select('id').where('kind', '=', 'SHARE_WATERMARK').where('evidence_id', '=', clip.id).where('status', '=', 'FAILED').where('created_at', '>=', since).execute();
+    expect(failed).toHaveLength(0);
+    // A later job for the same pair is an idempotent no-op.
+    expect((await runShareWatermark(deps, { shareId: s.id, evidenceId: clip.id })).status).toBe('EXISTS');
+  }, 180_000);
 });

@@ -43,7 +43,7 @@ export function NotificationBell() {
         {unread > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[1.1rem] rounded-full bg-red-700 px-1 text-center text-[10px] font-semibold leading-4 text-white" aria-hidden>{unread > 99 ? '99+' : unread}</span>}
       </button>
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-80 rounded-md border border-ink-200 bg-white shadow-lg" role="dialog" aria-label="Unread notifications">
+        <div className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-md border border-ink-200 bg-white shadow-lg" role="dialog" aria-label="Unread notifications">
           <div className="flex items-center justify-between border-b border-ink-100 px-3 py-2">
             <span className="text-sm font-semibold text-ink-900">{unread} unread</span>
             <button type="button" className="text-xs text-brand-700 hover:underline disabled:opacity-50" disabled={!unread || readAll.isPending} onClick={() => readAll.mutate()}>Mark all read</button>

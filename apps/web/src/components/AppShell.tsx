@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router';
 import { LogOut, Menu, ShieldCheck, UserCircle2, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { MODULES, NAV_SECTIONS, type NavItem } from '@/lib/modules';
-import { clsx } from '@/components/ui';
+import { clsx, lockBodyScroll } from '@/components/ui';
 import { NotificationBell } from '@/modules/alerts/NotificationBell';
 
 function visibleNav(canAny: (...p: never[]) => boolean): Map<string, NavItem[]> {
@@ -21,6 +21,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const nav = visibleNav(canAny as never);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const drawer = useRef<HTMLDivElement>(null);
+  // Off-canvas menu (< 1024 px): modal like a dialog — Esc closes it, the page behind does not scroll, focus moves
+  // into it and returns to the menu button (UI-B-03).
+  useEffect(() => {
+    if (!open) return;
+    const unlock = lockBodyScroll();
+    drawer.current?.querySelector<HTMLElement>('a[href]')?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    const button = menuButton.current;
+    return () => {
+      unlock();
+      document.removeEventListener('keydown', onKey);
+      button?.focus();
+    };
+  }, [open]);
 
   const sidebar = (
     <nav aria-label="Main" className="flex h-full flex-col">
@@ -66,15 +85,20 @@ export function AppShell({ children }: { children: ReactNode }) {
       </a>
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 self-start overflow-hidden bg-brand-950 lg:block">{sidebar}</aside>
       {open && (
-        <div className="fixed inset-0 z-40 flex lg:hidden">
-          <div className="w-64 bg-brand-950">{sidebar}</div>
-          <button type="button" className="flex-1 bg-ink-950/50" aria-label="Close menu" onClick={() => setOpen(false)} />
+        <div className="fixed inset-0 z-40 flex lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div ref={drawer} className="relative w-64 max-w-[85vw] bg-brand-950">
+            <button type="button" className="absolute right-2 top-3 rounded p-1.5 text-brand-100 hover:bg-brand-900 hover:text-white" aria-label="Close menu" onClick={() => setOpen(false)}>
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+            {sidebar}
+          </div>
+          <button type="button" tabIndex={-1} className="flex-1 bg-ink-950/50" aria-hidden="true" onClick={() => setOpen(false)} />
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-ink-200 bg-white px-4">
-          <button type="button" className="rounded p-1.5 hover:bg-ink-100 lg:hidden" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}>
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          <button ref={menuButton} type="button" className="rounded p-1.5 hover:bg-ink-100 lg:hidden" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}>
+            <Menu className="h-5 w-5" aria-hidden />
           </button>
           <div className="flex-1 truncate text-sm text-ink-600">{me?.user.homeOrgUnit.name}</div>
           <NotificationBell />

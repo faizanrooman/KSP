@@ -4,7 +4,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { SHARE_STATUSES } from '@ksp/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { useUrlState } from '@/lib/hooks';
+import { useDebounced, useUrlState } from '@/lib/hooks';
 import { formatDateTime, titleCase } from '@/lib/format';
 import { Badge, Card, DataTable, EmptyState, Field, Input, PageHeader, Pagination, Select, StatusBadge, Tabs, type Column } from '@/components/ui';
 import type { Paged, ShareSummary } from './types';
@@ -21,9 +21,10 @@ export function SharesPage() {
     ...(can('share:manage_all') ? [{ id: 'all', label: 'All in my jurisdiction' }] : []),
   ];
   const view = views.some((v) => v.id === s.view) ? s.view : 'mine';
+  const search = useDebounced(s.q.trim());
   const q = useQuery({
-    queryKey: ['shares', 'list', view, s.status, s.q, s.page],
-    queryFn: () => api.get<Paged<ShareSummary>>('/shares', { view, status: s.status || undefined, q: s.q || undefined, page: s.page, pageSize: 25 }),
+    queryKey: ['shares', 'list', view, s.status, search, s.page],
+    queryFn: () => api.get<Paged<ShareSummary>>('/shares', { view, status: s.status || undefined, q: search || undefined, page: s.page, pageSize: 25 }),
     placeholderData: keepPreviousData,
   });
   const cols: Column<ShareSummary>[] = [
@@ -53,7 +54,7 @@ export function SharesPage() {
       </Card>
       <Card bodyClassName="p-0">
         <DataTable caption="Shares" columns={cols} rows={q.data?.items} rowKey={(r) => r.id} loading={q.isFetching} error={q.error} onRetry={() => void q.refetch()} onRowClick={(r) => navigate(`/shares/${r.id}`)} empty={<EmptyState title="No shares" />} />
-        {q.data && q.data.total > q.data.pageSize && <div className="border-t border-ink-100 p-3"><Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onPage={(p) => set({ page: String(p) })} /></div>}
+        {q.data && q.data.total > q.data.pageSize && <Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onPage={(p) => set({ page: String(p) })} />}
       </Card>
     </div>
   );

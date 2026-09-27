@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '@/lib/api';
-import { openFailure, refreshDelayMs, storeKey } from './portal-helpers';
+import { blockedText, openFailure, refreshDelayMs, storeKey } from './portal-helpers';
 
 describe('share portal helpers', () => {
+  it('blockedText: one sentence, no doubled "contact" advice (UI-B-14)', () => {
+    expect(blockedText('Too many wrong access codes: this share is now locked; contact the sender')).toBe('Too many wrong access codes: this share is now locked; contact the sender.');
+    expect(blockedText('This share has expired.')).toBe('This share has expired. Contact the officer who shared it with you.');
+  });
+
   it('maps open failures: wrong code shows remaining attempts; locked/expired/revoked/limit block', () => {
     expect(openFailure(new ApiError(401, 'UNAUTHENTICATED', 'Invalid link or access code', { attemptsRemaining: 4 }))).toEqual({ kind: 'retry', message: 'Incorrect access code. 4 attempts left before the share is locked.' });
     expect(openFailure(new ApiError(401, 'UNAUTHENTICATED', 'Invalid link or access code', { attemptsRemaining: 1 })).message).toContain('1 attempt left');

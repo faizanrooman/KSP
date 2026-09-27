@@ -148,7 +148,7 @@ export function DeviceDetailPage() {
     <div className="space-y-4">
       <PageHeader
         breadcrumb={<Link to="/admin/devices" className="hover:underline">Devices</Link>}
-        title={<span className="mono flex items-center gap-2">{d.serialNumber} <StatusBadge status={d.status} /></span>}
+        title={<span className="flex flex-wrap items-center gap-2 font-mono">{d.serialNumber} <StatusBadge status={d.status} /></span>}
         subtitle={`${titleCase(d.deviceType)} · ${d.orgUnit.name}`}
         actions={manage ? (
           <>

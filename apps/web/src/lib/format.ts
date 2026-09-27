@@ -45,8 +45,10 @@ export function shortHash(h: string | null | undefined, n = 12): string {
   return h ? `${h.slice(0, n)}…` : '—';
 }
 
+// Acronyms stay upper-case ("CCTNS", not "Cctns"; "MFA challenge passed", "AI results viewed") — UI-B-11.
+const ACRONYMS = new Set(['AI', 'ANPR', 'API', 'BSA', 'CCTNS', 'CCTV', 'CSV', 'FIR', 'FSL', 'HLS', 'ID', 'IO', 'IP', 'JSON', 'KSP', 'MFA', 'OCR', 'PDF', 'SHA', 'SMS', 'TOTP', 'URL']);
 export function titleCase(v: string): string {
-  return v.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return v.toLowerCase().replace(/_/g, ' ').replace(/\b\w+/g, (w) => (ACRONYMS.has(w.toUpperCase()) ? w.toUpperCase() : w[0]!.toUpperCase() + w.slice(1)));
 }
 
 /** Parse "mm:ss.mmm", "hh:mm:ss.mmm", "ss.mmm" or plain milliseconds ("1234ms"). */

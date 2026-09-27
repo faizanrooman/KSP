@@ -5,6 +5,7 @@
  *   shares.expire    ACTIVE shares past expires_at -> EXPIRED (SHARE_EXPIRED custody event per item); watermarked
  *                    variants of shares that are no longer ACTIVE are deleted.
  */
+import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -24,7 +25,31 @@ export interface ShareDeps {
   cfg: AppConfig;
 }
 
-export async function runShareWatermark(deps: ShareDeps, p: ShareWatermarkPayload, queueJobId?: string): Promise<{ status: 'CREATED' | 'EXISTS' | 'SKIPPED'; reason?: string; derivativeId?: string }> {
+export type ShareWatermarkResult = { status: 'CREATED' | 'EXISTS' | 'SKIPPED'; reason?: string; derivativeId?: string };
+
+/**
+ * One burn-in per (share, evidence) at a time. The portal enqueues on every playback/stream/print request and the
+ * queue's `singletonKey` does not deduplicate on a `standard` pg-boss queue, so two jobs for the same pair routinely
+ * run concurrently (localConcurrency 2). They used to share one work directory: the first to finish removed it and
+ * the other failed (`ENOENT` / FFmpeg "Conversion failed!"), raising a spurious PROCESSING_FAILED alert
+ * ("SHARE_WATERMARK failed for ..."). A session advisory lock serialises the pair; a job that finds the lock taken
+ * skips (the running job produces the variant; the portal re-enqueues on its next poll if it did not).
+ */
+export async function runShareWatermark(deps: ShareDeps, p: ShareWatermarkPayload, queueJobId?: string): Promise<ShareWatermarkResult> {
+  if (!/^[0-9a-f-]{36}$/i.test(p.shareId) || !/^[0-9a-f-]{36}$/i.test(p.evidenceId)) return { status: 'SKIPPED', reason: 'invalid id' };
+  return deps.db.connection().execute(async (conn) => {
+    const lockKey = `share-wm:${p.shareId}:${p.evidenceId}`;
+    const { rows } = await sql<{ ok: boolean }>`SELECT pg_try_advisory_lock(hashtextextended(${lockKey}, 0)) AS ok`.execute(conn);
+    if (!rows[0]?.ok) return { status: 'SKIPPED', reason: 'already in progress' };
+    try {
+      return await runShareWatermarkLocked(deps, p, queueJobId);
+    } finally {
+      await sql`SELECT pg_advisory_unlock(hashtextextended(${lockKey}, 0))`.execute(conn);
+    }
+  });
+}
+
+async function runShareWatermarkLocked(deps: ShareDeps, p: ShareWatermarkPayload, queueJobId?: string): Promise<ShareWatermarkResult> {
   const { db, storage, cfg } = deps;
   const share = await db
     .selectFrom('shares as s')
@@ -41,7 +66,8 @@ export async function runShareWatermark(deps: ShareDeps, p: ShareWatermarkPayloa
   const proxy = await db.selectFrom('evidence_derivatives').selectAll().where('evidence_id', '=', ev.id).where('kind', '=', 'PROXY_MP4').executeTakeFirst();
   if (!proxy) return { status: 'SKIPPED', reason: 'no playback proxy yet' };
   const tracker = await ProcessingTracker.start(db, { kind: 'SHARE_WATERMARK', evidenceId: ev.id, queueJobId });
-  const dir = join(cfg.WORK_DIR, `share-wm-${p.shareId}-${p.evidenceId}`);
+  // Per-run directory: never shared with another attempt, even if the lock were bypassed.
+  const dir = join(cfg.WORK_DIR, `share-wm-${p.shareId}-${p.evidenceId}-${randomUUID().slice(0, 8)}`);
   await mkdir(dir, { recursive: true });
   try {
     const out = join(dir, 'watermarked.mp4');

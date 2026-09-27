@@ -9,6 +9,8 @@ import { shortHash } from '@/lib/format';
 import type { VerificationReport } from './types';
 
 const MAX = 100 * 1024 * 1024;
+// Native file inputs styled like the secondary button (they were the only unstyled control on the page).
+const FILE_INPUT = 'block text-sm text-ink-700 file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-ink-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink-800 hover:file:bg-ink-50';
 type Mode = 'package' | 'manifest';
 
 function toBase64(buf: ArrayBuffer): string {
@@ -48,11 +50,11 @@ export function VerifyPackagePage() {
       <Card>
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); m.mutate(); }}>
           {mode === 'package' ? (
-            <Field label="Export package (.zip, up to 100 MiB)" htmlFor="vp-zip"><input id="vp-zip" type="file" accept=".zip,application/zip" onChange={(e) => setZip(e.target.files?.[0] ?? null)} className="block text-sm" /></Field>
+            <Field label="Export package (.zip, up to 100 MiB)" htmlFor="vp-zip"><input id="vp-zip" type="file" accept=".zip,application/zip" onChange={(e) => { setZip(e.target.files?.[0] ?? null); m.reset(); }} className={FILE_INPUT} /></Field>
           ) : (
             <>
-              <Field label="manifest.json" htmlFor="vp-m"><input id="vp-m" type="file" accept=".json,application/json" onChange={(e) => setManifest(e.target.files?.[0] ?? null)} className="block text-sm" /></Field>
-              <Field label="manifest.sig" htmlFor="vp-s"><input id="vp-s" type="file" onChange={(e) => setSig(e.target.files?.[0] ?? null)} className="block text-sm" /></Field>
+              <Field label="manifest.json" htmlFor="vp-m"><input id="vp-m" type="file" accept=".json,application/json" onChange={(e) => { setManifest(e.target.files?.[0] ?? null); m.reset(); }} className={FILE_INPUT} /></Field>
+              <Field label="manifest.sig" htmlFor="vp-s"><input id="vp-s" type="file" onChange={(e) => { setSig(e.target.files?.[0] ?? null); m.reset(); }} className={FILE_INPUT} /></Field>
             </>
           )}
           <Button type="submit" icon={<ShieldCheck className="h-4 w-4" />} loading={m.isPending}>Verify</Button>

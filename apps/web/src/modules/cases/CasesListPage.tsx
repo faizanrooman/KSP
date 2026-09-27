@@ -40,7 +40,7 @@ export function CasesListPage() {
       render: (r) => (
         <div>
           <Link to={`/cases/${r.id}`} className="mono font-medium text-brand-800 hover:underline" onClick={(e) => e.stopPropagation()}>{r.caseNumber}</Link>
-          <p className="text-sm text-ink-800">{r.title}</p>
+          <p className="line-clamp-2 min-w-[14rem] max-w-md text-sm text-ink-800" title={r.title}>{r.title}</p>
         </div>
       ),
     },

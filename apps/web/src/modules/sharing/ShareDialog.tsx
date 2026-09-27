@@ -90,7 +90,7 @@ export function ShareDialog({ items, caseId, onClose }: { items: ShareTarget[]; 
             <Field label="Organisation" htmlFor="sd-org"><Input id="sd-org" value={rec.org} onChange={(e) => setRec({ ...rec, org: e.target.value })} /></Field>
           </div>
         )}
-        <Field label="Purpose" required htmlFor="sd-purpose" hint="Recorded in the chain of custody."><Textarea id="sd-purpose" rows={2} value={purpose} onChange={(e) => setPurpose(e.target.value)} /></Field>
+        <Field label="Purpose" required htmlFor="sd-purpose" hint="At least 5 characters; recorded in the chain of custody."><Textarea id="sd-purpose" rows={2} value={purpose} onChange={(e) => setPurpose(e.target.value)} /></Field>
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold uppercase text-ink-600">Permissions</legend>
           <Checkbox label="Allow download" description={canOriginal ? (type === 'EXTERNAL' ? 'External recipients receive the watermarked copy.' : 'The recipient may download the original.') : 'Requires that you may download the original.'} checked={perm.allowDownload} disabled={!canOriginal} onChange={(v) => setPerm({ ...perm, allowDownload: v, allowOriginal: v && perm.allowOriginal })} />
