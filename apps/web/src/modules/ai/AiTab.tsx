@@ -167,7 +167,7 @@ function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPl
   const player = useRef<EvidencePlayerHandle>(null);
   const [now, setNow] = useState(0);
   const [showPlayer, setShowPlayer] = useState(false);
-  const items = q.data?.items ?? [];
+  const items = useMemo(() => q.data?.items ?? [], [q.data]);
   const groups = useMemo(() => {
     const m = new Map<AiTask, AiDetectionDto[]>();
     for (const d of items) m.set(d.task, [...(m.get(d.task) ?? []), d]);

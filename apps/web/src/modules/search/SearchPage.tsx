@@ -59,7 +59,7 @@ function toDraft(c: SearchCriteria): Draft {
 }
 
 /** Returns criteria or an error message for the form. */
-function fromDraft(d: Draft, keep: SearchCriteria): { criteria?: SearchCriteria; error?: string } {
+function fromDraft(d: Draft, keep: SearchCriteria): { criteria?: SearchCriteria; error?: string; field?: keyof Draft } {
   const c: SearchCriteria = {
     text: d.text.trim() || undefined, evidenceNumber: d.evidenceNumber.trim() || undefined, orgUnitIds: d.orgUnitId ? [d.orgUnitId] : undefined,
     officerBadge: d.officerBadge.trim() || undefined, deviceSerial: d.deviceSerial.trim() || undefined, officerIds: keep.officerIds, deviceIds: keep.deviceIds,
@@ -69,25 +69,25 @@ function fromDraft(d: Draft, keep: SearchCriteria): { criteria?: SearchCriteria;
     storageTiers: d.storageTiers, legalHold: d.legalHold === '' ? undefined : d.legalHold === 'true', caseNumber: d.caseNumber.trim() || undefined,
     firNumber: d.firNumber.trim() || undefined, firYear: num(d.firYear), firOrgUnitId: d.firOrgUnitId || undefined,
   };
-  if ((c.firYear || c.firOrgUnitId) && !c.firNumber) return { error: 'Enter the FIR number to filter by FIR year or station.' };
+  if ((c.firYear || c.firOrgUnitId) && !c.firNumber) return { error: 'Enter the FIR number to filter by FIR year or station.', field: 'firNumber' };
   if (d.lat || d.lon || d.radiusKm) {
     const lat = num(d.lat);
     const lon = num(d.lon);
     const r = num(d.radiusKm);
-    if (lat === undefined || lon === undefined || r === undefined || [lat, lon, r].some((x) => Number.isNaN(x))) return { error: 'Location needs latitude, longitude and radius (km).' };
-    if (lat < -90 || lat > 90 || lon < -180 || lon > 180 || r <= 0 || r > 500) return { error: 'Latitude −90..90, longitude −180..180, radius 0–500 km.' };
+    if (lat === undefined || lon === undefined || r === undefined || [lat, lon, r].some((x) => Number.isNaN(x))) return { error: 'Location needs latitude, longitude and radius (km).', field: lat === undefined || Number.isNaN(lat) ? 'lat' : lon === undefined || Number.isNaN(lon) ? 'lon' : 'radiusKm' };
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180 || r <= 0 || r > 500) return { error: 'Latitude −90..90, longitude −180..180, radius 0–500 km.', field: lat < -90 || lat > 90 ? 'lat' : lon < -180 || lon > 180 ? 'lon' : 'radiusKm' };
     c.location = { lat, lon, radiusKm: r };
     c.bbox = undefined;
   }
   const minConf = num(d.minConfidence);
-  if (minConf !== undefined && (Number.isNaN(minConf) || minConf < 0 || minConf > 100)) return { error: 'Minimum confidence must be 0–100 %.' };
+  if (minConf !== undefined && (Number.isNaN(minConf) || minConf < 0 || minConf > 100)) return { error: 'Minimum confidence must be 0–100 %.', field: 'minConfidence' };
   const ai = {
     tasks: d.aiTasks, labels: list(d.aiLabels), colors: list(d.aiColors), plateText: d.plateText.trim() || undefined, watchlistEntryIds: list(d.watchlist),
     minConfidence: minConf === undefined ? undefined : minConf / 100, reviewStatus: d.includeUnreviewed ? ('ANY_NON_REJECTED' as const) : ('APPROVED' as const),
   };
   const hasAi = ai.tasks.length || ai.labels.length || ai.colors.length || ai.plateText || ai.watchlistEntryIds.length || ai.minConfidence !== undefined || d.includeUnreviewed;
   if (hasAi) c.ai = ai;
-  if (ai.watchlistEntryIds.some((x) => !/^[0-9a-f-]{36}$/i.test(x))) return { error: 'Watchlist entry ids must be UUIDs.' };
+  if (ai.watchlistEntryIds.some((x) => !/^[0-9a-f-]{36}$/i.test(x))) return { error: 'Watchlist entry ids must be UUIDs.', field: 'watchlist' };
   return { criteria: compactCriteria(c) };
 }
 
@@ -120,16 +120,23 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function AdvancedPanel({ initial, onApply, onClose }: { initial: SearchCriteria; onApply: (c: SearchCriteria) => void; onClose: () => void }) {
   const [d, setD] = useState<Draft>(() => toDraft(initial));
   const [error, setError] = useState<string | null>(null);
+  const [badField, setBadField] = useState<keyof Draft | null>(null);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const r = fromDraft(d, initial);
-    if (r.error) return setError(r.error);
+    setBadField(r.field ?? null);
+    if (r.error) {
+      setError(r.error);
+      // The message sits next to Apply, far from the offending field: mark that field and move focus to it.
+      if (r.field) document.getElementById(`adv-${r.field}`)?.focus();
+      return;
+    }
     setError(null);
     onApply(r.criteria!);
   };
   const inp = (k: keyof Draft, label: string, props: Record<string, unknown> = {}) => (
-    <Field label={label} htmlFor={`adv-${k}`}>
+    <Field label={label} htmlFor={`adv-${k}`} error={badField === k ? error : undefined}>
       <Input id={`adv-${k}`} value={d[k] as string} onChange={(e) => set(k, e.target.value as never)} {...props} />
     </Field>
   );
@@ -246,7 +253,7 @@ function ResultCard({ item }: { item: SearchItem }) {
           {item.legalHold && <Badge tone="amber"><Lock className="mr-1 inline h-3 w-3" aria-hidden />Legal hold</Badge>}
           {m.score !== null && <span className="text-xs text-ink-500">score {m.score}</span>}
         </div>
-        <p className="font-medium text-ink-900">{item.title ?? <span className="text-ink-500">Untitled</span>}</p>
+        <p className="font-medium text-ink-900 [overflow-wrap:anywhere]">{item.title ?? <span className="text-ink-500">Untitled</span>}</p>
         {m.snippet && <Snippet parts={m.snippet} />}
         <p className="text-xs text-ink-500">
           {item.orgUnit.name}
@@ -315,6 +322,11 @@ function SaveSearchButton({ criteria }: { criteria: SearchCriteria }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
+  // Enter in the name field saves, like the button (the field is not inside a <form>).
+  const submit = () => {
+    if (!name.trim() || save.isPending) return;
+    save.mutate({ name: name.trim(), criteria }, { onSuccess: () => { setOpen(false); toast.success('Search saved'); } });
+  };
   return (
     <>
       <Button variant="secondary" icon={<Save className="h-4 w-4" />} onClick={() => { setName(criteria.text ?? ''); save.reset(); setOpen(true); }}>Save search</Button>
@@ -325,12 +337,12 @@ function SaveSearchButton({ criteria }: { criteria: SearchCriteria }) {
         footer={
           <>
             <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button loading={save.isPending} disabled={!name.trim()} onClick={() => save.mutate({ name: name.trim(), criteria }, { onSuccess: () => { setOpen(false); toast.success('Search saved'); } })}>Save</Button>
+            <Button loading={save.isPending} disabled={!name.trim()} onClick={submit}>Save</Button>
           </>
         }
       >
         <Field label="Name" htmlFor="saved-name" required>
-          <Input id="saved-name" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} autoFocus />
+          <Input id="saved-name" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} autoFocus />
         </Field>
         <p className="mt-2 text-xs text-ink-500">Saved searches store the criteria only; results are re-evaluated against your access every time.</p>
         {save.error && <div className="mt-2"><Alert tone="red">{errorMessage(save.error)}</Alert></div>}
@@ -389,7 +401,7 @@ export function SearchPage() {
       {criteria.location && (
         <p className="flex items-center gap-1 text-xs text-ink-600"><MapPin className="h-3.5 w-3.5" aria-hidden />Within {criteria.location.radiusKm} km of {criteria.location.lat}, {criteria.location.lon}</p>
       )}
-      <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside aria-label="Facets" className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-1">
           {data?.facets ? (
             (Object.keys(FACET_LABEL) as FacetName[]).map((f) =>

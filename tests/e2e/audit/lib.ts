@@ -45,6 +45,8 @@ export class Recorder {
     this.current = { page, viewport };
   }
   add(kind: string, detail: string): void {
+    // The session probe before sign-in (401 on /auth/me and /auth/refresh) is expected, not a finding.
+    if (/401 (GET|POST) \/api\/v1\/auth\/(me|refresh)|status of 401 \(Unauthorized\)/.test(detail)) return;
     const f = { ...this.current, kind, detail };
     if (!this.findings.some((x) => x.page === f.page && x.viewport === f.viewport && x.kind === f.kind && x.detail === f.detail)) this.findings.push(f);
   }
@@ -137,7 +139,8 @@ export async function capture(page: Page, rec: Recorder, name: string): Promise<
     await page.waitForTimeout(200);
     await page.screenshot({ path: rec.shot(`${name}-bottom`) });
     const shell = await page.evaluate(() => {
-      const nav = document.querySelector('aside nav[aria-label="Main"]');
+      const aside = document.querySelector('aside');
+      const nav = aside && getComputedStyle(aside).display !== 'none' ? aside.querySelector('nav[aria-label="Main"]') : null;
       const header = document.querySelector('header.sticky, body > div header');
       const vis = (el: Element | null) => (el && getComputedStyle(el).display !== 'none' ? el.getBoundingClientRect() : null);
       return { nav: vis(nav)?.top ?? null, navH: vis(nav)?.height ?? null, header: vis(header)?.top ?? null, vh: window.innerHeight };

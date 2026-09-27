@@ -25,7 +25,7 @@ test('interactions (audit A)', async ({ browser }) => {
       const detail = await fn();
       checks.push({ name, ok: true, detail: detail || undefined });
     } catch (e) {
-      checks.push({ name, ok: false, detail: (e as Error).message.split('\n').slice(0, 3).join(' ') });
+      checks.push({ name, ok: false, detail: (e as Error).message.split('\n').slice(0, 8).join(' ').replace(new RegExp(String.fromCharCode(27) + '\\[[0-9;]*m', 'g'), '') });
     }
   };
   const open = async (user: DevUser, vp = { width: 1366, height: 768 }) => {
@@ -284,6 +284,5 @@ test('interactions (audit A)', async ({ browser }) => {
   });
 
   writeFileSync(resolve(OUT_DIR, suite, 'interact.json'), JSON.stringify({ checks, runtime: rec.findings }, null, 2));
-  rec.save();
   for (const c of checks) console.log(`${c.ok ? 'PASS' : 'FAIL'}  ${c.name}${c.detail ? ` — ${c.detail}` : ''}`);
 });

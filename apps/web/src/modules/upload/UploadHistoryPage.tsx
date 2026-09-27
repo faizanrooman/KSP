@@ -28,7 +28,7 @@ export function UploadHistoryPage() {
   });
 
   const columns: Column<UploadSessionView>[] = [
-    { key: 'file', header: 'File', className: 'min-w-[12rem] max-w-xs', render: (v) => <span className="break-all font-medium text-ink-900">{v.filename}</span> },
+    { key: 'file', header: 'File', className: 'min-w-[12rem] max-w-xs', render: (v) => <span className="font-medium text-ink-900 [overflow-wrap:anywhere]">{v.filename}</span> },
     { key: 'station', header: 'Station', className: 'min-w-[9rem]', render: (v) => v.orgUnitName },
     ...(q.scope === 'station' ? [{ key: 'by', header: 'Uploaded by', render: (v: UploadSessionView) => v.createdByName }] : []),
     { key: 'size', header: 'Size', render: (v) => formatBytes(v.size), className: 'whitespace-nowrap' },

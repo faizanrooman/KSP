@@ -186,8 +186,8 @@ export function SyncPlayer({ items: input, onOffsetsChange, className }: SyncPla
               />
               {/* Label + local time, then the offset controls as one unit (they used to wrap mid-group). */}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1.5 text-xs">
-                <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="truncate font-medium text-ink-800" title={it.label}>{it.label}</span>
+                <span className="flex min-w-[13rem] flex-1 flex-wrap items-center gap-x-2">
+                  <span className="font-medium text-ink-800 [overflow-wrap:anywhere]">{it.label}</span>
                   <span className="mono whitespace-nowrap text-ink-500">{local < 0 ? `starts in ${formatTimecode(-local)}` : formatTimecode(local)}</span>
                 </span>
                 <span className="ml-auto inline-flex items-center gap-1 whitespace-nowrap">

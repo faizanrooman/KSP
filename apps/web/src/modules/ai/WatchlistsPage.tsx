@@ -18,7 +18,7 @@ export function WatchlistsPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Watchlists" subtitle="Lists apply to evidence within their org unit's jurisdiction. Matches are suggestions that require dual human approval." actions={<Button icon={<Plus className="h-4 w-4" aria-hidden />} onClick={() => setCreating(true)}>New watchlist</Button>} />
-      <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
         <Card title="Lists">
           {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !q.data!.items.length ? <EmptyState title="No watchlists" /> : (
             <ul className="space-y-1">

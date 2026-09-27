@@ -26,10 +26,11 @@ test('crawl screens (audit A)', async ({ browser }) => {
   const only = process.env.AUDIT_ONLY ? new RegExp(process.env.AUDIT_ONLY) : null;
   const vps = process.env.AUDIT_VP ? VIEWPORTS.filter((v) => process.env.AUDIT_VP!.split(',').includes(v.name)) : VIEWPORTS;
   const io = await signedIn(browser, 'io.meera', rec);
-  const ev = await get<{ items: Array<{ id: string; mediaStatus: string; status: string }> }>(io, '/evidence?pageSize=50&sort=-created_at');
-  const ready = ev.items.find((e) => e.mediaStatus === 'READY' && e.status !== 'DISPOSED') ?? ev.items[0];
+  const ev = await get<{ items: Array<{ id: string; mediaStatus: string; status: string; title: string | null }> }>(io, '/evidence?pageSize=50&sort=-created_at');
+  // The registered item with the longest title: exercises wrapping of long unbroken file names (AUDIT_EVIDENCE overrides).
+  const ready = ev.items.filter((e) => e.mediaStatus === 'READY' && e.status === 'REGISTERED').sort((a, b) => (b.title ?? '').length - (a.title ?? '').length)[0] ?? ev.items[0];
   const ws = await get<{ items: Array<{ id: string }> }>(io, '/workspaces?pageSize=5');
-  const evId = ready?.id ?? 'none';
+  const evId = process.env.AUDIT_EVIDENCE ?? ready?.id ?? 'none';
   const wsId = ws.items[0]?.id ?? 'none';
 
   const screens: Array<[DevUser, string, string]> = [
