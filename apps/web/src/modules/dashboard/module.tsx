@@ -1,6 +1,8 @@
 import { LayoutDashboard } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { DashboardPage } from './DashboardPage';
+import { lazyPage } from '@/lib/lazy';
+
+const DashboardPage = lazyPage(() => import('./DashboardPage'), 'DashboardPage');
 
 const mod: WebModule = {
   id: 'dashboard',

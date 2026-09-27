@@ -1,8 +1,10 @@
 import { Cpu, ListChecks, ScanFace } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { ReviewQueuePage } from './ReviewQueuePage';
-import { ModelsPage } from './ModelsPage';
-import { WatchlistsPage } from './WatchlistsPage';
+import { lazyPage } from '@/lib/lazy';
+
+const ReviewQueuePage = lazyPage(() => import('./ReviewQueuePage'), 'ReviewQueuePage');
+const ModelsPage = lazyPage(() => import('./ModelsPage'), 'ModelsPage');
+const WatchlistsPage = lazyPage(() => import('./WatchlistsPage'), 'WatchlistsPage');
 
 const mod: WebModule = {
   id: 'ai',

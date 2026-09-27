@@ -1,6 +1,11 @@
 import { Bell, BellRing, SlidersHorizontal } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { AlertDetailPage, AlertRulesPage, AlertsListPage, NotificationsPage } from './AlertsPages';
+import { lazyPage } from '@/lib/lazy';
+
+const AlertDetailPage = lazyPage(() => import('./AlertsPages'), 'AlertDetailPage');
+const AlertRulesPage = lazyPage(() => import('./AlertsPages'), 'AlertRulesPage');
+const AlertsListPage = lazyPage(() => import('./AlertsPages'), 'AlertsListPage');
+const NotificationsPage = lazyPage(() => import('./AlertsPages'), 'NotificationsPage');
 
 const mod: WebModule = {
   id: 'alerts',

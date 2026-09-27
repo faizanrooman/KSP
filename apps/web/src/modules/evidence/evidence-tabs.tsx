@@ -1,7 +1,9 @@
 import type { EvidenceTab } from '@/lib/extensions';
-import { OverviewTab } from './OverviewTab';
-import { IntegrityTab } from './IntegrityTab';
-import { LifecycleTab } from './LifecycleTab';
+import { lazyPage } from '@/lib/lazy';
+
+const OverviewTab = lazyPage(() => import('./OverviewTab'), 'OverviewTab');
+const IntegrityTab = lazyPage(() => import('./IntegrityTab'), 'IntegrityTab');
+const LifecycleTab = lazyPage(() => import('./LifecycleTab'), 'LifecycleTab');
 
 const tabs: EvidenceTab[] = [
   { id: 'overview', label: 'Overview', order: 0, component: OverviewTab },

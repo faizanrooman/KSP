@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import type { ComponentType } from 'react';
 import type { Permission } from '@ksp/shared';
 import { useAuth } from '@/lib/auth';
+import { LazyBoundary } from '@/lib/lazy';
 import { MODULES } from '@/lib/modules';
 import { AppShell } from '@/components/AppShell';
 import { Spinner } from '@/components/ui';
@@ -11,7 +12,11 @@ import { ForbiddenPage, NotFoundPage } from '@/pages/StatusPages';
 function Guard({ element: El, anyOf }: { element: ComponentType; anyOf?: Permission[] }) {
   const { canAny } = useAuth();
   if (anyOf && anyOf.length && !canAny(...anyOf)) return <ForbiddenPage />;
-  return <El />;
+  return (
+    <LazyBoundary label="Loading page…">
+      <El />
+    </LazyBoundary>
+  );
 }
 
 export default function App() {
@@ -24,7 +29,7 @@ export default function App() {
   return (
     <Routes>
       {publicRoutes.map((r) => (
-        <Route key={r.path} path={r.path} element={<r.element />} />
+        <Route key={r.path} path={r.path} element={<LazyBoundary label="Loading…" className="min-h-screen"><r.element /></LazyBoundary>} />
       ))}
       <Route path="/login" element={me ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route

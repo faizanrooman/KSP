@@ -4,23 +4,13 @@ import { Camera, Download, ExternalLink } from 'lucide-react';
 import type { EvidenceSummary } from '@/lib/extensions';
 import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/api';
-import { formatDateTime, formatDuration, formatTimecode, shortHash } from '@/lib/format';
+import { formatDateTime, formatDuration, formatTimecode, parseTimeInput, shortHash } from '@/lib/format';
 import { Button, Card, CopyButton, EmptyState, ErrorState, Field, Input, KeyValue, Select, Spinner, useToast } from '@/components/ui';
 import { EvidencePlayer } from './EvidencePlayer';
 import { useCreateSnapshot, usePlayback, useSnapshots } from './api';
 
-/** Parse "mm:ss.mmm", "hh:mm:ss.mmm", "ss.mmm" or plain milliseconds ("1234ms"). */
-export function parseTimeInput(v: string): number | null {
-  const s = v.trim();
-  if (!s) return null;
-  if (/^\d+(\.\d+)?ms$/.test(s)) return Number(s.slice(0, -2));
-  if (!/^[\d:.]+$/.test(s)) return null;
-  const parts = s.split(':').map(Number);
-  if (parts.some((n) => !Number.isFinite(n))) return null;
-  let sec = 0;
-  for (const p of parts) sec = sec * 60 + p;
-  return Math.round(sec * 1000);
-}
+// Kept here for existing importers; lives in @/lib/format so eager code need not pull in the video chunk.
+export { parseTimeInput };
 
 export function PlaybackTab({ evidence }: { evidence: EvidenceSummary }) {
   const [params] = useSearchParams();

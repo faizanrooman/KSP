@@ -4,6 +4,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useUrlState } from '@/lib/hooks';
 import { CASE_TABS } from '@/lib/extensions';
+import { LazyBoundary } from '@/lib/lazy';
 import { formatDate } from '@/lib/format';
 import { EmptyState, ErrorState, PageHeader, Spinner, StatusBadge, Tabs } from '@/components/ui';
 import { caseKey, type CaseDetail } from './types';
@@ -64,7 +65,7 @@ export function CaseDetailPage() {
         {active === 'team' && <TeamTab caseItem={c} />}
         {active === 'diary' && <DiaryTab caseItem={c} />}
         {active === 'timeline' && <TimelineTab caseItem={c} />}
-        {extTab && <extTab.component caseItem={{ id: c.id, caseNumber: c.caseNumber, title: c.title, status: c.status, orgUnitId: c.orgUnitId }} />}
+        {extTab && <LazyBoundary key={extTab.id}><extTab.component caseItem={{ id: c.id, caseNumber: c.caseNumber, title: c.title, status: c.status, orgUnitId: c.orgUnitId }} /></LazyBoundary>}
       </div>
     </div>
   );

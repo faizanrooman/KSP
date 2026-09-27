@@ -1,6 +1,8 @@
 import { Search } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { SearchPage } from './SearchPage';
+import { lazyPage } from '@/lib/lazy';
+
+const SearchPage = lazyPage(() => import('./SearchPage'), 'SearchPage');
 
 const mod: WebModule = {
   id: 'search',

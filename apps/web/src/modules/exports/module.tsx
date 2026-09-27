@@ -1,9 +1,11 @@
 import { FileCheck2, Gavel } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { ExportsPage } from './ExportsPage';
-import { CreateExportPage } from './CreateExportPage';
-import { ExportDetailPage } from './ExportDetailPage';
-import { VerifyPackagePage } from './VerifyPackagePage';
+import { lazyPage } from '@/lib/lazy';
+
+const ExportsPage = lazyPage(() => import('./ExportsPage'), 'ExportsPage');
+const CreateExportPage = lazyPage(() => import('./CreateExportPage'), 'CreateExportPage');
+const ExportDetailPage = lazyPage(() => import('./ExportDetailPage'), 'ExportDetailPage');
+const VerifyPackagePage = lazyPage(() => import('./VerifyPackagePage'), 'VerifyPackagePage');
 
 const ANY = ['export:create', 'export:approve', 'export:download'] as const;
 

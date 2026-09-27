@@ -48,3 +48,16 @@ export function shortHash(h: string | null | undefined, n = 12): string {
 export function titleCase(v: string): string {
   return v.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+/** Parse "mm:ss.mmm", "hh:mm:ss.mmm", "ss.mmm" or plain milliseconds ("1234ms"). */
+export function parseTimeInput(v: string): number | null {
+  const s = v.trim();
+  if (!s) return null;
+  if (/^\d+(\.\d+)?ms$/.test(s)) return Number(s.slice(0, -2));
+  if (!/^[\d:.]+$/.test(s)) return null;
+  const parts = s.split(':').map(Number);
+  if (parts.some((n) => !Number.isFinite(n))) return null;
+  let sec = 0;
+  for (const p of parts) sec = sec * 60 + p;
+  return Math.round(sec * 1000);
+}

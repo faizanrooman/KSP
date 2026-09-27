@@ -1,5 +1,7 @@
 import type { WebModule } from '@/lib/modules';
-import { PlayerPage } from './PlayerPage';
+import { lazyPage } from '@/lib/lazy';
+
+const PlayerPage = lazyPage(() => import('./PlayerPage'), 'PlayerPage');
 
 const mod: WebModule = {
   id: 'video',

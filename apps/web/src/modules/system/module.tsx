@@ -1,6 +1,8 @@
 import { Activity } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { SystemHealthPage } from './SystemHealthPage';
+import { lazyPage } from '@/lib/lazy';
+
+const SystemHealthPage = lazyPage(() => import('./SystemHealthPage'), 'SystemHealthPage');
 
 const mod: WebModule = {
   id: 'system',

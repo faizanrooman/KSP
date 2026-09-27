@@ -216,6 +216,22 @@ Every request re-validates the media token and its session row and reads from S3
 ever exposed). ≈ 70–165 MB/s through one API process ≈ 250–600 concurrent 2 Mbit/s viewers per process on this host;
 0 errors at 100 connections.
 
+### Web bundle (FN-24, `npx vite build`, minified; gzip = `zlib.gzipSync` of each file)
+
+Route pages and evidence-detail tabs are `React.lazy` chunks (`apps/web/src/lib/lazy.tsx`; the module registries stay
+eager and keep their extension-point shapes), vendors are split with `manualChunks` (`vendor-react`, `vendor-charts`
+= recharts + d3/redux deps, `vendor-hls`); the player (`EvidencePlayer` + video tabs) is its own lazy chunk.
+
+| | JS files | all JS | JS loaded for the first page (from `index.html`) |
+|---|---|---|---|
+| before | 1 | 2 615 kB (627 kB gzip) | 2 615 kB (627 kB gzip) |
+| after | 67 | 2 589 kB (668 kB gzip) | **541 kB (154 kB gzip)**: `index` 131 kB + `vendor-react` 423 kB |
+
+Largest lazy chunks after: `vendor-hls` 594 kB (185 kB gzip, only with the player), `vendor-charts` 396 kB (116 kB
+gzip, dashboard/reports/system health), `WorkspacePage` 110 kB, `extensions` 67 kB (evidence/case tab registry),
+`CaseDetailPage` 58 kB, `EvidencePlayer` 37 kB; every other page 5–45 kB. A failed chunk load (e.g. stale chunk
+after a deployment) shows a "Reload" state instead of a blank page.
+
 ## What these numbers do and do not imply
 
 * They are **one laptop running everything** (API, worker, DB, S3, load generator, plus another agent's browser

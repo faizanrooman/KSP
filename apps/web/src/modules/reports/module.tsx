@@ -1,6 +1,8 @@
 import { FileBarChart } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { ReportsPage } from './ReportsPage';
+import { lazyPage } from '@/lib/lazy';
+
+const ReportsPage = lazyPage(() => import('./ReportsPage'), 'ReportsPage');
 
 const mod: WebModule = {
   id: 'reports',

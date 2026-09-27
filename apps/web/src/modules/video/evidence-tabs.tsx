@@ -1,5 +1,8 @@
 import type { EvidenceTab } from '@/lib/extensions';
-import { PlaybackTab, SnapshotsTab } from './tabs';
+import { lazyPage } from '@/lib/lazy';
+
+const PlaybackTab = lazyPage(() => import('./tabs'), 'PlaybackTab');
+const SnapshotsTab = lazyPage(() => import('./tabs'), 'SnapshotsTab');
 
 const tabs: EvidenceTab[] = [
   { id: 'playback', label: 'Playback', order: 10, anyOf: ['evidence:play'], component: PlaybackTab },

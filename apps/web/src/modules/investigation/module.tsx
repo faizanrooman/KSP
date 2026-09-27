@@ -1,7 +1,9 @@
 import { FolderKanban } from 'lucide-react';
 import type { WebModule } from '@/lib/modules';
-import { WorkspacesPage } from './WorkspacesPage';
-import { WorkspacePage } from './WorkspacePage';
+import { lazyPage } from '@/lib/lazy';
+
+const WorkspacesPage = lazyPage(() => import('./WorkspacesPage'), 'WorkspacesPage');
+const WorkspacePage = lazyPage(() => import('./WorkspacePage'), 'WorkspacePage');
 
 const mod: WebModule = {
   id: 'investigation',

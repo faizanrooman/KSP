@@ -82,7 +82,6 @@ Owner is a role, not a person.
 | FN-22 | Station CLI | Summary "Detail" column can show a stale status | LOW | open (cosmetic) |
 | FN-23 | E2E | API runs with `NODE_ENV=test` semantics during E2E (relaxed rate limits) | LOW | by design |
 | FN-25 | Tests | Intermittent: `apps/api/test/ai.test.ts` end-to-end AI job once processed 3 frames instead of ≥ 5 (fresh-clone run, final audit); passed on 3 re-runs. Investigate frame sampling under load before blaming the host | LOW | monitor |
-| FN-24 | Web | Production bundle is a single 2.6 MB JS chunk (627 kB gzip) — no route-level code splitting | LOW | open |
 
 ## Development host (ENV)
 
@@ -112,3 +111,4 @@ Owner is a role, not a person.
 | FN-9 PDFs used standard fonts (Kannada / non-Latin not rendered) | bundled Noto Sans + Noto Sans Kannada (OFL, SHA-256 pinned), HarfBuzz shaping, /ActualText; tests compare glyph runs with HarfBuzz, pdftotext round-trip and a 300 dpi raster (CHAIN-OF-CUSTODY.md). Other non-Latin scripts still print `?` |
 | FN-17 region annotations were pointer-only | keyboard region editor in AnnotationStudio (focusable frame: arrows move, Shift+arrows resize, Enter sets, Escape; X/Y/W/H % inputs; polite announcements); `91-keyboard` E2E + axe on the editor; unit tests for the geometry |
 | FN-18 integrations / API-client / retention / disposal screens not driven by E2E | `tests/e2e/specs/12-admin-lifecycle.spec.ts` (fixture system + FIR import, API client secret-once + revoke, retention create/assign, two-officer disposal to DISPOSED) |
+| FN-24 single 2.6 MB JS bundle (627 kB gzip) | route/tab `React.lazy` chunks + vendor chunks (react, charts, hls); first page loads 541 kB (154 kB gzip) — PERFORMANCE.md “Web bundle” |
