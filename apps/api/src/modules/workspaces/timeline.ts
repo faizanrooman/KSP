@@ -123,6 +123,7 @@ export async function buildTimeline(db: Database, p: Principal, wsId: string) {
     .innerJoin('users as u', 'u.id', 't.created_by')
     .select(['t.id', 't.title', 't.description', 't.occurred_at', 't.evidence_id', 't.time_ms', 'u.full_name'])
     .where('t.workspace_id', '=', wsId)
+    .where('t.deleted_at', 'is', null)
     .execute();
   for (const ev of events) {
     const restricted = !!ev.evidence_id && !visible.has(ev.evidence_id);
@@ -220,7 +221,7 @@ export default async function timelineRoutes(fastify: FastifyInstance) {
   app.patch('/:id/timeline/events/:eventId', { preValidation: guard, schema: { tags: ['workspaces'], summary: 'Edit a manual timeline event (editor)', params: eventParams, body: eventPatch } }, async (req) => {
     const p = req.requirePrincipal();
     const ws = await loadWorkspace(app.db, p, req.params.id, 'EDITOR');
-    const cur = await app.db.selectFrom('timeline_events').selectAll().where('id', '=', req.params.eventId).where('workspace_id', '=', ws.id).executeTakeFirst();
+    const cur = await app.db.selectFrom('timeline_events').selectAll().where('id', '=', req.params.eventId).where('workspace_id', '=', ws.id).where('deleted_at', 'is', null).executeTakeFirst();
     if (!cur) throw notFound('Timeline event');
     const b = req.body;
     if (!Object.keys(b).length) throw validationFailed('Nothing to update');
@@ -245,10 +246,12 @@ export default async function timelineRoutes(fastify: FastifyInstance) {
   app.delete('/:id/timeline/events/:eventId', { preValidation: guard, schema: { tags: ['workspaces'], summary: 'Delete a manual timeline event (editor)', params: eventParams } }, async (req, reply) => {
     const p = req.requirePrincipal();
     const ws = await loadWorkspace(app.db, p, req.params.id, 'EDITOR');
-    const cur = await app.db.selectFrom('timeline_events').select(['id', 'title', 'evidence_id']).where('id', '=', req.params.eventId).where('workspace_id', '=', ws.id).executeTakeFirst();
+    const cur = await app.db.selectFrom('timeline_events').select(['id', 'title', 'evidence_id']).where('id', '=', req.params.eventId).where('workspace_id', '=', ws.id).where('deleted_at', 'is', null).executeTakeFirst();
     if (!cur) throw notFound('Timeline event');
     await app.db.transaction().execute(async (tx) => {
-      await tx.deleteFrom('timeline_events').where('id', '=', cur.id).execute();
+      // FN-12: soft delete (the row and its content stay for the record, like annotations).
+      const upd = await tx.updateTable('timeline_events').set({ deleted_at: new Date(), deleted_by: p.userId }).where('id', '=', cur.id).where('deleted_at', 'is', null).executeTakeFirst();
+      if (!Number(upd.numUpdatedRows ?? 0)) throw notFound('Timeline event');
       await appendAudit(tx, req.actor(), { action: 'TIMELINE_EVENT_CHANGED', resourceType: 'timeline_event', resourceId: cur.id, caseId: ws.case_id, orgUnitId: ws.org_unit_id, details: { op: 'deleted', workspaceId: ws.id, title: cur.title } });
     });
     return reply.status(204).send();

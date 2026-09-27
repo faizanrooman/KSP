@@ -935,6 +935,8 @@ export interface SystemSettings {
 export interface TimelineEvents {
   created_at: Generated<Timestamp>;
   created_by: string;
+  deleted_at: Timestamp | null;
+  deleted_by: string | null;
   description: string | null;
   evidence_id: string | null;
   id: Generated<string>;

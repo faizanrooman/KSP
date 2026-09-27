@@ -270,6 +270,15 @@ describe('timeline reconstruction', () => {
     expect(p.status).toBe(200);
     expect((await meera.delete(`${W}/${ws}/timeline/events/${ev.body.id}`)).status).toBe(204);
     expect((await meera.delete(`${W}/${ws}/timeline/events/${ev.body.id}`)).status).toBe(404);
+    // FN-12: soft-deleted (row kept with deleted_at/by), gone from the timeline, not editable
+    const app = await getApp();
+    const row = await app.db.selectFrom('timeline_events').selectAll().where('id', '=', ev.body.id).executeTakeFirstOrThrow();
+    expect(row.title).toBe('Control room call');
+    expect(row.deleted_at).toBeInstanceOf(Date);
+    expect(row.deleted_by).toBe(await userId('io.meera'));
+    expect((await meera.get(`${W}/${ws}/timeline`)).body.entries.some((e: { id?: string }) => e.id === ev.body.id)).toBe(false);
+    expect((await meera.patch(`${W}/${ws}/timeline/events/${ev.body.id}`, { title: 'resurrect' })).status).toBe(404);
+    await expect(app.db.deleteFrom('timeline_events').where('id', '=', ev.body.id).execute()).rejects.toThrow(/permission denied/);
   });
 });
 
