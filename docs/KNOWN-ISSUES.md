@@ -27,7 +27,7 @@ Owner is a role, not a person.
 | ID | Issue | Sev | Status | Owner / next step |
 |---|---|---|---|---|
 | OPS-1 | Container images, compose and Kubernetes never built or run (no Docker on the dev host); validated statically (`scripts/ci/validate-deploy.sh`) + runtime layout simulated (`scripts/ci/simulate-image.sh`) | HIGH | UNVERIFIED | DevOps: build images + deploy to staging |
-| OPS-2 | GitHub Actions `ci.yml` / `release.yml` never executed; versitygw release tarball name in the CI DR step assumed; CI does not run the Playwright suite | MEDIUM | UNVERIFIED | DevOps: first CI run; add E2E job |
+| OPS-2 | GitHub Actions `ci.yml` / `release.yml` never executed (incl. the new `e2e` Playwright job); versitygw release tarball name in the CI DR step assumed | MEDIUM | UNVERIFIED | DevOps: first CI run |
 | OPS-3 | 2-hour restoration and 99.5 % availability not demonstrated at production scale; local drill only (small data); CNPG failover, PITR, native replication untested | HIGH | UNVERIFIED | DevOps: staging DR drill at realistic volume |
 | OPS-4 | `s3-replicate.ts` copies get new version IDs → `--repoint` needed after failover (native replication avoids it); full re-hash is O(bytes) — use `--trust-marker` within the RTO | LOW | accepted | by design |
 | OPS-5 | Disposal is not propagated to the DR store (copies persist until their own lock expires) — DR disposal sweep needed | MEDIUM | open | DevOps / custodian |
@@ -89,7 +89,7 @@ Owner is a role, not a person.
 | ENV-2 | Docker socket not accessible; system PostgreSQL (5432) unavailable → project cluster on 5433 | by design for dev |
 | ENV-3 | Heavy FFmpeg/upload suites slow/flaky when several agents run concurrently; green on sequential runs. Single-threaded `eslint .` crashes → lint uses `--concurrency` | monitor |
 | ENV-4 | Editing an applied migration causes checksum errors in a worktree's private DB (rebuild it) | note |
-| ENV-5 | Tools used by `validate-deploy.sh` / backup tests (hadolint, shellcheck, kustomize, kubeconform, actionlint, age, promtool) are not installed on the host; a missing validator prints SKIP and the script still passes. The final audit downloaded them into a scratch dir (promtool still skipped) | note |
+| ENV-5 | Validators are not preinstalled on the host: `scripts/ci/install-tools.sh` installs pinned, SHA-256-verified hadolint/shellcheck/kustomize/kubeconform/actionlint/age/promtool into `.local/bin`; `validate-deploy.sh --strict` (and `CI=true`) fails on a missing validator. Docker compose cannot be validated here (`--no-docker`, reported) | note |
 
 ## Appendix — resolved
 
@@ -114,3 +114,5 @@ Owner is a role, not a person.
 | FN-13 search totals via `count(*) OVER ()` | exact up to 10 000 then `totalApprox` (“10,000+”); tag/AI facets via bounded LATERAL lookups (facets 170–210 → 89–126 ms state-wide) |
 | EXT-11 / SEC-08 / SEC-18 react-router 6.30 advisories (GHSA-wrjc-x8rr-h8h6, GHSA-337j-9hxr-rhxg) | upgraded to `react-router` 7.18.4 (declarative mode; imports moved from `react-router-dom`); `npm audit --omit=dev`: 0 vulnerabilities |
 | FN-25 intermittent `ai.test.ts` job with 3 frames instead of ≥ 5 | root cause: the AI test-media cache (`.local/ai-test-media`, next to the shared model dir) is shared by every checkout on the host, and `slideshow()` reused any existing clip and built through a fixed temp name — two concurrent runs could rename a half-written clip into place (reproduced: a reader got a truncated / moov-less file). Fix: per-process temp file + atomic rename, cached clip reused only when its probed duration matches, 6 s fallback clip; the test now asserts `sourceDurationMs` ≥ 5.75 s and `framesProcessed ≥ framesTotal − 1` (FFmpeg `fps` rounding of the last frame). 10/10 consecutive runs green |
+| OPS-2 (part) CI did not run the Playwright suite | `e2e` job in `ci.yml` (services, stack.sh, Chrome, artifacts on failure); actionlint clean |
+| ENV-5 (part) missing validators printed SKIP and still passed | `scripts/ci/install-tools.sh` (pinned + checksum-verified) and strict mode in `validate-deploy.sh`; local strict run: all validators OK (compose skipped with `--no-docker`) |

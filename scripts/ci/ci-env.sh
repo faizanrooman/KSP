@@ -20,6 +20,9 @@ cat > "$1" <<ENV
 NODE_ENV=$3
 LOG_LEVEL=warn
 API_PORT=$4
+APP_BASE_URL=http://localhost:5173
+CORS_ORIGINS=http://localhost:5173
+COOKIE_SECURE=false
 DATABASE_URL=postgres://ksp_app:$APP_PW@$PGHOST:$PGPORT/$2
 DATABASE_MIGRATION_URL=$MIG/$2
 DATABASE_AI_URL=postgres://ksp_ai:$AI_PW@$PGHOST:$PGPORT/$2

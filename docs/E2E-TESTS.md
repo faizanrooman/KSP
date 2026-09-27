@@ -21,6 +21,10 @@ node tests/e2e/scripts/axe-summary.mjs [--rules] [--markdown]    # per-page axe 
 ```
 
 * Chrome: `/opt/google/chrome/chrome` (override with `E2E_CHROME`) — no browser download needed.
+* CI: job `e2e` in `.github/workflows/ci.yml` (PostgreSQL service, versitygw + pinned FFmpeg containers,
+  `scripts/ci/ci-env.sh`, migrate + seed, `fetch-models` registration, `stack.sh start`, `npm run test:e2e` with the
+  runner's Google Chrome via `E2E_CHROME=/usr/bin/google-chrome`, axe summary in the job summary; on failure
+  `tests/e2e/artifacts/` and `.local/logs/` are uploaded). **UNVERIFIED** — never executed on GitHub.
 * The API runs with `NODE_ENV=test` semantics against the checkout's `.env` (`KSP_ENV_FILE`). The only
   behavioural difference is relaxed rate limits (login 10/min/IP in development would throttle ~60 logins per run).
   Account lockout, the IP failed-login throttle, CSRF, MFA and every authorization rule are unchanged.
