@@ -11,6 +11,7 @@ import { loadConfig, stopQueue } from '@ksp/core';
 import type { FastifyInstance } from 'fastify';
 import { Agent, closeApp, createUser, getApp, login } from './helpers.js';
 import { invalidateSettings } from '../src/lib/settings.js';
+import { runQuarantineRelease } from '../../worker/src/jobs/ingest/release.js';
 import {
   ensureRole, ffmpegFixture, initUpload, orgId, putPart, readChunk, runFinalize, sha256File, sha512File, smallVideo, uploadAll, validVideo, writeFixture,
 } from './uploads-support.js';
@@ -397,18 +398,32 @@ describe('quarantine review', () => {
     expect(res.body.error.code).toBe('SEPARATION_OF_DUTIES');
   });
 
-  it('releases a quarantined duplicate through the registration path', async () => {
+  it('releases a quarantined duplicate asynchronously (202 + status polling) through the registration path', async () => {
     const r = await qm.post(`/api/v1/uploads/quarantine/${dupId}/release`, { reason: 'Second copy retained as separate exhibit per IO request' });
-    expect(r.status).toBe(200);
-    expect(r.body.status).toBe('REGISTERED');
-    expect(r.body.evidenceNumber).toMatch(/^KSP-PSCUBBONPARK-/);
+    expect(r.status).toBe(202);
+    expect(r.body).toMatchObject({ id: dupId, status: 'QUEUED', requestId: expect.any(String) });
+    expect(await queued('ingest.release', 'requestId', r.body.requestId)).toBe(1);
+    // a second release while one is pending → 409
+    expect((await qm.post(`/api/v1/uploads/quarantine/${dupId}/release`, { reason: 'double click' })).status).toBe(409);
+    const pending = await qm.get(`/api/v1/uploads/quarantine/releases/${r.body.requestId}`);
+    expect(pending.body).toMatchObject({ status: 'QUEUED', evidenceStatus: 'QUARANTINED', evidenceNumber: null });
+    expect((await op.get(`/api/v1/uploads/quarantine/releases/${r.body.requestId}`)).status).toBe(404); // not requester / no scope
+    expect((await qmMysuru.get(`/api/v1/uploads/quarantine/releases/${r.body.requestId}`)).status).toBe(404);
+    // the worker executes it (as the releasing user)
+    expect(await runQuarantineRelease({ db: app.db, storage: app.storage, cfg: app.cfg, log: app.log }, r.body.requestId)).toMatchObject({ status: 'COMPLETED', outcome: 'REGISTERED' });
+    const done = await qm.get(`/api/v1/uploads/quarantine/releases/${r.body.requestId}`);
+    expect(done.body).toMatchObject({ status: 'COMPLETED', evidenceStatus: 'REGISTERED' });
+    expect(done.body.evidenceNumber).toMatch(/^KSP-PSCUBBONPARK-/);
     const ev = await evidenceRow(dupId);
     expect(ev.storage_tier).toBe('ACTIVE');
     expect(ev.duplicate_of).toBeTruthy();
     const actions = await auditActions(dupId);
     expect(actions).toEqual(expect.arrayContaining(['EVIDENCE_QUARANTINE_RELEASED', 'EVIDENCE_STORED', 'EVIDENCE_REGISTERED']));
-    const rel = await app.db.selectFrom('audit_events').select(['details', 'actor_id']).where('evidence_id', '=', dupId).where('action', '=', 'EVIDENCE_QUARANTINE_RELEASED').executeTakeFirstOrThrow();
+    const rel = await app.db.selectFrom('audit_events').select(['details', 'actor_id', 'actor_type']).where('evidence_id', '=', dupId).where('action', '=', 'EVIDENCE_QUARANTINE_RELEASED').executeTakeFirstOrThrow();
     expect((rel.details as { reason: string }).reason).toMatch(/separate exhibit/);
+    expect(rel).toMatchObject({ actor_type: 'USER', actor_id: (await app.db.selectFrom('quarantine_releases').select('requested_by').where('id', '=', r.body.requestId).executeTakeFirstOrThrow()).requested_by });
+    // idempotent: re-running the job is a no-op
+    expect((await runQuarantineRelease({ db: app.db, storage: app.storage, cfg: app.cfg, log: app.log }, r.body.requestId)).status).toBe('SKIPPED');
     expect(await queued('media.process', 'evidenceId', dupId)).toBe(1);
     expect((await qm.post(`/api/v1/uploads/quarantine/${dupId}/release`, { reason: 'again please' })).status).toBe(409);
   });

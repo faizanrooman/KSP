@@ -721,6 +721,20 @@ export interface ProcessingJobs {
   upload_session_id: string | null;
 }
 
+export interface QuarantineReleases {
+  actor: Json;
+  created_at: Generated<Timestamp>;
+  error: string | null;
+  evidence_id: string;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  outcome: string | null;
+  reason: string;
+  requested_by: string;
+  started_at: Timestamp | null;
+  status: Generated<string>;
+}
+
 export interface RefreshTokens {
   expires_at: Timestamp;
   family_id: string;
@@ -1078,6 +1092,7 @@ export interface DB {
   org_units: OrgUnits;
   password_history: PasswordHistory;
   processing_jobs: ProcessingJobs;
+  quarantine_releases: QuarantineReleases;
   refresh_tokens: RefreshTokens;
   report_runs: ReportRuns;
   report_schedules: ReportSchedules;

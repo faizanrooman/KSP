@@ -60,7 +60,7 @@ export interface DisposalExecutePayload { disposalRequestId: string }
 export interface TierMigratePayload { evidenceId: string; targetTier: 'ACTIVE' | 'ARCHIVE' | 'LONG_TERM' }
 export interface ShareWatermarkPayload { shareId: string; evidenceId: string }
 export interface AlertDeliverPayload { alertId: string; channel: 'WEBHOOK' | 'EMAIL'; attempt: number }
-export interface QuarantineReleasePayload { uploadSessionId: string; requestId: string }
+export interface QuarantineReleasePayload { requestId: string }
 export interface SnapshotExtractPayload { snapshotRequestId: string }
 export interface AiTrainingExportPayload { trainingExportId: string }
 

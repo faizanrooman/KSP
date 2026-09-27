@@ -11,7 +11,9 @@
  *   POST   /uploads/:id/complete                    assemble, create evidence (RECEIVED), enqueue finalize
  *   DELETE /uploads/:id                             abort
  *   GET    /uploads/quarantine                      quarantined evidence in scope
- *   POST   /uploads/quarantine/:evidenceId/release  register despite the quarantine finding (reason required)
+ *   POST   /uploads/quarantine/:evidenceId/release  register despite the quarantine finding (reason required) —
+ *                                                   202 + requestId; the worker (ingest.release) re-hashes and registers
+ *   GET    /uploads/quarantine/releases/:requestId   release status (requester or quarantine manager in scope)
  *   POST   /uploads/quarantine/:evidenceId/reject   reject (REJECTED; staged object deleted; record kept)
  */
 import { createHash, randomUUID } from 'node:crypto';
@@ -31,9 +33,10 @@ import {
   parseStatusReason,
   totalChunksFor,
   type IngestFinalizePayload,
+  type QuarantineReleasePayload,
   type UploadSessionView,
 } from '@ksp/shared';
-import { IngestError, appendAudit, enqueue, registerEvidence, rejectQuarantined, type Database, type IngestDeps } from '@ksp/core';
+import { IngestError, appendAudit, enqueue, rejectQuarantined, type Database, type IngestDeps } from '@ksp/core';
 import { hasPermission, hasPermissionAt, scopePaths, type Principal } from '../../lib/principal.js';
 import { evidenceVisibleSql, loadEvidenceFor, orgScopeSql } from '../../lib/access.js';
 import { AppError, badRequest, conflict, forbidden, gone, notFound } from '../../lib/errors.js';
@@ -325,17 +328,33 @@ export default async function uploads(fastify: FastifyInstance) {
   app.post('/quarantine/:evidenceId/release', {
     preHandler: app.authorize('evidence:quarantine_manage'),
     schema: { tags: ['uploads'], summary: 'Release a quarantined item and register it', ...decisionSchema },
-  }, async (req) => {
+  }, async (req, reply) => {
     const ev = await quarantineTarget(req, req.params.evidenceId);
-    const cur = await app.db.selectFrom('evidence').select('status_reason').where('id', '=', ev.id).executeTakeFirstOrThrow();
-    try {
-      const out = await registerEvidence(deps(), ev.id, req.actor(), { release: { reason: req.body.reason, previousReason: cur.status_reason } });
-      const after = await app.db.selectFrom('evidence').select(['id', 'status', 'evidence_number']).where('id', '=', ev.id).executeTakeFirstOrThrow();
-      return { id: after.id, status: after.status, evidenceNumber: after.evidence_number, outcome: out.outcome };
-    } catch (err) {
-      if (err instanceof IngestError && err.permanent) throw conflict(err.message);
-      throw err;
-    }
+    const p = req.requirePrincipal();
+    // The re-hash of a multi-GB original and the move into immutable storage run in the worker (ingest.release);
+    // the release audit is written in the registration transaction there, under this user.
+    const row = await app.db.insertInto('quarantine_releases')
+      .values({ evidence_id: ev.id, requested_by: userId(p), reason: req.body.reason, actor: JSON.stringify(req.actor()) })
+      .onConflict((oc) => oc.column('evidence_id').where('status', 'in', ['QUEUED', 'RUNNING']).doNothing())
+      .returning(['id', 'status', 'created_at']).executeTakeFirst();
+    if (!row) throw conflict('A release of this item is already in progress');
+    await enqueue<QuarantineReleasePayload>(QUEUES.QUARANTINE_RELEASE, { requestId: row.id }, { singletonKey: row.id });
+    return reply.status(202).send({ requestId: row.id, id: ev.id, status: 'QUEUED', statusUrl: `/api/v1/uploads/quarantine/releases/${row.id}` });
+  });
+
+  app.get('/quarantine/releases/:requestId', {
+    schema: { tags: ['uploads'], summary: 'Status of a quarantine release request', params: z.object({ requestId: uuid }) },
+  }, async (req) => {
+    const p = req.requirePrincipal();
+    const r = await app.db.selectFrom('quarantine_releases as q').innerJoin('evidence as e', 'e.id', 'q.evidence_id')
+      .select(['q.id', 'q.evidence_id', 'q.requested_by', 'q.status', 'q.outcome', 'q.error', 'q.created_at', 'q.started_at', 'q.finished_at', 'e.org_path', 'e.status as evidence_status', 'e.evidence_number'])
+      .where('q.id', '=', req.params.requestId).executeTakeFirst();
+    if (!r || !(r.requested_by === p.userId || hasPermissionAt(p, 'evidence:quarantine_manage', r.org_path))) throw notFound('Release request');
+    return {
+      requestId: r.id, evidenceId: r.evidence_id, status: r.status, outcome: r.outcome, error: r.status === 'FAILED' ? r.error : null,
+      evidenceStatus: r.evidence_status, evidenceNumber: r.status === 'COMPLETED' ? r.evidence_number : null,
+      createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at,
+    };
   });
 
   app.post('/quarantine/:evidenceId/reject', {
