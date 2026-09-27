@@ -22,7 +22,7 @@ function AddToWorkspace({ evidence }: { evidence: EvidenceSummary }) {
   };
   return (
     <>
-      <Button variant="secondary" icon={<FolderPlus className="h-4 w-4" />} onClick={() => setOpen(true)}>Add to workspace</Button>
+      <Button variant="secondary" size="sm" icon={<FolderPlus className="h-4 w-4" />} onClick={() => setOpen(true)}>Add to workspace</Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Add to investigation workspace">
         {list.isLoading ? <Spinner /> : list.error ? <ErrorState error={list.error} onRetry={() => void list.refetch()} /> : !writable.length ? (
           <EmptyState title="No workspaces you can edit" description="Create a workspace to collect this evidence." />

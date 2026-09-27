@@ -75,7 +75,7 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
         <Card title="Reconstruction" actions={<span className="text-xs text-ink-500">{formatDateTime(t.range!.start)} → {formatDateTime(t.range!.end)}</span>}>
           <div className="space-y-2" role="list" aria-label="Timeline lanes">
             {layout.lanes.map((lane) => (
-              <div key={lane.itemId} className="grid grid-cols-[10rem_1fr] items-center gap-2" role="listitem">
+              <div key={lane.itemId} className="grid grid-cols-[minmax(0,13rem)_1fr] items-center gap-2" role="listitem">
                 <span className="mono truncate text-xs" title={lane.label}>{lane.label}</span>
                 <div
                   className="relative h-7 cursor-pointer rounded bg-ink-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
@@ -97,7 +97,7 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
                 </div>
               </div>
             ))}
-            <div className="grid grid-cols-[10rem_1fr] items-center gap-2">
+            <div className="grid grid-cols-[minmax(0,13rem)_1fr] items-center gap-2">
               <span className="text-xs font-medium text-ink-600">Events</span>
               <div className="relative h-7 rounded bg-emerald-50">
                 {layout.events.map((ev) => (
@@ -150,7 +150,7 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
               const key = `${e.kind}-${'id' in e ? e.id : e.itemId}`;
               return (
                 <li key={key} className="flex items-start gap-3 rounded px-2 py-1.5 hover:bg-ink-50">
-                  <span className="mono w-40 shrink-0 text-xs text-ink-500">{formatDateTime(e.at)}</span>
+                  <span className="mono w-48 shrink-0 text-xs text-ink-500">{formatDateTime(e.at)}</span>
                   <Badge tone={kindTone[e.kind]}>{e.kind.toLowerCase()}</Badge>
                   <div className="min-w-0 flex-1 text-sm">
                     {e.kind === 'RECORDING' && <>Recording <span className="mono text-xs">{e.label}</span> until {formatDateTime(e.end)}</>}

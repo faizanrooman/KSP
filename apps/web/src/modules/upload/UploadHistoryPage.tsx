@@ -28,8 +28,8 @@ export function UploadHistoryPage() {
   });
 
   const columns: Column<UploadSessionView>[] = [
-    { key: 'file', header: 'File', render: (v) => <span className="font-medium text-ink-900">{v.filename}</span> },
-    { key: 'station', header: 'Station', render: (v) => v.orgUnitName },
+    { key: 'file', header: 'File', className: 'min-w-[12rem] max-w-xs', render: (v) => <span className="font-medium text-ink-900 [overflow-wrap:anywhere]">{v.filename}</span> },
+    { key: 'station', header: 'Station', className: 'min-w-[9rem]', render: (v) => v.orgUnitName },
     ...(q.scope === 'station' ? [{ key: 'by', header: 'Uploaded by', render: (v: UploadSessionView) => v.createdByName }] : []),
     { key: 'size', header: 'Size', render: (v) => formatBytes(v.size), className: 'whitespace-nowrap' },
     {
@@ -43,7 +43,7 @@ export function UploadHistoryPage() {
       header: 'Evidence',
       render: (v) =>
         v.evidence?.status === 'REGISTERED' ? (
-          <Link className="font-mono text-brand-700 hover:underline" to={`/evidence/${v.evidence.id}`}>{v.evidence.evidenceNumber}</Link>
+          <Link className="whitespace-nowrap font-mono text-xs text-brand-700 hover:underline" to={`/evidence/${v.evidence.id}`}>{v.evidence.evidenceNumber}</Link>
         ) : v.evidence?.reasonCode ? (
           <span className="text-xs text-red-800" title={v.evidence.statusReason ?? ''}>{v.evidence.reasonCode}</span>
         ) : v.error ? (

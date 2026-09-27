@@ -184,16 +184,20 @@ export function SyncPlayer({ items: input, onOffsetsChange, className }: SyncPla
                 maxHeight={items.length > 2 ? '32vh' : '45vh'}
                 onReady={(info) => setInfos((x) => ({ ...x, [it.evidenceId]: info }))}
               />
-              <div className="flex flex-wrap items-center gap-1 px-2 py-1.5 text-xs">
-                <span className="mr-auto truncate font-medium text-ink-800" title={it.label}>{it.label}</span>
-                <span className="mono text-ink-500">{local < 0 ? `starts in ${formatTimecode(-local)}` : formatTimecode(local)}</span>
-                <span className="mx-1 text-ink-300">|</span>
+              {/* Label + local time, then the offset controls as one unit (they used to wrap mid-group). */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1.5 text-xs">
+                <span className="flex min-w-[13rem] flex-1 flex-wrap items-center gap-x-2">
+                  <span className="font-medium text-ink-800 [overflow-wrap:anywhere]">{it.label}</span>
+                  <span className="mono whitespace-nowrap text-ink-500">{local < 0 ? `starts in ${formatTimecode(-local)}` : formatTimecode(local)}</span>
+                </span>
+                <span className="ml-auto inline-flex items-center gap-1 whitespace-nowrap">
                 <span className="text-ink-600">Offset</span>
                 <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, -100)} aria-label={`${it.label}: offset −100 ms`}>−100ms</button>
                 <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, -f)} aria-label={`${it.label}: offset −1 frame`}>−1f</button>
                 <span className="mono w-20 text-center" aria-live="polite">{(offsets[i] ?? 0) >= 0 ? '+' : '−'}{formatTimecode(Math.abs(offsets[i] ?? 0))}</span>
                 <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, f)} aria-label={`${it.label}: offset +1 frame`}>+1f</button>
                 <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, 100)} aria-label={`${it.label}: offset +100 ms`}>+100ms</button>
+                </span>
               </div>
             </div>
           );

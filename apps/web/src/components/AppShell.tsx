@@ -32,11 +32,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
     };
+    // Growing the window to desktop width shows the static sidebar: close the drawer (and release the scroll lock).
+    const onResize = () => window.matchMedia('(min-width: 1024px)').matches && setOpen(false);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
     const button = menuButton.current;
     return () => {
       unlock();
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onResize);
       button?.focus();
     };
   }, [open]);
@@ -86,7 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 self-start overflow-hidden bg-brand-950 lg:block">{sidebar}</aside>
       {open && (
         <div className="fixed inset-0 z-40 flex lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <div ref={drawer} className="relative w-64 max-w-[85vw] bg-brand-950">
+          <div ref={drawer} className="relative h-full w-64 max-w-[85vw] overflow-hidden bg-brand-950">
             <button type="button" className="absolute right-2 top-3 rounded p-1.5 text-brand-100 hover:bg-brand-900 hover:text-white" aria-label="Close menu" onClick={() => setOpen(false)}>
               <X className="h-5 w-5" aria-hidden />
             </button>

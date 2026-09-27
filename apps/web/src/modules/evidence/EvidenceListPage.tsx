@@ -54,9 +54,9 @@ export function EvidenceListPage() {
       header: 'Evidence',
       sortKey: 'evidence_number',
       render: (r) => (
-        <div className="min-w-[14rem]">
+        <div className="min-w-[12rem] max-w-[20rem]">
           <p className="mono text-xs font-semibold text-brand-800">{r.evidenceNumber ?? '—'}</p>
-          <p className="text-sm text-ink-900">{r.title ?? <span className="text-ink-500">Untitled</span>}</p>
+          <p className="text-sm text-ink-900 [overflow-wrap:anywhere]">{r.title ?? <span className="text-ink-500">Untitled</span>}</p>
           {r.tags.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {r.tags.slice(0, 4).map((t) => (
@@ -74,7 +74,8 @@ export function EvidenceListPage() {
       render: (r) => (
         <div className="flex flex-col items-start gap-1">
           <StatusBadge status={r.status} />
-          <span className="text-xs text-ink-500">Media: {titleCase(r.mediaStatus)}</span>
+          <span className="whitespace-nowrap text-xs text-ink-500">Media: {titleCase(r.mediaStatus)}</span>
+          <span className="whitespace-nowrap text-xs text-ink-500">Tier: {titleCase(r.storageTier)}</span>
           {r.legalHold && (
             <Badge tone="red">
               <Lock className="mr-1 h-3 w-3" aria-hidden />
@@ -84,12 +85,11 @@ export function EvidenceListPage() {
         </div>
       ),
     },
-    { key: 'unit', header: 'Unit / officer', render: (r) => (<div><p>{r.orgUnit.name}</p><p className="text-xs text-ink-500">{r.officer ? `${r.officer.fullName}${r.officer.badgeNumber ? ` (${r.officer.badgeNumber})` : ''}` : `Uploaded by ${r.uploadedBy.fullName}`}</p></div>) },
-    { key: 'recorded', header: 'Recorded', sortKey: 'recorded_at', render: (r) => <span className="whitespace-nowrap">{formatDateTime(r.recordedAt)}</span> },
+    { key: 'unit', header: 'Unit / officer', className: 'min-w-[9rem]', render: (r) => (<div><p>{r.orgUnit.name}</p><p className="text-xs text-ink-500">{r.officer ? `${r.officer.fullName}${r.officer.badgeNumber ? ` (${r.officer.badgeNumber})` : ''}` : `Uploaded by ${r.uploadedBy.fullName}`}</p></div>) },
+    { key: 'recorded', header: 'Recorded', sortKey: 'recorded_at', className: 'min-w-[7rem]', render: (r) => formatDateTime(r.recordedAt) },
     { key: 'duration', header: 'Duration', sortKey: 'duration_ms', render: (r) => formatDuration(r.durationMs) },
     { key: 'size', header: 'Size', sortKey: 'size_bytes', render: (r) => <span className="whitespace-nowrap">{formatBytes(r.sizeBytes)}</span> },
-    { key: 'tier', header: 'Tier', render: (r) => titleCase(r.storageTier) },
-    { key: 'created', header: 'Received', sortKey: 'created_at', render: (r) => <span className="whitespace-nowrap">{formatDateTime(r.createdAt)}</span> },
+    { key: 'created', header: 'Received', sortKey: 'created_at', className: 'min-w-[7rem]', render: (r) => formatDateTime(r.createdAt) },
   ];
 
   return (

@@ -18,7 +18,7 @@ export function WatchlistsPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Watchlists" subtitle="Lists apply to evidence within their org unit's jurisdiction. Matches are suggestions that require dual human approval." actions={<Button icon={<Plus className="h-4 w-4" aria-hidden />} onClick={() => setCreating(true)}>New watchlist</Button>} />
-      <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
         <Card title="Lists">
           {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !q.data!.items.length ? <EmptyState title="No watchlists" /> : (
             <ul className="space-y-1">
@@ -133,7 +133,7 @@ function AddEntry({ listId, kind, onAdded }: { listId: string; kind: 'FACE' | 'V
     <form className="flex flex-wrap items-end gap-3 rounded border border-ink-200 p-3" onSubmit={(e) => { e.preventDefault(); if (ok) m.mutate(); }}>
       <Field label={kind === 'FACE' ? 'Name / reference' : 'Label'} htmlFor="we-label" required><Input id="we-label" value={label} onChange={(e) => setLabel(e.target.value)} /></Field>
       {kind === 'VEHICLE' ? (
-        <Field label="Plate" htmlFor="we-plate" required hint="Letters and digits; spaces/dashes ignored"><Input id="we-plate" value={plate} onChange={(e) => setPlate(e.target.value)} className="mono w-36" /></Field>
+        <Field label="Plate" htmlFor="we-plate" required hint="Letters and digits; spaces/dashes ignored"><Input id="we-plate" value={plate} onChange={(e) => setPlate(e.target.value)} className="w-36 font-mono" /></Field>
       ) : (
         <Field label="Reference image (JPEG/PNG ≤ 2 MB, one clear frontal face)" htmlFor="we-img" required error={fileErr}>
           <input id="we-img" type="file" accept="image/jpeg,image/png" className="text-sm" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); setFileErr(f && f.size > MAX_IMAGE ? 'Image larger than 2 MB' : null); }} />

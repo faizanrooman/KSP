@@ -16,6 +16,15 @@ interface SessionRow {
   current: boolean;
 }
 
+/** "Chrome on Linux" from a raw user-agent string (the full string stays available as a tooltip). */
+function describeAgent(ua: string | null): string {
+  if (!ua) return 'Unknown device';
+  const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : null;
+  const os = /Windows/.test(ua) ? 'Windows' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : null;
+  if (!browser && !os) return ua.slice(0, 60);
+  return [browser ?? 'Browser', os && `on ${os}`].filter(Boolean).join(' ');
+}
+
 export function ProfilePage() {
   const { me, refresh } = useAuth();
   const qc = useQueryClient();
@@ -120,15 +129,15 @@ export function ProfilePage() {
             onRetry={() => void sessions.refetch()}
             rowKey={(r) => r.id}
             columns={[
-              { key: 'device', header: 'Device', render: (r) => <span className="line-clamp-2 max-w-xs text-xs">{r.user_agent ?? 'Unknown'}</span> },
+              { key: 'device', header: 'Device', render: (r) => <span className="text-sm" title={r.user_agent ?? undefined}>{describeAgent(r.user_agent)}</span> },
               { key: 'ip', header: 'IP', render: (r) => <span className="mono">{r.ip ?? '—'}</span> },
-              { key: 'seen', header: 'Last active', render: (r) => formatDateTime(r.last_seen_at) },
+              { key: 'seen', header: 'Last active', className: 'whitespace-nowrap', render: (r) => formatDateTime(r.last_seen_at) },
               {
                 key: 'act',
                 header: <span className="sr-only">Session actions</span>,
                 render: (r) =>
                   r.current ? (
-                    <Badge tone="green">This session</Badge>
+                    <Badge tone="green" className="whitespace-nowrap">This session</Badge>
                   ) : (
                     <Button size="sm" variant="secondary" onClick={() => setRevoke(r)}>
                       Revoke

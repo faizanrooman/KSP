@@ -67,6 +67,7 @@ header, or the final DOM of each page. (It found physical bucket names in the da
 | `91-keyboard` | Keyboard-only: login, skip link, nav, list row, tabs (arrows), player controls/shortcuts, review queue shortcuts, dialog focus trap/restore, typing reasons does not fire shortcuts; region annotation created/moved/resized with arrow keys + numeric input, live-region announcements, axe on the editor |
 | `92-responsive` | 1280 px and 768 px: no horizontal page scroll on 11 main pages, menu button below 1024 px, screenshots |
 | `93-ui-audit-b` | UI audit B regressions (docs/UI-AUDIT-B.md): focus stays in the dialog field being typed into, body scroll lock, no page-width overflow at 1024 px, off-canvas menu Esc/focus, settings edits kept across groups, debounced list search, share portal lockout text + viewer at 390/768 px + no staff-session probe |
+| `94-ux-audit-a` | UI/UX audit A regressions (docs/UI-AUDIT-A.md): dialogs lock page scroll, close with Escape and return focus; typing in a dialog keeps focus; dialog footer inside the viewport; evidence tabs not clipped at 1024 px; full-page player fits 1366×768; 768 px drawer (Escape, lock, focus); invalid search filter focuses its field; no page-wide sideways scroll on AI models at 1024 px |
 
 ## Results
 

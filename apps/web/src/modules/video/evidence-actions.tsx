@@ -36,7 +36,7 @@ function DownloadOriginal({ evidence }: { evidence: EvidenceSummary }) {
   if (ev.permissions?.canDownloadOriginal !== true && ev.canDownloadOriginal !== true) return null;
   return (
     <>
-      <Button variant="secondary" icon={<Download className="h-4 w-4" />} onClick={() => setOpen(true)}>
+      <Button variant="secondary" size="sm" icon={<Download className="h-4 w-4" />} onClick={() => setOpen(true)}>
         Download original
       </Button>
       <ConfirmDialog
@@ -76,7 +76,7 @@ function Reprocess({ evidence }: { evidence: EvidenceSummary }) {
   if (!['REGISTERED', 'DISPOSAL_PENDING'].includes(evidence.status)) return null;
   return (
     <>
-      <Button variant="secondary" icon={<RefreshCw className="h-4 w-4" />} onClick={() => setOpen(true)}>
+      <Button variant="secondary" size="sm" icon={<RefreshCw className="h-4 w-4" />} onClick={() => setOpen(true)}>
         Reprocess media
       </Button>
       <ConfirmDialog

@@ -6,6 +6,8 @@
   /* Long unbroken strings (hashes, e-mails, pasted text) wrap instead of overflowing their box (UI-B-05). */
   body { overflow-wrap: break-word; }
   :focus-visible { @apply outline-none ring-2 ring-brand-500 ring-offset-1; }
+  /* Long unbroken strings (file names, hashes, ids) wrap at the container edge instead of widening the page. */
+  body { overflow-wrap: break-word; }
   h1 { @apply text-xl font-semibold text-ink-900; }
   h2 { @apply text-base font-semibold text-ink-900; }
 }
