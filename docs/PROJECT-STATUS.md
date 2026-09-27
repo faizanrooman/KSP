@@ -31,10 +31,10 @@ REAL IMPLEMENTATION STATUS: **FEATURE-COMPLETE FOR THE 20 SPECIFICATION MODULES 
 | Completion C (2026-09-27): Kannada in every PDF (bundled Noto Sans + Noto Sans Kannada, HarfBuzz shaping, /ActualText; FN-9), keyboard region annotations (FN-17), E2E for integrations / API clients / retention / two-officer disposal (FN-18), route-level code splitting (first page 2 615 → 548 kB JS; FN-24), custody keyset paging + capped search totals + bounded facets (FN-19/FN-13), react-router 7 (0 prod audit findings; EXT-11/SEC-08/SEC-18), AI test race fixed (FN-25), CI e2e job + pinned validator installer + strict validate-deploy (OPS-2/ENV-5); disposed-evidence thumbnail 404 fixed | API 482 · worker 66 · ai-worker 21 · web 25 · core 5 · station client 4 · E2E 52 (two consecutive full runs green); build, typecheck (+e2e), lint 0 errors, `validate-deploy.sh --strict --no-docker` passed; `ai.test.ts` 10/10 |
 | Final audit (agent 20): full re-verification on a fresh worktree + fresh-clone check; 4 small bugs fixed (share maxViews race, lockout re-trigger after expiry, restore.sh password quoting, DR drill orphaned services) + migrate/codegen from source | FINAL-AUDIT.md §3 |
 
-Test totals (final audit branch, 2026-09-27): API 446 · worker 55 · ai-worker 19 · web 23 · station client 3 · E2E 48 (594 total) — all passing; build, typecheck (+e2e), lint (0 errors, 5 warnings), web build green. `main` at `8ede45c` had 592 (API 444); the audit added 2 regression tests.
+Test totals (final audit branch, 2026-09-27): API 446 · worker 55 · ai-worker 19 · web 23 · station client 3 · E2E 65 — all passing; build, typecheck (+e2e), lint (0 errors, 5 warnings), web build green. `main` at `8ede45c` had 592 (API 444); the audit added 2 regression tests.
 
 ## In Progress
-Nothing. All code-completable work is done (completion pass A/B/C merged 2026-09-27; see FINAL-AUDIT.md §10).
+Nothing. UI/UX audit (A+B) merged 2026-09-27: 56 UI issues fixed (docs/UI-AUDIT-A.md, docs/UI-AUDIT-B.md), share-watermark race fixed; E2E 65/65 twice. All code-completable work is done (completion pass A/B/C merged 2026-09-27; see FINAL-AUDIT.md §10).
 
 ## Queued
 Production-readiness conditions listed in [FINAL-AUDIT.md](FINAL-AUDIT.md) §8.
