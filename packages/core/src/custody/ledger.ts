@@ -1,6 +1,6 @@
 /**
  * Chain-of-custody view over the audit ledger: every audit_events row with evidence_id = X, each re-verified
- * in SQL (hash recomputed with audit_canonical() and linkage to the preceding ledger row checked).
+ * in SQL (hash recomputed with audit_row_hash() — v1/v2 canonical form per row and linkage to the preceding ledger row checked).
  */
 import { sql } from 'kysely';
 import type { Database, Tx } from '../db/index.js';
@@ -90,7 +90,7 @@ export async function loadCustodyEvents(db: Database | Tx, evidenceId: string, l
     SELECT e.seq, e.event_id, e.occurred_at, e.actor_type, e.actor_id, e.actor_name, u.full_name AS actor_full_name,
            host(e.actor_ip) AS actor_ip, e.action, e.category, e.outcome, e.resource_type, e.resource_id, e.case_id,
            e.org_unit_id, e.details, e.prev_hash, e.hash,
-           (e.hash = encode(digest(e.prev_hash || '|' || audit_canonical(e), 'sha256'), 'hex')) AS hash_ok,
+           (e.hash = audit_row_hash(e)) AS hash_ok,
            (e.prev_hash = CASE WHEN e.seq = 1 THEN repeat('0', 64)
                                ELSE (SELECT p.hash FROM audit_events p WHERE p.seq = e.seq - 1) END) IS TRUE AS link_ok
       FROM audit_events e

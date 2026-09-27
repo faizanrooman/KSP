@@ -269,6 +269,7 @@ export interface AuditEvents {
   event_id: Generated<string>;
   evidence_id: string | null;
   hash: string;
+  hash_version: Generated<number>;
   occurred_at: Timestamp;
   org_unit_id: string | null;
   outcome: string;

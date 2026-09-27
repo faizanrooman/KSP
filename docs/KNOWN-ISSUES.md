@@ -42,7 +42,7 @@ Owner is a role, not a person.
 
 | ID | Issue | Sev | Status | Owner / next step |
 |---|---|---|---|---|
-| SEC-R1 | `audit_canonical()` (migration 0002) does not include `user_agent`, so a DB superuser could alter that column without breaking the hash chain (all other columns are covered; the app role cannot UPDATE at all) | MEDIUM | open | Backend: new migration with a versioned canonical form (old rows keep v1) |
+| SEC-R1 | `audit_canonical()` (migration 0002) did not include `user_agent` | MEDIUM | fixed | Migration 1000: `audit_events.hash_version` (existing rows = 1, history not rewritten), `audit_canonical_v2()` covers every column incl. `user_agent`; `audit_append()` writes v2; `audit_verify()` + `audit_row_hash()` verify each row with its own version and reject a v2→v1 downgrade; custody/ledger + audit-viewer verifiers use `audit_row_hash()`. Pre-1000 rows remain without `user_agent` coverage. Test `audit-hash-v2.test.ts` |
 | SEC-R2 | Residual: FFmpeg demuxer/decoder memory-safety; media tokens are bearer secrets for their TTL (not re-checked against permission changes); DB superuser can bypass triggers (detected by the hash chain, not prevented); keys not in HSM | MEDIUM | accepted | Security officer |
 | SEC-R3 | Not yet tested: browser XSS fuzzing, container images, FFmpeg fuzzing, distributed share-portal brute force, real-cluster NetworkPolicies | MEDIUM | UNVERIFIED | VAPT scope |
 | SEC-R4 | Rate limits use an in-memory store → per API replica | LOW | open | Backend: shared store if needed |
