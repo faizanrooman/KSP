@@ -12,6 +12,7 @@
  */
 import { constants, createPrivateKey, createPublicKey, sign, verify, X509Certificate, type KeyObject } from 'node:crypto';
 import { loadConfig, type AppConfig } from './config.js';
+import { Pkcs11Signer, pkcs11OptionsFromConfig } from './signing-pkcs11.js';
 
 export interface SignatureResult {
   algorithm: string;
@@ -129,6 +130,7 @@ const factories: Record<string, SignerFactory> = {
     if (!cfg.SIGNING_PRIVATE_KEY || !cfg.SIGNING_CERTIFICATE) throw new Error('SIGNING_PROVIDER=pem needs SIGNING_PRIVATE_KEY and SIGNING_CERTIFICATE');
     return new PemSigner(cfg.SIGNING_PRIVATE_KEY, cfg.SIGNING_CERTIFICATE, cfg.SIGNING_KEY_ID);
   },
+  pkcs11: (cfg) => new Pkcs11Signer(pkcs11OptionsFromConfig(cfg)),
 };
 
 /** Register an additional signer provider (signing-pkcs11.ts registers 'pkcs11'). */

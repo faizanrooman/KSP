@@ -903,6 +903,15 @@ export interface Shares {
   watermark: Generated<boolean>;
 }
 
+export interface SigningCertificates {
+  certificate_pem: string;
+  fingerprint256: string;
+  first_used_at: Generated<Timestamp>;
+  key_id: string;
+  non_evidentiary: boolean;
+  provider: string;
+}
+
 export interface SnapshotRequests {
   actor: Json;
   created_at: Generated<Timestamp>;
@@ -1135,6 +1144,7 @@ export interface DB {
   share_access_log: ShareAccessLog;
   share_items: ShareItems;
   shares: Shares;
+  signing_certificates: SigningCertificates;
   snapshot_requests: SnapshotRequests;
   storage_snapshots: StorageSnapshots;
   system_settings: SystemSettings;

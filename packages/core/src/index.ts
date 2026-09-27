@@ -10,6 +10,7 @@ export * from './queue.js';
 export * from './media.js';
 export * from './snapshot.js';
 export * from './signing.js';
+export * from './signing-pkcs11.js';
 export * from './ingest/index.js';
 export * from './mailer.js';
 export * from './schedule.js';

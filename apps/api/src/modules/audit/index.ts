@@ -23,7 +23,7 @@ import { once } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { AUDIT_CATEGORIES, type Permission } from '@ksp/shared';
 import { appendAudit, evidenceSigner, type DB } from '@ksp/core';
-import { chainBrokenAlert, checkpointPayload, createCheckpoint, mapCheckpoint, sanitizeDetails, verifyCheckpoint, verifyLedger } from '@ksp/core/custody';
+import { chainBrokenAlert, checkpointCertificate, checkpointPayload, createCheckpoint, mapCheckpoint, sanitizeDetails, verifyCheckpoint, verifyLedger } from '@ksp/core/custody';
 import { forbidden, notFound } from '../../lib/errors.js';
 import { hasPermission, scopePaths, type Principal } from '../../lib/principal.js';
 
@@ -281,7 +281,8 @@ export default async function audit(fastify: FastifyInstance) {
       const c = mapCheckpoint(raw as never);
       let signatureValid = false;
       try {
-        signatureValid = signer.verify(Buffer.from(checkpointPayload({ headSeq: c.headSeq, headHash: c.headHash, createdAt: new Date(c.createdAt), keyId: c.keyId }), 'utf8'), c.signature);
+        const cert = await checkpointCertificate(app.db, c.certFingerprint, signer);
+        signatureValid = signer.verify(Buffer.from(checkpointPayload({ headSeq: c.headSeq, headHash: c.headHash, createdAt: new Date(c.createdAt), keyId: c.keyId }), 'utf8'), c.signature, cert);
       } catch {
         signatureValid = false;
       }
@@ -327,6 +328,9 @@ export default async function audit(fastify: FastifyInstance) {
       exportedAt: new Date().toISOString(),
       signingCertificate: probe.certificatePem,
       certificateFingerprint256: probe.certificateFingerprint256,
+      // Earlier signing certificates (key rotation); each checkpoint's certFingerprint selects its certificate.
+      certificates: (await app.db.selectFrom('signing_certificates').select(['fingerprint256', 'key_id', 'provider', 'non_evidentiary', 'certificate_pem', 'first_used_at']).orderBy('first_used_at').execute())
+        .map((c) => ({ fingerprint256: c.fingerprint256, keyId: c.key_id, provider: c.provider, nonEvidentiary: c.non_evidentiary, certificatePem: c.certificate_pem, firstUsedAt: c.first_used_at })),
       checkpoints: rows.map((r) => {
         const c = mapCheckpoint(r as never);
         return { ...c, payload: checkpointPayload({ headSeq: c.headSeq, headHash: c.headHash, createdAt: new Date(c.createdAt), keyId: c.keyId }) };
