@@ -1,6 +1,7 @@
 /** Shared pickers backed by /api/v1/directory. */
 import { useEffect, useId, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import type { Permission } from '@ksp/shared';
 import { api } from '@/lib/api';
 import { Input, Select } from '@/components/ui';
 
@@ -15,14 +16,21 @@ export interface OrgUnitOption {
   active: boolean;
 }
 
-export function useOrgUnits() {
-  return useQuery({ queryKey: ['directory', 'org-units'], queryFn: () => api.get<{ items: OrgUnitOption[] }>('/directory/org-units'), staleTime: 5 * 60_000 });
+/** Org units; with `scope`, only units where the current user holds that permission (their jurisdiction for it). */
+export function useOrgUnits(scope?: Permission) {
+  return useQuery({
+    queryKey: ['directory', 'org-units', scope ?? ''],
+    queryFn: () => api.get<{ items: OrgUnitOption[] }>('/directory/org-units', scope ? { scope } : undefined),
+    staleTime: 5 * 60_000,
+  });
 }
 
-export function OrgUnitSelect({ value, onChange, id, allowEmpty = true, emptyLabel = 'All units', stationsOnly, required, disabled }: {
+export function OrgUnitSelect({ value, onChange, id, allowEmpty = true, emptyLabel = 'All units', stationsOnly, required, disabled, scope }: {
   value: string; onChange: (id: string) => void; id?: string; allowEmpty?: boolean; emptyLabel?: string; stationsOnly?: boolean; required?: boolean; disabled?: boolean;
+  /** Offer only units inside the user's jurisdiction for this permission (use when the target endpoint enforces it). */
+  scope?: Permission;
 }) {
-  const { data, isLoading } = useOrgUnits();
+  const { data, isLoading } = useOrgUnits(scope);
   const items = (data?.items ?? []).filter((u) => !stationsOnly || u.unitType === 'STATION');
   return (
     <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} required={required} disabled={disabled || isLoading}>

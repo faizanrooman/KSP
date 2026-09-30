@@ -63,7 +63,7 @@ export function UsersListPage() {
             </Field>
           </div>
           <Field label="Unit (incl. sub-units)" htmlFor="u-org">
-            <OrgUnitSelect id="u-org" value={s.orgUnitId} onChange={(v) => set({ orgUnitId: v })} />
+            <OrgUnitSelect id="u-org" scope="users:read" value={s.orgUnitId} onChange={(v) => set({ orgUnitId: v })} />
           </Field>
           <Field label="Status" htmlFor="u-status">
             <Select id="u-status" value={s.status} onChange={(e) => set({ status: e.target.value })}>

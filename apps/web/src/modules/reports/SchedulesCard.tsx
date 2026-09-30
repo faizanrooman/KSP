@@ -91,7 +91,7 @@ export function SchedulesCard({ types, formats }: { types: ReportTypeOption[]; f
             {f.frequency === 'WEEKLY' && <Field label="Day of week" htmlFor="sch-dow"><Select id="sch-dow" value={f.dayOfWeek} onChange={(e) => setF({ ...f, dayOfWeek: e.target.value })}>{DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}</Select></Field>}
             {f.frequency === 'MONTHLY' && <Field label="Day of month" htmlFor="sch-dom" hint="1–28"><Input id="sch-dom" type="number" min={1} max={28} value={f.dayOfMonth} onChange={(e) => setF({ ...f, dayOfMonth: e.target.value })} /></Field>}
             <Field label="Period covered (days)" htmlFor="sch-lookback" hint="Default: 1 / 7 / 31 by frequency"><Input id="sch-lookback" type="number" min={1} max={1098} value={f.lookbackDays} onChange={(e) => setF({ ...f, lookbackDays: e.target.value })} /></Field>
-            <Field label="Station / unit" htmlFor="sch-org"><OrgUnitSelect id="sch-org" value={f.orgUnitId} onChange={(v) => setF({ ...f, orgUnitId: v })} emptyLabel="All in my jurisdiction" /></Field>
+            <Field label="Station / unit" htmlFor="sch-org"><OrgUnitSelect id="sch-org" scope="reports:generate" value={f.orgUnitId} onChange={(v) => setF({ ...f, orgUnitId: v })} emptyLabel="All in my jurisdiction" /></Field>
             <Field label="Add recipient" htmlFor="sch-rcpt">
               <UserPicker id="sch-rcpt" value={pick} onChange={(u) => { if (u && !recipients.some((r) => r.id === u.id)) setRecipients([...recipients, u]); setPick(null); }} />
             </Field>

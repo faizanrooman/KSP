@@ -82,7 +82,7 @@ function GrantRoleModal({ user, onClose }: { user: UserDetail; onClose: () => vo
         </Field>
         {role && <p className="text-xs text-ink-600">{role.description ?? ''} {role.permissions.length} permission(s).</p>}
         <Field label="At unit" htmlFor="gr-org" required hint="The role applies to this unit and every unit below it.">
-          <OrgUnitSelect id="gr-org" value={orgUnitId} onChange={setOrgUnitId} emptyLabel="Select a unit…" />
+          <OrgUnitSelect id="gr-org" scope="roles:manage" value={orgUnitId} onChange={setOrgUnitId} emptyLabel="Select a unit…" />
         </Field>
         <Field label="Expires (optional, IST)" htmlFor="gr-exp" hint="Leave blank for a permanent assignment.">
           <Input id="gr-exp" type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />

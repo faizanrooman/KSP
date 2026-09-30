@@ -86,7 +86,7 @@ export function ReportsPage() {
                 </Select>
               </Field>
               <Field label="Format" htmlFor="rep-format"><Select id="rep-format" value={format} onChange={(e) => setFormat(e.target.value)}>{types.data!.formats.map((f) => <option key={f}>{f}</option>)}</Select></Field>
-              <Field label="Station / unit" htmlFor="rep-org" hint="Must be inside your jurisdiction"><OrgUnitSelect id="rep-org" value={orgUnitId} onChange={setOrgUnitId} emptyLabel="All in my jurisdiction" /></Field>
+              <Field label="Station / unit" htmlFor="rep-org" hint="Must be inside your jurisdiction"><OrgUnitSelect scope="reports:generate" id="rep-org" value={orgUnitId} onChange={setOrgUnitId} emptyLabel="All in my jurisdiction" /></Field>
               <Field label="From" htmlFor="rep-from"><Input id="rep-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
               <Field label="To" htmlFor="rep-to"><Input id="rep-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
               {selected?.extraParams.includes('inactiveDays') && <Field label="Inactive after (days)" htmlFor="rep-inactive"><Input id="rep-inactive" type="number" min={1} max={3650} value={inactiveDays} onChange={(e) => setInactiveDays(e.target.value)} /></Field>}

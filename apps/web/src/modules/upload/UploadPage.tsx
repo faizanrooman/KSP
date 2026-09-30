@@ -181,7 +181,7 @@ export function UploadPage() {
       <Card title="1. Destination">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Police station" htmlFor="up-station" required>
-            <OrgUnitSelect id="up-station" value={station} onChange={setStation} stationsOnly allowEmpty emptyLabel="Select station…" required disabled={started} />
+            <OrgUnitSelect id="up-station" scope="evidence:upload" value={station} onChange={setStation} stationsOnly allowEmpty emptyLabel="Select station…" required disabled={started} />
           </Field>
           <Field label="Batch label" htmlFor="up-label" hint="Optional, e.g. shift or docking-station name">
             <Input id="up-label" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={200} disabled={started} />

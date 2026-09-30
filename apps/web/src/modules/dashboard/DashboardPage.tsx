@@ -2,11 +2,11 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { AlertOctagon, AlertTriangle, CheckCircle2, Info, RefreshCw, XCircle } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatBytes, formatDateTime } from '@/lib/format';
 import { useUrlState } from '@/lib/hooks';
-import { Badge, Button, Card, DataTable, EmptyState, ErrorState, Field, Input, PageHeader, Spinner, Stat, clsx, type Column } from '@/components/ui';
+import { Alert, Badge, Button, Card, DataTable, EmptyState, ErrorState, Field, Input, PageHeader, Spinner, Stat, clsx, type Column } from '@/components/ui';
 import { OrgUnitSelect } from '@/components/pickers';
 import { CategoryBars, STATUS, ThresholdMeter, TimeBars } from './charts';
 import type { DashboardSummary } from './types';
@@ -47,6 +47,7 @@ export function DashboardPage() {
     placeholderData: (prev) => prev,
   });
   const d = query.data;
+  const outOfScope = !!q.orgUnitId && query.error instanceof ApiError && query.error.status === 404;
 
   return (
     <div className="space-y-5">
@@ -59,14 +60,24 @@ export function DashboardPage() {
         <form className="flex flex-wrap items-end gap-3" onSubmit={(e) => e.preventDefault()} aria-label="Dashboard filters">
           <Field label="From" htmlFor="dash-from"><Input id="dash-from" type="date" value={from} max={to} onChange={(e) => setQ({ from: e.target.value })} /></Field>
           <Field label="To" htmlFor="dash-to"><Input id="dash-to" type="date" value={to} min={from} max={isoDay(today)} onChange={(e) => setQ({ to: e.target.value })} /></Field>
-          <Field label="Station / unit" htmlFor="dash-org"><OrgUnitSelect id="dash-org" value={q.orgUnitId} onChange={(v) => setQ({ orgUnitId: v })} emptyLabel="All in my jurisdiction" /></Field>
+          <Field label="Station / unit" htmlFor="dash-org"><OrgUnitSelect id="dash-org" scope="dashboard:view" value={q.orgUnitId} onChange={(v) => setQ({ orgUnitId: v })} emptyLabel="All in my jurisdiction" /></Field>
           {(q.from || q.to || q.orgUnitId) && <Button variant="ghost" type="button" onClick={() => setQ({ from: '', to: '', orgUnitId: '' })}>Reset</Button>}
         </form>
       </Card>
 
       {query.isLoading && <Spinner label="Loading dashboard…" />}
-      {query.error && !d && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
-      {d && <DashboardBody d={d} />}
+      {outOfScope ? (
+        // A unit outside the viewer's jurisdiction (e.g. from an old link) is answered 404 by design (no existence leak).
+        <Alert tone="amber" title="This station / unit is outside your jurisdiction">
+          <p>You can only view dashboards for units you are responsible for.</p>
+          <Button variant="secondary" size="sm" className="mt-2" onClick={() => setQ({ orgUnitId: '' })}>Show my jurisdiction</Button>
+        </Alert>
+      ) : (
+        <>
+          {query.error && !d && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
+          {d && <DashboardBody d={d} />}
+        </>
+      )}
     </div>
   );
 }

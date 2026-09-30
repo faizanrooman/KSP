@@ -53,7 +53,7 @@ export function FirListPage() {
       <Card>
         <form className="grid gap-3 md:grid-cols-3 xl:grid-cols-6" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); set({ q: String(f.get('q') ?? '').trim(), actSection: String(f.get('act') ?? '').trim() }); }}>
           <div className="md:col-span-2"><Field label="Search" htmlFor="f-q"><Input id="f-q" name="q" defaultValue={s.q} key={s.q} placeholder="FIR number, complainant, facts…" /></Field></div>
-          <Field label="Station" htmlFor="f-org"><OrgUnitSelect id="f-org" value={s.orgUnitId} onChange={(v) => set({ orgUnitId: v })} /></Field>
+          <Field label="Station" htmlFor="f-org"><OrgUnitSelect id="f-org" scope="cases:read" value={s.orgUnitId} onChange={(v) => set({ orgUnitId: v })} /></Field>
           <Field label="Year" htmlFor="f-year"><Input id="f-year" type="number" min={1950} max={2200} value={s.year} onChange={(e) => set({ year: e.target.value })} /></Field>
           <Field label="Status" htmlFor="f-status">
             <Select id="f-status" value={s.status} onChange={(e) => set({ status: e.target.value })}>
@@ -113,7 +113,7 @@ function FirFormModal({ fir, onClose }: { fir?: FirDetail; onClose: () => void }
           <>
             <Field label="FIR number" required htmlFor="fr-no"><Input id="fr-no" value={f.firNumber} onChange={upd('firNumber')} placeholder="0142" /></Field>
             <Field label="Year" required htmlFor="fr-year"><Input id="fr-year" type="number" value={f.firYear} onChange={upd('firYear')} /></Field>
-            <Field label="Station" required htmlFor="fr-org"><OrgUnitSelect id="fr-org" value={f.orgUnitId} onChange={(v) => setF((x) => ({ ...x, orgUnitId: v }))} stationsOnly emptyLabel="Select station" /></Field>
+            <Field label="Station" required htmlFor="fr-org"><OrgUnitSelect id="fr-org" scope="cases:manage" value={f.orgUnitId} onChange={(v) => setF((x) => ({ ...x, orgUnitId: v }))} stationsOnly emptyLabel="Select station" /></Field>
           </>
         )}
         <Field label="Registered at" required htmlFor="fr-reg"><Input id="fr-reg" type="datetime-local" value={f.registeredAt} onChange={upd('registeredAt')} /></Field>

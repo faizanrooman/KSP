@@ -7,7 +7,8 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { hasPermission } from '../../lib/principal.js';
+import { isPermission } from '@ksp/shared';
+import { hasPermission, pathCovers, scopePaths } from '../../lib/principal.js';
 import { forbidden } from '../../lib/errors.js';
 
 export const prefix = '/directory';
@@ -15,10 +16,25 @@ export const prefix = '/directory';
 export default async function directory(fastify: FastifyInstance) {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
 
-  app.get('/org-units', { schema: { tags: ['directory'], summary: 'All active org units (for pickers)', querystring: z.object({ includeInactive: z.coerce.boolean().default(false) }) } }, async (req) => {
+  app.get('/org-units', {
+    schema: {
+      tags: ['directory'],
+      summary: 'Active org units (for pickers); `scope=<permission>` limits the list to units where the caller holds that permission',
+      querystring: z.object({
+        includeInactive: z.coerce.boolean().default(false),
+        // Pickers whose target endpoint is jurisdiction-checked (dashboard, reports, upload, admin forms) only offer units
+        // the caller can actually use, instead of letting them pick a unit that the server then refuses with 404.
+        scope: z.string().max(64).refine(isPermission, 'unknown permission').optional(),
+      }),
+    },
+  }, async (req) => {
     let q = app.db.selectFrom('org_units').select(['id', 'code', 'name', 'unit_type', 'parent_id', 'path', 'active']).orderBy('path');
     if (!req.query.includeInactive) q = q.where('active', '=', true);
-    const rows = await q.execute();
+    let rows = await q.execute();
+    if (req.query.scope) {
+      const paths = scopePaths(req.requirePrincipal(), req.query.scope);
+      rows = rows.filter((r) => paths.some((p) => pathCovers(p, r.path)));
+    }
     return { items: rows.map((r) => ({ id: r.id, code: r.code, name: r.name, unitType: r.unit_type, parentId: r.parent_id, path: r.path, depth: r.path.split('.').length - 1, active: r.active })) };
   });
 

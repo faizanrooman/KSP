@@ -33,7 +33,7 @@ export function ProfileFields({ f, setF, idPrefix }: { f: ProfileForm; setF: (f:
         <Input {...fld('fullName')} maxLength={200} required />
       </Field>
       <Field label="Home unit" htmlFor={`${idPrefix}-homeOrgUnitId`} required hint="Determines which administrators manage this account.">
-        <OrgUnitSelect id={`${idPrefix}-homeOrgUnitId`} value={f.homeOrgUnitId} onChange={(v) => setF({ ...f, homeOrgUnitId: v })} allowEmpty emptyLabel="Select a unit…" required />
+        <OrgUnitSelect scope="users:manage" id={`${idPrefix}-homeOrgUnitId`} value={f.homeOrgUnitId} onChange={(v) => setF({ ...f, homeOrgUnitId: v })} allowEmpty emptyLabel="Select a unit…" required />
       </Field>
       <Field label="Email" htmlFor={`${idPrefix}-email`}>
         <Input type="email" {...fld('email')} maxLength={254} />
@@ -110,7 +110,7 @@ export function UserCreatePage() {
                       </Select>
                     </Field>
                     <Field label="At unit (and sub-units)" htmlFor={`g-org-${i}`}>
-                      <OrgUnitSelect id={`g-org-${i}`} value={g.orgUnitId} onChange={(v) => setGrants(grants.map((x, j) => (j === i ? { ...x, orgUnitId: v } : x)))} emptyLabel="Select a unit…" />
+                      <OrgUnitSelect scope="roles:manage" id={`g-org-${i}`} value={g.orgUnitId} onChange={(v) => setGrants(grants.map((x, j) => (j === i ? { ...x, orgUnitId: v } : x)))} emptyLabel="Select a unit…" />
                     </Field>
                     <Field label="Expires (optional)" htmlFor={`g-exp-${i}`}>
                       <Input id={`g-exp-${i}`} type="datetime-local" value={g.expiresAt} onChange={(e) => setGrants(grants.map((x, j) => (j === i ? { ...x, expiresAt: e.target.value } : x)))} />

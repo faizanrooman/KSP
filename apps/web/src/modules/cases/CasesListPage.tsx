@@ -77,7 +77,7 @@ export function CasesListPage() {
               {CASE_PRIORITIES.map((x) => <option key={x} value={x}>{titleCase(x)}</option>)}
             </Select>
           </Field>
-          <Field label="Station / unit" htmlFor="c-org"><OrgUnitSelect id="c-org" value={s.orgUnitId} onChange={(v) => set({ orgUnitId: v })} /></Field>
+          <Field label="Station / unit" htmlFor="c-org"><OrgUnitSelect id="c-org" scope="cases:read" value={s.orgUnitId} onChange={(v) => set({ orgUnitId: v })} /></Field>
           <div className="flex items-end pb-2"><Checkbox label="My cases (team)" checked={s.mine === 'true'} onChange={(v) => set({ mine: v ? 'true' : '' })} /></div>
           <Field label="Opened from" htmlFor="c-from"><Input id="c-from" type="date" value={s.openedFrom} onChange={(e) => set({ openedFrom: e.target.value })} /></Field>
           <Field label="Opened to" htmlFor="c-to"><Input id="c-to" type="date" value={s.openedTo} onChange={(e) => set({ openedTo: e.target.value })} /></Field>
@@ -179,7 +179,7 @@ export function CreateCaseModal({ open, onClose, initialFir }: { open: boolean; 
         <div className="md:col-span-2"><Field label="Title" required htmlFor="nc-title"><Input id="nc-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} /></Field></div>
         <div className="md:col-span-2"><Field label="Description" htmlFor="nc-desc"><Textarea id="nc-desc" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} /></Field></div>
         <Field label="Linked FIR" htmlFor="nc-fir" hint="Optional. The case station defaults to the FIR's station."><FirSelect id="nc-fir" value={fir} onChange={setFir} /></Field>
-        <Field label="Station" htmlFor="nc-org" hint="Defaults to the FIR station or your home unit."><OrgUnitSelect id="nc-org" value={orgUnitId} onChange={setOrgUnitId} emptyLabel="Default" stationsOnly /></Field>
+        <Field label="Station" htmlFor="nc-org" hint="Defaults to the FIR station or your home unit."><OrgUnitSelect id="nc-org" scope="cases:manage" value={orgUnitId} onChange={setOrgUnitId} emptyLabel="Default" stationsOnly /></Field>
         <Field label="Priority" htmlFor="nc-pri">
           <Select id="nc-pri" value={priority} onChange={(e) => setPriority(e.target.value)}>
             {CASE_PRIORITIES.map((x) => <option key={x} value={x}>{titleCase(x)}</option>)}

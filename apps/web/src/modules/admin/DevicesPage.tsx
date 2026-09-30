@@ -56,7 +56,7 @@ function DeviceModal({ device, onClose }: { device: Device | null; onClose: (cre
           <Select {...fld('deviceType')}>{DEVICE_TYPES.map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}</Select>
         </Field>
         <Field label="Owning unit" htmlFor="dv-orgUnitId" required>
-          <OrgUnitSelect id="dv-orgUnitId" value={f.orgUnitId} onChange={(v) => setF({ ...f, orgUnitId: v })} emptyLabel="Select a unit…" />
+          <OrgUnitSelect id="dv-orgUnitId" scope="devices:manage" value={f.orgUnitId} onChange={(v) => setF({ ...f, orgUnitId: v })} emptyLabel="Select a unit…" />
         </Field>
         {!isNew && (
           <Field label="Status" htmlFor="dv-status" hint="Use “Retire” to take a device out of service permanently.">
@@ -99,7 +99,7 @@ export function DevicesPage() {
           <div className="md:col-span-2">
             <Field label="Search" htmlFor="dv-q"><Input id="dv-q" name="q" defaultValue={s.q} key={s.q} placeholder="Serial, make, model, officer…" /></Field>
           </div>
-          <Field label="Unit" htmlFor="dv-org"><OrgUnitSelect id="dv-org" value={s.orgUnitId} onChange={(v) => set({ orgUnitId: v })} /></Field>
+          <Field label="Unit" htmlFor="dv-org"><OrgUnitSelect id="dv-org" scope="devices:read" value={s.orgUnitId} onChange={(v) => set({ orgUnitId: v })} /></Field>
           <Field label="Type" htmlFor="dv-type">
             <Select id="dv-type" value={s.type} onChange={(e) => set({ type: e.target.value })}><option value="">Any type</option>{DEVICE_TYPES.map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}</Select>
           </Field>

@@ -85,7 +85,7 @@ function CreateClientModal({ onClose, onCreated }: { onClose: () => void; onCrea
     <Modal open onClose={onClose} title="New API client" size="lg" footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={name.trim().length < 3 || !orgUnitId || !scopes.length}>Create</Button></>}>
       <div className="grid gap-3 md:grid-cols-2">
         <Field label="Name" required htmlFor="ac-name"><Input id="ac-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. CCTNS bridge (Bengaluru)" /></Field>
-        <Field label="Jurisdiction (org unit)" required htmlFor="ac-org" hint="The client only sees evidence/cases within this unit's subtree."><OrgUnitSelect id="ac-org" value={orgUnitId} onChange={setOrgUnitId} emptyLabel="Select unit" /></Field>
+        <Field label="Jurisdiction (org unit)" required htmlFor="ac-org" hint="The client only sees evidence/cases within this unit's subtree."><OrgUnitSelect id="ac-org" scope="integrations:manage" value={orgUnitId} onChange={setOrgUnitId} emptyLabel="Select unit" /></Field>
         <div className="md:col-span-2"><Field label="Description" htmlFor="ac-desc"><Textarea id="ac-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field></div>
         <fieldset className="md:col-span-2">
           <legend className="text-sm font-medium text-ink-800">Scopes</legend>
