@@ -252,12 +252,19 @@ drill_diag() {
   log "diag: integrity checks"; q "SELECT evidence_id, trigger, ok, error, checked_at FROM integrity_checks ORDER BY checked_at DESC LIMIT 12" >&2 || true
   log "diag: DR store versions"
   env "${S3ENV_PRIMARY[@]/S3_ENDPOINT=*/S3_ENDPOINT=$DR_S3_ENDPOINT}" node --input-type=module -e '
-    import { S3Client, ListObjectVersionsCommand } from "@aws-sdk/client-s3";
+    import { S3Client, ListObjectVersionsCommand, GetObjectCommand } from "@aws-sdk/client-s3";
     const c = new S3Client({ endpoint: process.env.S3_ENDPOINT, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env.S3_ACCESS_KEY, secretAccessKey: process.env.S3_SECRET_KEY } });
     for (const Bucket of process.argv.slice(1)) {
       const r = await c.send(new ListObjectVersionsCommand({ Bucket })).catch((e) => ({ error: String(e) }));
       console.log(Bucket, JSON.stringify({ versions: (r.Versions ?? []).map((v) => ({ key: v.Key, vid: v.VersionId, latest: v.IsLatest, size: v.Size })), deleteMarkers: (r.DeleteMarkers ?? []).length, error: r.error }));
+      // can every listed version be read back by id (what the worker does) and without an id?
+      for (const v of r.Versions ?? []) {
+        const probe = async (VersionId) => { try { const o = await c.send(new GetObjectCommand({ Bucket, Key: v.Key, VersionId })); let n = 0; for await (const ch of o.Body) n += ch.length; return `OK ${n} B vid=${o.VersionId}`; } catch (e) { return `FAIL ${e.name}: ${e.message}`; } };
+        console.log(`  ${v.Key.slice(-20)} byVersion=${await probe(v.VersionId)} | latest=${await probe(undefined)}`);
+      }
     }' "$BP-evidence" "$BP-archive" >&2 || true
+  log "diag: DR gateway log (last 40 lines)"; tail -40 "$BASE/logs/dr-s3.log" >&2 || true
+  log "diag: DR versioning dir"; find "$BASE/dr-s3/versions" -maxdepth 4 | head -30 >&2 || true; (cd "$BASE/dr-s3/buckets" && getfattr -dR -m - . 2>/dev/null | head -40 >&2) || true
   log "diag: worker log (last 60 lines)"; tail -60 "$BASE/logs/worker.log" >&2 || true
 }
 
