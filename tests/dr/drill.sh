@@ -97,12 +97,21 @@ ENV
 DR_S3_ENDPOINT="http://127.0.0.1:$DR_S3_PORT"
 write_env "$BASE/primary.env" "$PRIMARY_S3_ENDPOINT"
 write_env "$BASE/dr.env" "$DR_S3_ENDPOINT"
+# The env files are authoritative for every process the drill starts (migrate/seed/buckets tools and the services):
+# variables inherited from the caller — CI jobs export S3_ENDPOINT/S3_ACCESS_KEY/… for the primary store — would
+# otherwise take precedence and point the DR services at the wrong object store (seen in CI as NoSuchVersion).
+# run_with_envfile <envfile> cmd… : run cmd with KSP_ENV_FILE set and every key of that file removed from the environment.
+envfile_unset_args() { local k; while IFS='=' read -r k _; do [[ "$k" =~ ^[A-Z][A-Z0-9_]*$ ]] && printf -- '-u\n%s\n' "$k"; done < "$1"; }
+run_with_envfile() { local f="$1"; shift; local -a u; mapfile -t u < <(envfile_unset_args "$f"); env "${u[@]}" KSP_ENV_FILE="$f" "$@"; }
 
 start_svc() { # name layout-dir envfile cmd...
   local name="$1" dir="$2" envf="$3"; shift 3
   # Background ONLY the setsid command (not the `cd && …` list): otherwise $! can be an intermediate subshell, stop_svc
   # kills that shell and the service survives (seen in the final audit: stale primary API answered the DR health check).
-  (cd "$dir" && { KSP_ENV_FILE="$envf" setsid "$@" > "$BASE/logs/$name.log" 2>&1 & echo $! > "$BASE/$name.pid"; })
+  # The env file must be authoritative: variables inherited from the caller (CI jobs export S3_ENDPOINT/S3_ACCESS_KEY…
+  # for the primary store) would otherwise override it and point the DR services at the wrong object store.
+  local -a u; mapfile -t u < <(envfile_unset_args "$envf")
+  (cd "$dir" && { setsid env "${u[@]}" KSP_ENV_FILE="$envf" "$@" > "$BASE/logs/$name.log" 2>&1 & echo $! > "$BASE/$name.pid"; })
   PIDS+=("$(cat "$BASE/$name.pid")")
 }
 stop_svc() { local f="$BASE/$1.pid" p; [ -f "$f" ] || return 0; p=$(cat "$f")
@@ -154,9 +163,9 @@ sleep 1
 # ---------------------------------------------------------------- 1 provision
 step_start provision
 psql "$PGADMIN_URL" -qtAX -v ON_ERROR_STOP=1 -c "CREATE DATABASE $DB" >/dev/null
-(cd "$ROOT" && KSP_ENV_FILE="$BASE/primary.env" node packages/core/dist/bin/migrate.js > "$BASE/logs/migrate.log" 2>&1)
-(cd "$ROOT" && KSP_ENV_FILE="$BASE/primary.env" KSP_SEED_CLI=1 node packages/core/dist/bin/seed.js > "$BASE/logs/seed.log" 2>&1)
-(cd "$ROOT" && KSP_ENV_FILE="$BASE/primary.env" node scripts/ops/ensure-buckets.mjs > "$BASE/logs/buckets.log" 2>&1)
+(cd "$ROOT" && run_with_envfile "$BASE/primary.env" node packages/core/dist/bin/migrate.js > "$BASE/logs/migrate.log" 2>&1)
+(cd "$ROOT" && KSP_SEED_CLI=1 run_with_envfile "$BASE/primary.env" node packages/core/dist/bin/seed.js > "$BASE/logs/seed.log" 2>&1)
+(cd "$ROOT" && run_with_envfile "$BASE/primary.env" node scripts/ops/ensure-buckets.mjs > "$BASE/logs/buckets.log" 2>&1)
 step_end "$(tail -1 "$BASE/logs/migrate.log")"
 
 # ---------------------------------------------------------------- 2 start (production layouts)
@@ -221,8 +230,8 @@ env "${BACKUPENV[@]}" bash "$ROOT/scripts/backup/restore.sh" --admin-url "$PGADM
   || { cat "$BASE/logs/restore.log" >&2; exit 1; }
 step_end "$(grep -c 'OK' "$BASE/logs/restore.log") checks OK"
 step_start "migrate+storage-check"
-(cd "$ROOT" && KSP_ENV_FILE="$BASE/dr.env" node packages/core/dist/bin/migrate.js > "$BASE/logs/migrate2.log" 2>&1)
-(cd "$ROOT" && KSP_ENV_FILE="$BASE/dr.env" node scripts/ops/ensure-buckets.mjs > "$BASE/logs/buckets2.log" 2>&1) || { cat "$BASE/logs/buckets2.log" >&2; exit 1; }
+(cd "$ROOT" && run_with_envfile "$BASE/dr.env" node packages/core/dist/bin/migrate.js > "$BASE/logs/migrate2.log" 2>&1)
+(cd "$ROOT" && run_with_envfile "$BASE/dr.env" node scripts/ops/ensure-buckets.mjs > "$BASE/logs/buckets2.log" 2>&1) || { cat "$BASE/logs/buckets2.log" >&2; exit 1; }
 step_end "$(tail -1 "$BASE/logs/migrate2.log"); DR buckets verified (missing staging bucket created)"
 
 # ---------------------------------------------------------------- 8 repoint
