@@ -69,7 +69,7 @@ async function main(): Promise<void> {
           result = (now.checks ?? now.items ?? []).find((c: { id: string }) => !seen.has(c.id));
         }
         if (!result) throw new Error(`fixity check for ${id} did not complete in 120 s`);
-        if (result.ok || !/not found/i.test(result.error ?? '')) break;
+        if (result.ok || !/not found/i.test(result.error ?? '') || attempt === 2) break;
         retries++;
         console.error(`fixity check for ${id} reported a missing object (${result.error}); retrying in 2 s (${retries}/2)`);
         await new Promise((r) => setTimeout(r, 2000));

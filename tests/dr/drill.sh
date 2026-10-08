@@ -244,10 +244,27 @@ step_end "/health/ready 200 against DR store"
 RTO_MS=$(( $(now_ms) - RESTORE_T0 ))
 printf '%s\t%s\t%s\n' "RESTORE→SERVICE READY (RTO, excl. detection)" "$RTO_MS" "" >> "$REPORT"
 
+# Diagnostics when validation against the DR store fails: what the DB points at vs. what the DR gateway holds.
+drill_diag() {
+  log "diag: evidence pointers"; q "SELECT id, status, storage_tier, storage_bucket, storage_key, storage_version_id FROM evidence ORDER BY created_at" >&2 || true
+  log "diag: evidence_storage_copies"; q "SELECT evidence_id, status, tier, bucket, object_key, version_id FROM evidence_storage_copies ORDER BY created_at" >&2 || true
+  log "diag: dr_object_copies"; q "SELECT evidence_id, kind, status, bucket, object_key, version_id FROM dr_object_copies ORDER BY id" >&2 || true
+  log "diag: integrity checks"; q "SELECT evidence_id, trigger, ok, error, checked_at FROM integrity_checks ORDER BY checked_at DESC LIMIT 12" >&2 || true
+  log "diag: DR store versions"
+  env "${S3ENV_PRIMARY[@]/S3_ENDPOINT=*/S3_ENDPOINT=$DR_S3_ENDPOINT}" node --input-type=module -e '
+    import { S3Client, ListObjectVersionsCommand } from "@aws-sdk/client-s3";
+    const c = new S3Client({ endpoint: process.env.S3_ENDPOINT, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env.S3_ACCESS_KEY, secretAccessKey: process.env.S3_SECRET_KEY } });
+    for (const Bucket of process.argv.slice(1)) {
+      const r = await c.send(new ListObjectVersionsCommand({ Bucket })).catch((e) => ({ error: String(e) }));
+      console.log(Bucket, JSON.stringify({ versions: (r.Versions ?? []).map((v) => ({ key: v.Key, vid: v.VersionId, latest: v.IsLatest, size: v.Size })), deleteMarkers: (r.DeleteMarkers ?? []).length, error: r.error }));
+    }' "$BP-evidence" "$BP-archive" >&2 || true
+  log "diag: worker log (last 60 lines)"; tail -60 "$BASE/logs/worker.log" >&2 || true
+}
+
 # ---------------------------------------------------------------- 10 validate
 step_start validate-service
 node "$ROOT/tests/dr/api-check.ts" "http://127.0.0.1:$API_PORT" io.meera 'Ksp@Dev-Passw0rd!' "$FILES" --fixity > "$BASE/logs/api-check.json" 2> "$BASE/logs/api-check.err" \
-  || { cat "$BASE/logs/api-check.json" "$BASE/logs/api-check.err" >&2; tail -30 "$BASE/logs/worker.log" >&2; exit 1; }
+  || { cat "$BASE/logs/api-check.json" "$BASE/logs/api-check.err" >&2; tail -30 "$BASE/logs/worker.log" >&2; drill_diag; exit 1; }
 step_end "$(cut -c1-200 "$BASE/logs/api-check.json")"
 step_start validate-integrity
 env "${DRENV[@]}" "${BUCKETENV[@]}" DATABASE_URL="$APP_URL_BASE/$DB" node "$ROOT/scripts/backup/s3-replicate.ts" --verify-only > "$BASE/logs/dr-verify.json" 2> "$BASE/logs/dr-verify.err" \
