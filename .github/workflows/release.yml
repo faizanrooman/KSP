@@ -78,8 +78,11 @@ jobs:
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
+  # Deploy jobs run only once a target cluster exists: set repository variable DEPLOY_STAGING=true (and the
+  # STAGING_KUBECONFIG_B64 environment secret). Until then the release ends with built, scanned, attested images.
   deploy-staging:
     needs: images
+    if: ${{ vars.DEPLOY_STAGING == 'true' }}
     runs-on: ubuntu-24.04
     environment: staging
     concurrency: deploy-staging
@@ -99,6 +102,7 @@ jobs:
 
   deploy-production:
     needs: deploy-staging
+    if: ${{ vars.DEPLOY_PRODUCTION == 'true' }}
     runs-on: ubuntu-24.04
     environment: production     # required reviewers = manual approval gate
     concurrency: deploy-production
