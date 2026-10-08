@@ -13,7 +13,7 @@
     "media:benchmark": "tsx --conditions=ksp-src src/bin/media-benchmark.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1140.0",
+    "@aws-sdk/client-s3": "^3.1146.0",
     "@ksp/core": "^1.0.0",
     "@ksp/shared": "^1.0.0",
     "kysely": "^0.29.6",
