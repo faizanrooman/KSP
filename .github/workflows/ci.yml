@@ -117,7 +117,9 @@ jobs:
           S3_ROOT_ACCESS: kspciaccess
           S3_ROOT_SECRET: kspcisecret-not-secret
         run: |
-          curl -fsSL https://github.com/versity/versitygw/releases/download/v1.8.0/versitygw_v1.8.0_Linux_x86_64.tar.gz | tar xz -C .local/bin versitygw
+          # the release tarball layout has changed between asset builds; locate the binary instead of assuming a root entry
+          tmp=$(mktemp -d) && curl -fsSL https://github.com/versity/versitygw/releases/download/v1.8.0/versitygw_v1.8.0_Linux_x86_64.tar.gz | tar xz -C "$tmp" \
+            && install -m 0755 "$(find "$tmp" -type f -name versitygw | head -1)" .local/bin/versitygw && .local/bin/versitygw --version
           npm run build
           PATH="$PWD/.local/bin:$PATH" tests/dr/drill.sh --ci
 
