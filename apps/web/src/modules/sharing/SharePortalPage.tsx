@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router';
-import { Download, Loader2, Lock, Printer, ShieldCheck } from 'lucide-react';
+import { Download, Loader2, Lock, Printer } from 'lucide-react';
 import { ApiError, errorMessage, request } from '@/lib/api';
 import { formatDateTime, formatDuration } from '@/lib/format';
 import { Alert, Button, Field, Input } from '@/components/ui';
@@ -64,7 +64,7 @@ export function SharePortalPage() {
     <div className="min-h-screen bg-ink-50">
       <header className="border-b border-ink-200 bg-white">
         <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3">
-          <ShieldCheck className="h-6 w-6 text-brand-700" aria-hidden />
+          <img src="/brand/ksp-emblem.png" alt="" className="h-9 w-auto" />
           <div>
             <div className="text-sm font-semibold text-ink-900">{tr('Karnataka State Police — Secure Evidence Share')}</div>
             <div className="text-xs text-ink-600">{tr('Access is logged. Redistribution is prohibited.')}</div>

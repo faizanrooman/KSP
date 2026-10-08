@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router';
-import { LogOut, Menu, ShieldCheck, UserCircle2, X } from 'lucide-react';
+import { LogOut, Menu, UserCircle2, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { MODULES, NAV_SECTIONS, type NavItem } from '@/lib/modules';
 import { clsx, lockBodyScroll } from '@/components/ui';
@@ -48,8 +48,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const sidebar = (
     <nav aria-label={t('Main')} className="flex h-full flex-col">
-      <Link to="/" className="flex items-center gap-2 px-4 py-4 text-white">
-        <ShieldCheck className="h-7 w-7 text-brand-300" aria-hidden />
+      <Link to="/" className="flex items-center gap-3 px-4 py-4 text-white">
+        <img src="/brand/ksp-emblem.png" alt="" className="h-10 w-auto shrink-0 drop-shadow" />
         <span className="leading-tight">
           <span className="block text-sm font-semibold">{t('KSP Evidence')}</span>
           <span className="block text-[11px] text-brand-200">{t('Video Management System')}</span>

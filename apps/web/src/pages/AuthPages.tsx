@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { ShieldCheck } from 'lucide-react';
+import { Landmark, ScanSearch, ShieldCheck } from 'lucide-react';
 import type { MeResponse } from '@ksp/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -10,40 +10,83 @@ import { LanguageSwitcher, t } from '@/lib/i18n';
 function AuthFrame({ title, children, subtitle, signOut }: { title: string; subtitle?: string; children: ReactNode; signOut?: boolean }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const points: Array<[typeof ShieldCheck, string]> = [
+    [ShieldCheck, t('Tamper-evident chain of custody for every recording')],
+    [Landmark, t('Access limited to each officer\u2019s jurisdiction')],
+    [ScanSearch, t('AI findings stay advisory until a reviewer confirms them')],
+  ];
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-950 via-brand-900 to-ink-900 p-4">
-      <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center justify-center gap-3 text-white">
-          <ShieldCheck className="h-10 w-10 text-brand-300" aria-hidden />
-          <div>
-            <p className="text-lg font-semibold">{t('Karnataka State Police')}</p>
-            <p className="text-sm text-brand-200">{t('Video Evidence Management System')}</p>
+    <main className="min-h-screen bg-brand-950 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+      {/* Hero: photographs are decorative (alt=""); headings live in the form column so the heading order stays h1-first. */}
+      <section className="relative hidden overflow-hidden lg:block" aria-label={t('Karnataka State Police')}>
+        <img src="/brand/hero-vidhana-soudha.webp" alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-950 via-brand-950/80 to-brand-950/40" aria-hidden />
+        <div className="relative flex h-full flex-col justify-between p-10 text-white">
+          <div className="flex items-center gap-4">
+            <img src="/brand/ksp-emblem.png" alt="" className="h-20 w-auto drop-shadow-lg" />
+            <div>
+              <p className="text-2xl font-semibold leading-tight">{t('Karnataka State Police')}</p>
+              <p className="text-sm text-brand-200">{t('Government of Karnataka')} · ಕರ್ನಾಟಕ ರಾಜ್ಯ ಪೊಲೀಸ್</p>
+            </div>
           </div>
+          <div className="max-w-2xl space-y-6">
+            <div>
+              <p className="text-3xl font-semibold leading-tight">{t('Video Evidence Management System')}</p>
+              <p className="mt-3 text-base text-brand-100">{t('Secure, tamper-evident custody of body-worn camera evidence \u2014 from the police station to the court room.')}</p>
+            </div>
+            <ul className="grid gap-3 text-sm text-brand-50 sm:grid-cols-3">
+              {points.map(([Icon, text]) => (
+                <li key={text} className="flex items-start gap-2 rounded-md bg-white/10 p-3 backdrop-blur-sm">
+                  <Icon className="mt-0.5 h-5 w-5 shrink-0 text-brand-200" aria-hidden />
+                  <span>{text}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="grid grid-cols-3 gap-3">
+              {['/brand/dcp-central-division.webp', '/brand/interceptor.webp', '/brand/traffic-officer.webp'].map((src) => (
+                <img key={src} src={src} alt="" loading="lazy" className="h-28 w-full rounded-md object-cover shadow-md ring-1 ring-white/20" />
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-brand-300">{t('Photographs: Wikimedia Commons contributors (CC BY-SA 4.0 / CC BY 3.0 / CC0) \u2014 credits in /brand/README.md')}</p>
         </div>
-        <div className="card p-6">
-          <div className="mb-3 flex justify-end"><LanguageSwitcher /></div>
-          <h1 className="mb-1">{title}</h1>
-          {subtitle && <p className="mb-4 text-sm text-ink-500">{subtitle}</p>}
-          {children}
-        </div>
-        {signOut && (
-          <p className="mt-4 text-center text-sm">
-            <button
-              type="button"
-              className="text-brand-100 underline hover:text-white"
-              onClick={async () => {
-                await logout();
-                navigate('/login', { replace: true });
-              }}
-            >
-              {t('Sign out')}
-            </button>
+      </section>
+
+      <section className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-950 via-brand-900 to-ink-900 p-4 lg:min-h-0">
+        <img src="/brand/hero-vidhana-soudha.webp" alt="" className="absolute inset-0 h-full w-full object-cover opacity-20 lg:hidden" />
+        <div className="relative w-full max-w-md">
+          <div className="mb-6 flex items-center justify-center gap-3 text-white">
+            <img src="/brand/ksp-emblem.png" alt="" className="h-14 w-auto drop-shadow" />
+            <div>
+              <p className="text-lg font-semibold leading-tight">{t('Karnataka State Police')}</p>
+              <p className="text-sm text-brand-200">{t('Video Evidence Management System')}</p>
+            </div>
+          </div>
+          <div className="card p-6">
+            <div className="mb-3 flex justify-end"><LanguageSwitcher /></div>
+            <h1 className="mb-1">{title}</h1>
+            {subtitle && <p className="mb-4 text-sm text-ink-500">{subtitle}</p>}
+            {children}
+          </div>
+          {signOut && (
+            <p className="mt-4 text-center text-sm">
+              <button
+                type="button"
+                className="text-brand-100 underline hover:text-white"
+                onClick={async () => {
+                  await logout();
+                  navigate('/login', { replace: true });
+                }}
+              >
+                {t('Sign out')}
+              </button>
+            </p>
+          )}
+          <p className="mt-4 text-center text-xs text-brand-200">
+            {t('This system is for authorised police personnel only. Access and activity are logged and monitored.')}
           </p>
-        )}
-        <p className="mt-4 text-center text-xs text-brand-200">
-          {t('This system is for authorised police personnel only. Access and activity are logged and monitored.')}
-        </p>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }

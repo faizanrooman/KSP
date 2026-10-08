@@ -52,6 +52,18 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      <section className="relative overflow-hidden rounded-lg border border-brand-900/40 bg-brand-950 text-white" aria-label={tr('Karnataka State Police')}>
+        <img src="/brand/police-vehicle.webp" alt="" className="absolute inset-0 h-full w-full object-cover object-[center_60%] opacity-40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-950 via-brand-950/85 to-brand-900/40" />
+        <div className="relative flex flex-wrap items-center gap-4 px-5 py-4">
+          <img src="/brand/ksp-emblem.png" alt="" className="h-14 w-auto shrink-0 drop-shadow" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-200">{tr('Karnataka State Police')} · {tr('Video Evidence Management System')}</p>
+            <p className="truncate text-lg font-semibold">{tr('Welcome, {name}', { name: me?.user.fullName ?? '' })}</p>
+            <p className="truncate text-sm text-brand-100">{[me?.user.rank, me?.user.homeOrgUnit?.name].filter(Boolean).join(' · ')}</p>
+          </div>
+        </div>
+      </section>
       <PageHeader
         title={tr('Dashboard')}
         subtitle={d ? `${d.meta.scope === 'OWN' ? 'Your own uploads and evidence' : d.meta.orgUnit ? d.meta.orgUnit.name : 'Everything within your jurisdiction'} · refreshed ${formatDateTime(d.meta.generatedAt)} (auto-refresh every 60 s)` : `Welcome, ${me?.user.fullName ?? ''}`}
