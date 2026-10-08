@@ -50,9 +50,7 @@ export async function ensureImages(): Promise<Record<TestImage, string>> {
     const path = join(dir, img.file);
     const sha = existsSync(path) ? createHash('sha256').update(await readFile(path)).digest('hex') : null;
     if (sha !== img.sha256) {
-      const res = await fetch(img.url, { headers: { 'user-agent': 'KSP-VMS-tests/1.0 (automated test fixture download)' } });
-      if (!res.ok) throw new Error(`download ${img.file}: HTTP ${res.status}`);
-      const buf = Buffer.from(await res.arrayBuffer());
+      const buf = await download(img.url, img.file);
       const got = createHash('sha256').update(buf).digest('hex');
       if (got !== img.sha256) throw new Error(`SHA-256 mismatch for ${img.file}: ${got}`);
       await writeFile(`${path}.part`, buf);
@@ -61,6 +59,19 @@ export async function ensureImages(): Promise<Record<TestImage, string>> {
     out[k] = path;
   }
   return out;
+}
+
+/** Wikimedia rate-limits anonymous bursts (HTTP 429): retry with backoff, honouring Retry-After, before giving up. */
+async function download(url: string, file: string): Promise<Buffer> {
+  const waits = [2_000, 5_000, 10_000, 20_000];
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, { headers: { 'user-agent': 'KSP-VMS-tests/1.0 (automated test fixture download; github.com/faizanrooman/KSP)' } });
+    if (res.ok) return Buffer.from(await res.arrayBuffer());
+    const retryable = res.status === 429 || res.status >= 500;
+    if (!retryable || attempt >= waits.length) throw new Error(`download ${file}: HTTP ${res.status}`);
+    const after = Number(res.headers.get('retry-after'));
+    await new Promise((r) => setTimeout(r, Number.isFinite(after) && after > 0 ? Math.min(after * 1000, 60_000) : waits[attempt]));
+  }
 }
 
 export async function tryEnsureImages(): Promise<{ images: Record<TestImage, string> | null; reason: string | null }> {

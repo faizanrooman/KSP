@@ -86,6 +86,9 @@ jobs:
         uses: actions/cache@v4
         with: { path: .local/models, key: "ai-models-${{ hashFiles('apps/ai-worker/src/models/manifest.ts') }}" }
       - run: npm run fetch-models -w @ksp/ai-worker -- --no-db
+      - name: Test imagery (SHA-256 pinned Wikimedia files; cached so runs do not depend on upstream rate limits)
+        uses: actions/cache@v4
+        with: { path: .local/ai-test-media, key: "ai-test-media-${{ hashFiles('apps/ai-worker/test/media.ts') }}" }
       - name: API tests
         working-directory: apps/api
         run: npx vitest run

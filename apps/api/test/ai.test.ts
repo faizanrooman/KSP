@@ -150,13 +150,15 @@ describe('end-to-end with the isolated worker: detections and crops', () => {
 
     const d = await io.get(`/api/v1/ai/evidence/${A.id}/detections?jobId=${r.body.id}`);
     expect(d.status).toBe(200);
-    expect(d.body.total).toBeGreaterThan(0);
     const s = JSON.stringify(d.body);
     expect(s).not.toMatch(/crop_key|cropKey|evidence\/[0-9a-f-]{36}\/ai|embedding/);
-    const withCrop = d.body.items.find((x: { cropUrl: string | null }) => x.cropUrl);
-    expect(withCrop.cropUrl).toMatch(/^\/api\/v1\/ai\/crops\/[0-9a-f-]{36}\?t=/);
-    expect(withCrop.reviewStatus).toBe('PENDING');
+    // Without the downloaded imagery the proxy is a synthetic colour clip: the pipeline must still complete, but there is
+    // nothing to detect, so the content assertions below only apply when the real test images were available.
     if (MEDIA.images) {
+      expect(d.body.total).toBeGreaterThan(0);
+      const withCrop = d.body.items.find((x: { cropUrl: string | null }) => x.cropUrl);
+      expect(withCrop.cropUrl).toMatch(/^\/api\/v1\/ai\/crops\/[0-9a-f-]{36}\?t=/);
+      expect(withCrop.reviewStatus).toBe('PENDING');
       const tasks = new Set(d.body.items.map((x: { task: string }) => x.task));
       expect(tasks).toEqual(new Set(['PERSON_DETECTION', 'FACE_DETECTION', 'ANPR']));
       expect(d.body.items.some((x: { label: string }) => x.label === 'IJZ8992')).toBe(true);
