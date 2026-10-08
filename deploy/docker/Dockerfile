@@ -166,7 +166,7 @@ ARG AGE_X_CRYPTO_VERSION=v0.56.0
 ENV CGO_ENABLED=0 GOFLAGS=-trimpath GOTOOLCHAIN=local
 WORKDIR /src/age-build
 RUN go mod init ksp/age-build >/dev/null \
- && go get "filippo.io/age@${AGE_VERSION}" "golang.org/x/crypto@${AGE_X_CRYPTO_VERSION}" \
+ && go get "filippo.io/age/cmd/age@${AGE_VERSION}" "filippo.io/age/cmd/age-keygen@${AGE_VERSION}" "golang.org/x/crypto@${AGE_X_CRYPTO_VERSION}" \
  && go build -o /usr/local/bin/age filippo.io/age/cmd/age \
  && go build -o /usr/local/bin/age-keygen filippo.io/age/cmd/age-keygen \
  && /usr/local/bin/age --version
