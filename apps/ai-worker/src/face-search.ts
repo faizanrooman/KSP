@@ -45,7 +45,7 @@ export async function scanEmbeddings(ctx: AiContext, modelId: string, probe: Flo
     const { rows } = await sql<{ id: string; evidence_id: string; frame_time_ms: number | null; embedding: number[] }>`
       SELECT id, evidence_id, frame_time_ms, embedding FROM ai_detections
       WHERE embedding IS NOT NULL
-        AND ((task = 'FACE_RECOGNITION' AND model_id = ${modelId}::uuid) OR (task = 'FACE_DETECTION' AND attributes->>'embeddingModelId' = ${modelId}))
+        AND ((task = 'FACE_RECOGNITION' AND model_id = ${modelId}::uuid) OR (task = 'FACE_DETECTION' AND attributes->>'faceModelId' = ${modelId}))
         AND (${after}::uuid IS NULL OR id > ${after}::uuid)
       ORDER BY id LIMIT ${PAGE}`.execute(ctx.db);
     for (const r of rows) {

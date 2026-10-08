@@ -76,6 +76,10 @@ export async function buildWorld(app: FastifyInstance): Promise<World> {
   }
   ids.aiJob = must('ai job', await owner.post(`/api/v1/ai/evidence/${ev.id}/jobs`, { tasks: ['PERSON_DETECTION'] })).body.id;
   ids.detection = (await insertDetections(ev.id, meeraId, [{ label: 'car', reviewStatus: 'PENDING' }]))[0]!;
+  ids.faceSearch = (await app.db.insertInto('face_searches').values({ requested_by: meeraId, org_unit_id: cubbon, probe_key: 'pending', params: '{}', status: 'COMPLETED', result: '[]', stats: '{}' }).returning('id').executeTakeFirstOrThrow()).id;
+  const probeKey = `ai/face-searches/${ids.faceSearch}/probe.png`;
+  await app.storage.put(app.storage.bucket('derived'), probeKey, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'), { contentType: 'image/png' });
+  await app.db.updateTable('face_searches').set({ probe_key: probeKey }).where('id', '=', ids.faceSearch).execute();
   ids.savedSearch = must('saved search', await owner.post('/api/v1/search/saved', { name: `${MARK} saved`, criteria: { text: MARK } })).body.id;
 
   ids.reportRun = must('report', await kavya.post('/api/v1/reports/runs', { reportType: 'EVIDENCE_INVENTORY', orgUnitId: cubbon })).body.id;

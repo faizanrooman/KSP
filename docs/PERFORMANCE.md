@@ -237,6 +237,24 @@ Totals are exact up to 10 000 and reported as `total: 10000, totalApprox: true` 
 10 001 rows, so its cost no longer grows with the match set. Relevance ranking of very large text match sets is still
 O(matches) — see KNOWN-ISSUES FN-13.
 
+### Repository-wide suspect (face) search (tender §20, `tests/perf/face-search-bench.mts`)
+
+Requirement: "match the suspect person in less than one minute with database size of 1 lakh". The bench seeds
+100 000 synthetic 128-d SFace embeddings as `ai_detections` rows (one planted near-duplicate of the probe), then runs
+the production matcher (`scanEmbeddings`, paged `SELECT … WHERE embedding IS NOT NULL`, cosine in the worker) as the
+`ksp_ai` role on this host.
+
+| Run | Faces scanned | Wall-clock | Planted match |
+|---|---|---|---|
+| 1 | 100 013 | 7.8 s | found, similarity 0.9914 |
+| 2 | 100 013 | 8.2 s | found |
+| 3 | 100 013 | 7.9 s | found |
+
+Embedding the probe (YuNet + SFace on CPU) adds ≈ 0.1–0.4 s. The scan is linear in the number of stored faces
+(≈ 80 µs/face incl. row transfer), so 1 lakh completes in ~8 s and the one-minute budget covers ≈ 7 lakh faces per
+worker before an ANN index (pgvector/HNSW) would be needed; `face_searches` is processed by worker slot 0 only, so
+concurrent searches queue rather than contend. Numbers are from the single-host dev machine (see *Host*).
+
 ### Web bundle (FN-24, `npx vite build`, minified; gzip = `zlib.gzipSync` of each file)
 
 Route pages and evidence-detail tabs are `React.lazy` chunks (`apps/web/src/lib/lazy.tsx`; the module registries stay

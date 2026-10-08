@@ -46,7 +46,7 @@ function paramValue(url: string, param: string, ids: Record<string, string>): st
   if (param === 'n') return '1';
   if (param !== 'id') return null;
   const map: Array<[string, string]> = [
-    ['ai/jobs', 'aiJob'], ['review/detections', 'detection'], ['alerts/', 'alert'], ['notifications/', 'notification'],
+    ['ai/face-searches', 'faceSearch'], ['ai/jobs', 'aiJob'], ['review/detections', 'detection'], ['alerts/', 'alert'], ['notifications/', 'notification'],
     ['auth/sessions', 'session'], ['cases/', 'case'], ['devices/', 'device'], ['exports/', 'export'], ['firs/', 'fir'],
     ['reports/runs', 'reportRun'], ['reports/schedules', 'reportSchedule'], ['media/snapshot-requests', 'snapshotRequest'], ['search/saved', 'savedSearch'], ['shares/', 'share'], ['uploads/batches', 'batch'],
     ['uploads/', 'upload'], ['users/', 'meera'], ['workspaces/bookmarks', 'bookmark'], ['workspaces/annotations', 'annotation'],

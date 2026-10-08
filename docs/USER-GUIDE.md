@@ -19,6 +19,8 @@ outside your jurisdiction is simply not found.
   sign out other sessions.
 * **Dashboard** — KPIs and charts scoped to your jurisdiction; each chart has a text summary for screen readers.
 * **Notifications** — alerts routed to you.
+* **Language** — the **EN / ಕನ್ನಡ** switch in the top bar (and on the sign-in page) changes every screen, date and
+  number format immediately and is remembered on this browser. Evidence numbers, usernames and codes stay as stored.
 * Every view, play, download, snapshot and change you make on evidence is recorded in the chain of custody.
 
 ## Field officer (`FIELD_OFFICER`)
@@ -47,6 +49,9 @@ outside your jurisdiction is simply not found.
   *Bookmarks & annotations*, *Related evidence*. Actions: **Verify** (re-hash), **Link to case**,
   **Add to workspace**, **Export for court**, **Share**. (E2E `03-evidence`)
 * **AI analysis tab** — choose tasks and run; results appear as *Pending review* until a reviewer approves them.
+* **Face search** (Analysis menu) — upload a photograph of a suspect; every face found in any analysed footage you
+  are allowed to see is compared and the closest matches are listed with a link to the exact frame. Available only
+  where face recognition is enabled and legally approved; every search is audited.
 * **Cases** → **New case** / open a case: link evidence, write the append-only case diary, see the timeline,
   change status. **FIRs** → **Register FIR** or **Import from CCTNS** (fixture adapter only — UNVERIFIED against
   real CCTNS). (E2E `06-cases`)

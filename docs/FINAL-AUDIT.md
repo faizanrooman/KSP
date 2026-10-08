@@ -214,3 +214,21 @@ and hardening the E2E runtime guard's teardown). Web tests 26/26 incl. a Tabs re
 **Verdict unchanged:** ready for staging/UAT (conditions in §8); **not ready for production** until the external
 conditions 1–8 and 10 in §8 are met. None of those can be completed in the codebase.
 
+## 11. Tender completion pass (2026-10-08)
+
+Scope: close the four Appendix‑1 points the gap analysis marked partial (§16 accuracy metrics, §20 suspect match
+< 1 min at 1 lakh, §45 multilingual UI, §50 authorised networks) and merge the production-hardening branch
+(preflight, legal gates, PKCS#11 signer, media profiles, first-run tools). Point-by-point status:
+[TENDER-COMPLIANCE.md](TENDER-COMPLIANCE.md).
+
+Delivered and verified on the development host: `security-network.test.ts` (3), `face-search.test.ts` API (3: 401/403,
+probe storage + audit + ownership, visibility filtering with `hiddenMatches`) and AI worker (2, real YuNet+SFace
+inference: stored portrait found at similarity 1.00, random vector rejected, image without a face → FAILED),
+`evaluate.test.ts` (9: metric maths + real-inference smoke on the pinned images), IDOR matrix extended with
+`ai/face-searches`, `tests/perf/face-search-bench.mts` (100 013 faces in 7.8–8.2 s, planted match found, 3 runs), web
+suite with the Kannada dictionary loaded, `build-dictionary.mjs --check` 100 %. Verification totals: API 538 · worker 68 · ai-worker 32 · web 39 · core 5 · station client 4 (all passing, 2026-10-08); build, typecheck (+e2e), lint 0 errors, `vite build`, i18n checks green; E2E __E2E__.
+
+Still external (unchanged verdict for production): CERT-In VAPT, legal confirmations/DPIA, CCTNS contract, KSPDC
+infrastructure measurements (availability, SLA timings), KSP-footage accuracy dataset (EXT-13) and the Kannada
+language review (EXT-12).
+

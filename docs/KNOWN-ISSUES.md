@@ -20,6 +20,8 @@ Owner is a role, not a person.
 | EXT-7 | Production S3 IAM separation (AI worker → derived bucket only; app/backup/replicate identities) cannot be shown on versitygw (single account); policies in `deploy/s3/policies/` | HIGH | UNVERIFIED | Infra: apply on the production store, run negative tests |
 | EXT-8 | Object Lock runs in GOVERNANCE mode in dev (bypassable by privileged credentials); production should use COMPLIANCE | MEDIUM | decision | Custodian + infra: choose mode/retention per bucket |
 | EXT-9 | CPU transcoding of the full HLS ladder at state-wide volume (~40 000 footage-hours/day) needs ~1 100 4-vCPU workers — GPU / proxy-only default / on-demand HLS decision | HIGH | decision | Infra / product: capacity decision (INFRASTRUCTURE.md) |
+| EXT-12 | Kannada UI dictionary (`apps/web/src/i18n/kn/`) written by the development team, not yet reviewed by a KSP Kannada language officer; English is the key so a correction is a one-line change | MEDIUM | open | Department: review during UAT (GO-LIVE E7); `node scripts/i18n/build-dictionary.mjs --check` keeps coverage at 100 % |
+| EXT-13 | AI accuracy figures on KSP footage not yet measured — `metrics.kspEvaluation` is empty until a reviewed, held-out KSP dataset is run through `npm run evaluate -w @ksp/ai-worker`; upstream benchmark figures are shown with `source: upstream` meanwhile (tender §15/§16) | HIGH | open | Forensic lead: label a period of reviewed detections (training export) and register the evaluation (GO-LIVE E6) |
 | EXT-10 | Should EVIDENCE_CUSTODIAN hold `export:approve`? Default matrix gives it only to SUPERVISOR (unchanged) | MEDIUM | decision | Product owner. Mechanism ready: grant `export:approve` to EVIDENCE_CUSTODIAN in Roles admin (no separate setting — ADMIN-GUIDE.md § Export approval policy); tested incl. SoD (`exports.test.ts`) |
 
 ## Deployment, DR & operations
@@ -80,6 +82,9 @@ Owner is a role, not a person.
 | FN-21 | Storage | versitygw ignores Object Lock on CopyObject and refuses conditional writes to tombstoned keys — code uses multipart copy and never reuses keys | LOW | mitigated |
 | FN-22 | Station CLI | **Fixed**: the summary is refreshed from the server before printing (also with `--no-wait`) and outcome updates always replace the detail; already-uploaded files are marked | LOW | fixed |
 | FN-23 | E2E | API runs with `NODE_ENV=test` semantics during E2E (relaxed rate limits) | LOW | by design |
+
+| FN-26 | Repository-wide face search is a linear cosine scan in the AI worker (≈ 80 µs/face; 1 lakh ≈ 8 s, single worker slot). Beyond ≈ 7 lakh stored faces the one-minute budget (tender §20) needs an ANN index (pgvector/HNSW) or sharded scan; `face_searches` are processed one at a time per worker | LOW | open | Capacity: add pgvector when the embedding count approaches 5 lakh (PERFORMANCE.md § face search) |
+| FN-27 | Face-search probe images are kept in the derived bucket (`ai/face-searches/<id>/`) for audit reproducibility; no retention sweep yet — add to the retention worker when a policy for probe images is decided | LOW | open | Product owner: retention period for probes |
 
 ## Development host (ENV)
 

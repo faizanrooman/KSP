@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "fetch-models": "tsx --conditions=ksp-src scripts/fetch-models.ts"
+    "fetch-models": "tsx --conditions=ksp-src scripts/fetch-models.ts",
+    "evaluate": "tsx --conditions=ksp-src scripts/evaluate-model.ts"
   },
   "dependencies": {
     "@ksp/core": "^1.0.0",

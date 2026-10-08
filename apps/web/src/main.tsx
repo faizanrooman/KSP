@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApiError } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth';
+import { LanguageProvider } from '@/lib/i18n';
 import { ToastProvider } from '@/components/ui';
 import App from './App';
 import './index.css';
@@ -22,11 +23,13 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <ToastProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </ToastProvider>
+        <LanguageProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </ToastProvider>
+        </LanguageProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

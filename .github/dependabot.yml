@@ -11,10 +11,9 @@ updates:
       fastify: { patterns: ["fastify", "@fastify/*", "fastify-*"] }
       testing: { patterns: ["vitest", "@vitest/*", "@playwright/test", "@axe-core/*", "@testing-library/*"] }
     ignore:
-      # Major upgrades are deliberate, reviewed changes (see docs/DECISIONS.md).
-      - dependency-name: "react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react-dom"
+      # Major upgrades are deliberate, reviewed changes (see docs/DECISIONS.md); automated PRs for them only produce
+      # red CI runs (zod 4, vitest 5, typescript 7, @types/node 26 …). Minor/patch and security updates still come in.
+      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /deploy/docker

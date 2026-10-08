@@ -136,6 +136,23 @@ Recognition compares only against entries embedded with the job's recognition mo
 `AI_RESULT_*`, `AI_MODEL_REGISTERED/ACTIVATED/RETIRED`, `AI_TRAINING_EXPORTED` (also once per evidence item included,
 with `evidenceId`), `AI_WATCHLIST_CHANGED`.
 
+## Face embeddings and repository-wide suspect search (tender §20)
+
+When FACE_DETECTION runs without FACE_RECOGNITION, the pipeline still wraps the detector in `FaceEmbeddingDetector`
+(`models/face-embedding.ts`): every face ≥ 20 px is embedded with the ACTIVE SFace model and stored in
+`ai_detections.embedding` with `attributes.faceModelId`. Face searches (`face_searches`, migration 1200) are
+claimed by worker slot 0 (`FOR UPDATE SKIP LOCKED`), embed the probe, scan all stored embeddings of that model in
+20 000-row pages and write the top-K matches; the API filters them with `evidenceVisibleSql` on every read. The scan
+runs as `ksp_ai` with column-level SELECT on `ai_detections` and UPDATE on the result columns of `face_searches` only.
+Legal gating is identical to FACE_RECOGNITION jobs (API 422 `AI_TASK_DISABLED`; the worker's task gate applies too).
+
+## Accuracy evaluation (tender §16)
+
+`apps/ai-worker/src/evaluate.ts` + `scripts/evaluate-model.ts`: precision / recall / FPR / FNR per threshold for
+detectors, verification metrics (FAR/FRR/TAR@FAR/EER) for face recognition and read accuracy/CER for ANPR, measured
+with the production detector classes on COCO / `labels.json` / pairs / plates datasets and recorded on the model
+version (`metrics.kspEvaluation`). Details: AI-MODEL-LIFECYCLE.md § Accuracy evaluation.
+
 ## Web
 
 * Evidence tab **AI analysis** (order 30; `ai:request` gated by the per-evidence `canRequestAi` flag, or `ai:review`):

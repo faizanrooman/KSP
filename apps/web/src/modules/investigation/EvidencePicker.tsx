@@ -37,7 +37,7 @@ export function EvidencePicker({ open, onClose, onPick, exclude, loading, title 
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>{t('Cancel')}</Button>
-          <Button disabled={!sel.length} loading={loading} onClick={() => onPick(sel)}>{t('Add')}{' '}{sel.length || ''}{' '}{t('item')}{' '}{sel.length === 1 ? '' : 's'}</Button>
+          <Button disabled={!sel.length} loading={loading} onClick={() => onPick(sel)}>{sel.length === 1 ? t('Add 1 item') : t('Add {n} items', { n: sel.length })}</Button>
         </>
       }
     >

@@ -15,7 +15,10 @@ describe('directory org units scope', () => {
     expect(all.map((u) => u.code)).toEqual(expect.arrayContaining(['ksp', 'ps_cubbonpark', 'ps_indiranagar']));
     const scoped = await meera.get('/api/v1/directory/org-units?scope=dashboard:view');
     expect(scoped.status).toBe(200);
-    expect(scoped.body.items.map((u: { code: string }) => u.code)).toEqual(['ps_cubbonpark']);
+    const codes = scoped.body.items.map((u: { code: string }) => u.code) as string[];
+    expect(codes).toContain('ps_cubbonpark'); // other suites may add child units under Cubbon Park; those are legitimately in scope
+    expect(codes).not.toContain('ksp');
+    expect(codes).not.toContain('ps_indiranagar');
     // A permission she does not hold anywhere -> empty list, not an error.
     expect((await meera.get('/api/v1/directory/org-units?scope=users:manage')).body.items).toEqual([]);
   });

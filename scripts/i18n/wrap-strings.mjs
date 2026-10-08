@@ -198,7 +198,17 @@ try {
   /* optional */
 }
 const sorted = [...keys].sort((a, b) => a.localeCompare(b));
-writeFileSync(join(ROOT, 'i18n', 'keys.json'), JSON.stringify(sorted, null, 2) + '\n');
+const keysFile = join(ROOT, 'i18n', 'keys.json');
+const keysJson = JSON.stringify(sorted, null, 2) + '\n';
+if (CHECK) {
+  // CI guard: the committed keys.json must match the source (run the codemod and commit the result otherwise).
+  let committed = '';
+  try { committed = readFileSync(keysFile, 'utf8'); } catch { /* missing */ }
+  if (committed !== keysJson) {
+    console.error('i18n: keys.json is out of date — run `node scripts/i18n/wrap-strings.mjs` and commit apps/web/src/i18n/keys.json');
+    process.exitCode = 1;
+  }
+} else writeFileSync(keysFile, keysJson);
 if (CHECK) {
   if (report.length) {
     console.error(`i18n: ${report.length} file(s) contain unwrapped UI strings:\n  ${report.join('\n  ')}`);

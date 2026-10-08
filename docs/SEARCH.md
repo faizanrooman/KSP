@@ -103,6 +103,24 @@ External digital-evidence repositories (integration systems) are **not** federat
 defined in the specification (see `integration_systems` — UNVERIFIED); items imported from them become searchable
 like any other evidence.
 
+## Suspect search by face — `POST /ai/face-searches` (tender §20)
+
+Upload a probe photograph; the AI worker embeds the largest face and compares it with **every face embedding stored
+in the repository** (every face detected by any analysis is embedded with the ACTIVE SFace model — not only watchlist
+matches). Routes (`ai:request`, user principals only):
+
+| Route | Purpose |
+|---|---|
+| `POST /ai/face-searches {imageBase64, threshold?, limit?}` | 202; stores the probe under `ai/face-searches/<id>/` in the derived bucket; audit `AI_FACE_SEARCH_REQUESTED`; refused (422 `AI_TASK_DISABLED`) when FACE_RECOGNITION is not enabled/legally approved |
+| `GET /ai/face-searches` | the caller's recent searches |
+| `GET /ai/face-searches/:id` | status, stats (`candidates`, `scanMs`), matches **filtered with `evidenceVisibleSql`** at read time, `hiddenMatches` = count outside the caller's access; audit `AI_FACE_SEARCH_VIEWED` |
+| `GET /ai/face-searches/:id/probe` | the probe image (owner only; 404 otherwise) |
+
+The worker (`apps/ai-worker/src/face-search.ts`) writes raw top-K matches once; visibility is applied per request, so a
+result computed for one officer never leaks evidence another officer may not see. Matches are advisory AI output and
+link to the review queue / evidence frame. Page: **Analysis → Face search**. Performance: see PERFORMANCE.md (1 lakh in
+~8 s).
+
 ## Indexes (migration `0600_search_investigation.sql`)
 
 Pre-existing (0003): `evidence_org_path` (gist), `evidence_status`, `evidence_recorded`, `evidence_created`,

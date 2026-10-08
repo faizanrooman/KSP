@@ -49,7 +49,7 @@ for (const width of [1280, 768]) {
       await expect(nav).toBeHidden();
       await page.getByRole('button', { name: 'Open menu' }).click();
       await expect(nav).toBeVisible();
-      await nav.getByRole('link', { name: 'Search' }).click();
+      await nav.getByRole('link', { name: 'Search', exact: true }).click();
       await expect(page).toHaveURL(/\/search/);
       await expect(nav).toBeHidden();
     } else {

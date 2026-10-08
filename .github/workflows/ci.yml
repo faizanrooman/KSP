@@ -33,6 +33,7 @@ jobs:
         with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
       - run: npm ci
       - run: npm run lint
+      - run: node scripts/i18n/wrap-strings.mjs --check && node scripts/i18n/build-dictionary.mjs --check
       - run: npm run typecheck
       - run: npm run build
       - name: Production layouts start (no dev deps)
@@ -69,10 +70,7 @@ jobs:
         with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
       - name: S3 gateway with versioning + Object Lock (same server as development)
         # Service containers cannot take arguments, so the gateway is started explicitly.
-        run: |
-          docker run -d --name s3 -p 7070:7070 -e ROOT_ACCESS_KEY="$S3_ACCESS_KEY" -e ROOT_SECRET_KEY="$S3_SECRET_KEY" \
-            --tmpfs /data "$VERSITYGW_IMAGE" --port :7070 posix --versioning-dir /data/v --sidecar /data/s /data/b
-          sleep 2 && docker logs s3
+        run: scripts/ci/start-s3.sh
       - name: FFmpeg (same pinned static build as the worker image) + capability check
         run: |
           id=$(docker create "$FFMPEG_IMAGE" /ffmpeg)
@@ -145,10 +143,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
       - name: S3 gateway with versioning + Object Lock
-        run: |
-          docker run -d --name s3 -p 7070:7070 -e ROOT_ACCESS_KEY="$S3_ACCESS_KEY" -e ROOT_SECRET_KEY="$S3_SECRET_KEY" \
-            --tmpfs /data "$VERSITYGW_IMAGE" --port :7070 posix --versioning-dir /data/v --sidecar /data/s /data/b
-          sleep 2 && docker logs s3
+        run: scripts/ci/start-s3.sh
       - name: FFmpeg (pinned static build)
         run: |
           id=$(docker create "$FFMPEG_IMAGE" /ffmpeg)
@@ -209,7 +204,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
       - name: Trivy filesystem scan (dependencies, IaC misconfig, secrets)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: fs
           scanners: vuln,misconfig,secret

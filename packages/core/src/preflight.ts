@@ -143,6 +143,7 @@ export function staticPreflight(cfg: AppConfig, service: PreflightService, env: 
     const bad = origins.filter((o) => !o.startsWith('https://') || o === '*');
     if (bad.length) err('CORS_HTTPS', `CORS_ORIGINS contains non-https origins: ${bad.join(', ')}`, 'list only the https origin(s) of the SPA');
     if (!cfg.TRUST_PROXY) warn('TRUST_PROXY', 'TRUST_PROXY=false: client IPs in the audit trail will be the ingress address', 'TRUST_PROXY=true behind the ingress');
+    if (!cfg.ALLOWED_NETWORKS.trim()) warn('ALLOWED_NETWORKS', 'ALLOWED_NETWORKS is empty: the staff API answers from any network (tender §50 expects authorised internal networks only)', 'ALLOWED_NETWORKS=<KSP/VPN CIDRs>; the share portal and tokenised media stay exempt');
     if ((cfg.RATE_LIMIT_STORE ?? 'postgres') === 'memory') {
       if ((cfg.KSP_EXPECTED_API_REPLICAS ?? 2) > 1) err('RATE_LIMIT_STORE', 'RATE_LIMIT_STORE=memory with more than one API replica (or KSP_EXPECTED_API_REPLICAS unset): limits are per replica', 'RATE_LIMIT_STORE=postgres (default)');
       else warn('RATE_LIMIT_STORE', 'RATE_LIMIT_STORE=memory (single replica declared)');

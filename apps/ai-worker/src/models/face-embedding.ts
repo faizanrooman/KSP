@@ -15,7 +15,7 @@ export class FaceEmbeddingDetector implements Detector {
   constructor(
     private readonly inner: Detector,
     private readonly embedder: SfaceEmbedder,
-    private readonly embeddingModelId: string,
+    private readonly faceModelId: string,
   ) {
     this.task = inner.task;
     this.modelId = inner.modelId;
@@ -32,7 +32,7 @@ export class FaceEmbeddingDetector implements Detector {
     for (const f of faces) {
       if (!f.landmarks || f.box.x2 - f.box.x1 < 20) continue;
       f.embedding = Array.from(await this.embedder.embed(frame, f.landmarks));
-      f.attributes = { ...(f.attributes ?? {}), embeddingModelId: this.embeddingModelId };
+      f.attributes = { ...(f.attributes ?? {}), faceModelId: this.faceModelId };
     }
     return faces;
   }

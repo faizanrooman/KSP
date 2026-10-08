@@ -14,11 +14,12 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { sql } from 'kysely';
-import { appendAudit, sha256Hex } from '@ksp/core';
+import { aiTaskGates, appendAudit, loadConfig, sha256Hex } from '@ksp/core';
 import { AI_JOBS_CHANNEL } from '@ksp/shared';
 import { evidenceVisibleSql } from '../../lib/access.js';
-import { forbidden, notFound, unprocessable, validationFailed } from '../../lib/errors.js';
+import { AppError, forbidden, notFound, unprocessable, validationFailed } from '../../lib/errors.js';
 import { hasPermission } from '../../lib/principal.js';
+import { getSettings } from '../../lib/settings.js';
 import { sendObject } from '../media/stream.js';
 import { cropUrl } from './common.js';
 import { sniffImage } from './watchlists.js';
@@ -52,6 +53,12 @@ export default async function faceSearchRoutes(fastify: FastifyInstance) {
     },
   }, async (req, reply) => {
     const p = requireAi(req);
+    // Same deployment + legal gate as FACE_RECOGNITION jobs (EXT-5 DPIA): a refused task never reaches the worker.
+    const gate = aiTaskGates(loadConfig(), (await getSettings(app.db)).aiLegalApprovals).FACE_RECOGNITION;
+    if (!gate.allowed) {
+      await appendAudit(app.db, req.actor(), { action: 'AI_TASK_REFUSED', outcome: 'FAILURE', resourceType: 'face_search', orgUnitId: p.homeOrgUnitId, details: { tasks: ['FACE_RECOGNITION'], reasons: { FACE_RECOGNITION: gate.reason } } });
+      throw new AppError(422, 'AI_TASK_DISABLED', `Not permitted on this deployment: face recognition (${gate.explanation})`, { tasks: [{ task: 'FACE_RECOGNITION', reason: gate.reason, explanation: gate.explanation }] });
+    }
     const active = await app.db.selectFrom('ai_models').select('id').where('task', '=', 'FACE_RECOGNITION').where('status', '=', 'ACTIVE').executeTakeFirst();
     if (!active) throw unprocessable('No ACTIVE face-recognition model is registered');
     const buf = Buffer.from(req.body.imageBase64.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64');

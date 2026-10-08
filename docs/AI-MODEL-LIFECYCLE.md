@@ -47,7 +47,8 @@ If a download fails the image-dependent tests are skipped with the reason printe
 ```
 
 1. **Evaluate** a candidate on a held-out, human-labelled KSP set (use a training export of a period *not* used for
-   training). Record at least precision/recall (per class) and the dataset id.
+   training) with `npm run evaluate -w @ksp/ai-worker` (see *Accuracy evaluation* below). Record at least
+   precision/recall (per class), false-positive / false-negative rates and the dataset id.
 2. **Register** (`POST /ai/models`, ai:models_manage) → `STAGED`. Required: `code`, `version`, `task`,
    `artifactUri` (`models://<file>` under `AI_MODELS_DIR` — arbitrary paths are rejected), `artifactSha256`,
    `defaultThreshold`, `config.architecture` (`yolox | yunet | sface | yolov9-plate+cct-ocr | rules`) plus
@@ -63,6 +64,37 @@ If a download fails the image-dependent tests are skipped with the reason printe
    model the worker re-embeds entries whose `model_id` differs; until then those entries are not compared.
 
 The worker verifies the SHA-256 of every artefact before loading (mismatch ⇒ job FAILED, nothing is inferred).
+
+## Accuracy evaluation (tender Appendix 1 §16)
+
+Every model version carries two kinds of figures in `ai_models.metrics` (shown on **AI models** and returned by
+`GET /ai/models`):
+
+* `source: 'upstream'` — the publisher's numbers (COCO mAP, WIDER FACE, LFW 99.40 %, plate-OCR precision/recall), copied
+  from the manifest. They say what the model can do on public benchmarks, **not** on KSP footage.
+* `kspEvaluation` — measured by `apps/ai-worker/scripts/evaluate-model.ts` with the **same detector classes the worker
+  uses** on a labelled dataset, and written with `--register` (audit `AI_MODEL_UPDATED`, actor `evaluate-model`).
+
+```
+npm run evaluate -w @ksp/ai-worker -- --task PERSON_DETECTION --dataset ./eval/persons --iou 0.5 --out persons.json --register
+npm run evaluate -w @ksp/ai-worker -- --task OBJECT_DETECTION --dataset <training export dir with coco.json renamed annotations.json>
+npm run evaluate -w @ksp/ai-worker -- --task FACE_DETECTION  --dataset ./eval/faces
+npm run evaluate -w @ksp/ai-worker -- --task FACE_RECOGNITION --pairs ./eval/pairs.json
+npm run evaluate -w @ksp/ai-worker -- --task ANPR --plates ./eval/plates.json
+```
+
+| Task | Dataset | Reported |
+|---|---|---|
+| PERSON / OBJECT / FACE_DETECTION | COCO `annotations.json` (boxes) or `labels.json` (boxes or image-level labels; images without labels are negatives) | per threshold (sweep 0.10–0.95 + model default): precision, recall, F1, **false-positive rate** (negative images with a report), **false-negative rate** (missed objects), missed-image rate, per-label P/R; best-F1 threshold; inference latency mean/p95 |
+| FACE_RECOGNITION | `pairs.json` (same-person / different-person image pairs) | accuracy, FAR, FRR at the model threshold; best threshold; TAR @ FAR 1 % and 0.1 %; EER |
+| ANPR | `plates.json` (plate text per image, `null` = no plate) | detection rate, exact-match rate, character error rate, false-positive rate on negatives |
+
+Rules: predictions are matched greedily by confidence with IoU ≥ `--iou` (default 0.5); only labels present in the
+dataset are scored (a person detector is not penalised for cars); image-level labels count as present/absent. The
+metric functions are unit-tested and the harness is exercised with real inference on the pinned test images
+(`apps/ai-worker/test/evaluate.test.ts`). The reviewed-detection **training export** (`coco.json` + `crops/`) is
+accepted directly, which is how accuracy on KSP's own body-worn footage is measured once reviewers have labelled a
+period — until that is done the KSP figures are *not* declared; the UI shows upstream figures with their source.
 
 ## Retraining data (training exports)
 

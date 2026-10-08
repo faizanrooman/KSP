@@ -41,6 +41,7 @@ Waivers are explicit environment variables, each logged as a preflight warning: 
 | B6 | Per-service S3 identities verified by negative tests (EXT-7) | Infra | Test log: AI identity denied on `ksp-evidence` | **P** `S3_AI_CREDENTIALS`: AI worker without its own identity (or with the app key) refused | `aws s3 ls s3://ksp-evidence --profile ksp-ai` must fail |
 | B7 | MFA mandatory for privileged roles | Security officer | Settings screenshot | Production seed forces SYSTEM_ADMINISTRATOR into `requireMfaForRoles`; preflight warning `MFA_POLICY` if a privileged role is removed | `npm run preflight` |
 | B8 | Rate limiting shared across API replicas | DevOps | — | **P** `RATE_LIMIT_STORE`: `memory` with more than one replica refused | `npm run preflight -- --service api` |
+| B9 | Staff access only from authorised internal networks (tender §50) | Security officer / network | KSP + VPN CIDR list signed off | `ALLOWED_NETWORKS` → 403 `NETWORK_NOT_ALLOWED` before authentication, audit `ACCESS_DENIED`; share portal / tokenised media / health exempt; preflight warning `ALLOWED_NETWORKS` when empty | `curl` from an outside address → 403; from VPN → 401/200; `security-network.test.ts` |
 
 ## C. Data & storage
 
@@ -67,6 +68,8 @@ Waivers are explicit environment variables, each logged as a preflight warning: 
 | E3 | Monitoring and alerting end-to-end | DevOps | Test alert received | Prometheus rules, SLO probe, `/api/v1/system/health` | [MONITORING.md](MONITORING.md) |
 | E4 | UAT signed off per role | Product owner | Signed sheet in [UAT-PLAN.md](UAT-PLAN.md) | — | — |
 | E5 | Verification re-run on sound hardware (ENV-1) | QA | CI / staging test logs | — | `npm test`, `npm run test:e2e` |
+| E6 | AI accuracy declared on KSP footage (tender §15/§16) | Forensic lead / AI owner | Evaluation reports per task (`npm run evaluate -w @ksp/ai-worker … --register`) on a reviewed, held-out KSP dataset | `ai_models.metrics.kspEvaluation` (precision, recall, FPR, FNR, latency) shown on **AI models**; upstream figures remain labelled `source: upstream` until then | `GET /api/v1/ai/models` → `metrics.kspEvaluation` present for every ACTIVE model |
+| E7 | Kannada UI dictionary reviewed by a KSP language officer (tender §45) | Department / language officer | Review sign-off; corrections applied to `apps/web/src/i18n/kn/*.json` | `node scripts/i18n/build-dictionary.mjs --check` (100 % coverage enforced in CI) | switch to ಕನ್ನಡ on the sign-in page and walk the UAT scripts |
 
 ## F. Cut-over sequence
 

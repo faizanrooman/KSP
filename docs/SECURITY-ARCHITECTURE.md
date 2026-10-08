@@ -45,6 +45,16 @@ response that created them and are shown once in the UI (copy button, then disca
 | Jurisdiction bypass via restructuring | Org unit path immutable in DB |
 | IDOR on users/devices | 404 for out-of-scope ids |
 
+## Authorised-network access (tender §50)
+
+`ALLOWED_NETWORKS` (comma-separated IPv4/IPv6 CIDRs) restricts the staff API to KSP's internal / VPN networks at the
+application layer, in addition to the perimeter: requests from any other source address get `403 NETWORK_NOT_ALLOWED`
+before authentication and are audited as `ACCESS_DENIED` (one event per source IP per minute). The client address is
+taken from the proxy headers only when `TRUST_PROXY` is set. `ALLOWED_NETWORKS_EXEMPT_PREFIXES` (default: share
+portal, tokenised media stream/download, health) keeps the external evidence-share portal reachable from the public
+internet, which is the only part of the system designed for outside access. Empty `ALLOWED_NETWORKS` = no restriction
+(development default; preflight warns in production). Tests: `apps/api/test/security-network.test.ts`.
+
 ## Known limitations
 
 * **Multi-instance caches**: principal (10 s) and settings (15 s) caches are per process. Role revocations and settings

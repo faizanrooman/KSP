@@ -173,5 +173,5 @@ export function useDeleteSavedSearch() {
 }
 
 export function useRelated(evidenceId: string) {
-  return useQuery({ queryKey: ['search', 'related', evidenceId], queryFn: () => api.get<{ items: RelatedItem[]; total: number }>(`/search/evidence/${evidenceId}/related`) });
+  return useQuery({ queryKey: ['search', 'related', evidenceId], enabled: !!evidenceId, queryFn: () => api.get<{ items: RelatedItem[]; total: number }>(`/search/evidence/${evidenceId}/related`) });
 }
