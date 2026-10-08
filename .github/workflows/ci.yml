@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
       - run: npm ci
@@ -65,7 +65,7 @@ jobs:
       S3_SECRET_KEY: kspcisecret-not-secret
       FFMPEG_DIR: /usr/local/bin
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
       - name: S3 gateway with versioning + Object Lock (same server as development)
@@ -83,11 +83,11 @@ jobs:
       - run: npm run build -w @ksp/shared && npm run build -w @ksp/core
       - run: npm run db:migrate && npm run db:seed
       - name: AI models (pinned, SHA-256 verified)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with: { path: .local/models, key: "ai-models-${{ hashFiles('apps/ai-worker/src/models/manifest.ts') }}" }
       - run: npm run fetch-models -w @ksp/ai-worker -- --no-db
       - name: Test imagery (SHA-256 pinned Wikimedia files; cached so runs do not depend on upstream rate limits)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with: { path: .local/ai-test-media, key: "ai-test-media-${{ hashFiles('apps/ai-worker/test/media.ts') }}" }
       - name: API tests
         working-directory: apps/api
@@ -146,7 +146,7 @@ jobs:
       # Google Chrome ships with the ubuntu-24.04 runner image; Playwright drives it (no browser download).
       E2E_CHROME: /usr/bin/google-chrome
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
       - name: S3 gateway with versioning + Object Lock
@@ -160,7 +160,7 @@ jobs:
       - run: npm run build -w @ksp/shared && npm run build -w @ksp/core
       - run: npm run db:migrate && npm run db:seed
       - name: AI models (pinned, SHA-256 verified)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with: { path: .local/models, key: "ai-models-${{ hashFiles('apps/ai-worker/src/models/manifest.ts') }}" }
       - name: Register + activate the AI models in the E2E database
         run: npm run fetch-models -w @ksp/ai-worker
@@ -193,7 +193,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
         with: { node-version: "${{ env.NODE_VERSION }}", cache: npm }
