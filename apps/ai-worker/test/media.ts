@@ -7,6 +7,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ffmpeg, loadConfig, probe, storage, type Database } from '@ksp/core';
 
 export const TEST_IMAGES = {
@@ -37,6 +38,9 @@ export const TEST_IMAGES = {
 } as const;
 export type TestImage = keyof typeof TEST_IMAGES;
 
+/** Copies of the pinned images vendored with the repository (public domain / CC0, see TEST_IMAGES.licence). */
+const VENDORED_DIR = fileURLToPath(new URL('./fixtures/images/', import.meta.url));
+
 export function mediaDir(): string {
   return resolve(loadConfig().AI_MODELS_DIR, '..', 'ai-test-media');
 }
@@ -50,7 +54,8 @@ export async function ensureImages(): Promise<Record<TestImage, string>> {
     const path = join(dir, img.file);
     const sha = existsSync(path) ? createHash('sha256').update(await readFile(path)).digest('hex') : null;
     if (sha !== img.sha256) {
-      const buf = await download(img.url, img.file);
+      const vendored = join(VENDORED_DIR, img.file);
+      const buf = existsSync(vendored) && createHash('sha256').update(await readFile(vendored)).digest('hex') === img.sha256 ? await readFile(vendored) : await download(img.url, img.file);
       const got = createHash('sha256').update(buf).digest('hex');
       if (got !== img.sha256) throw new Error(`SHA-256 mismatch for ${img.file}: ${got}`);
       await writeFile(`${path}.part`, buf);

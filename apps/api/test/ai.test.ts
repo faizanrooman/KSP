@@ -162,18 +162,18 @@ describe('end-to-end with the isolated worker: detections and crops', () => {
       const tasks = new Set(d.body.items.map((x: { task: string }) => x.task));
       expect(tasks).toEqual(new Set(['PERSON_DETECTION', 'FACE_DETECTION', 'ANPR']));
       expect(d.body.items.some((x: { label: string }) => x.label === 'IJZ8992')).toBe(true);
+      const img = await new Agent(app).get(withCrop.cropUrl);
+      expect(img.status).toBe(200);
+      expect(img.headers['content-type']).toBe('image/jpeg');
+      // token for detection X does not open detection Y
+      const other = d.body.items.find((x: { id: string; cropUrl: string | null }) => x.cropUrl && x.id !== withCrop.id);
+      if (other) {
+        const t = new URL(withCrop.cropUrl, 'http://x').searchParams.get('t')!;
+        expect((await new Agent(app).get(`/api/v1/ai/crops/${other.id}?t=${encodeURIComponent(t)}`)).status).toBe(403);
+      }
+      expect((await new Agent(app).get(`/api/v1/ai/crops/${withCrop.id}`)).status).toBe(401);
+      expect((await new Agent(app).get(`/api/v1/ai/crops/${withCrop.id}?t=bogus.tokenvalue`)).status).toBe(401);
     }
-    const img = await new Agent(app).get(withCrop.cropUrl);
-    expect(img.status).toBe(200);
-    expect(img.headers['content-type']).toBe('image/jpeg');
-    // token for detection X does not open detection Y
-    const other = d.body.items.find((x: { id: string; cropUrl: string | null }) => x.cropUrl && x.id !== withCrop.id);
-    if (other) {
-      const t = new URL(withCrop.cropUrl, 'http://x').searchParams.get('t')!;
-      expect((await new Agent(app).get(`/api/v1/ai/crops/${other.id}?t=${encodeURIComponent(t)}`)).status).toBe(403);
-    }
-    expect((await new Agent(app).get(`/api/v1/ai/crops/${withCrop.id}`)).status).toBe(401);
-    expect((await new Agent(app).get(`/api/v1/ai/crops/${withCrop.id}?t=bogus.tokenvalue`)).status).toBe(401);
 
     // filters + authz
     const f = await io.get(`/api/v1/ai/evidence/${A.id}/detections?task=PERSON_DETECTION&minConfidence=0.5`);

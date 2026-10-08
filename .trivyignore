@@ -4,3 +4,10 @@
 # settings and `file:/run/secrets/...` mount paths (JWT_*_KEY, SIGNING_*). No secret material is stored in the
 # ConfigMap; secrets come from Kubernetes Secrets materialised by ExternalSecrets/SealedSecrets (docs/SECRETS.md, OPS-9).
 KSV-0109
+
+# Kubernetes base manifests (deploy/k8s/base, deploy/k8s/jobs) are kustomize bases: image tags/digests are set by the
+# release overlay (`images:`) and the namespace by the overlay, so these checks fire on the base only.
+KSV-0013
+KSV-0125
+KSV-0110
+KSV-01010
