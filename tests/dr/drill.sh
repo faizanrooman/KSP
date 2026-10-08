@@ -61,6 +61,10 @@ write_env() {
     grep -E '^(JWT_PRIVATE_KEY|JWT_PUBLIC_KEY|DATA_ENCRYPTION_KEY|MEDIA_TOKEN_SECRET|SIGNING_PRIVATE_KEY|SIGNING_CERTIFICATE|SIGNING_KEY_ID|FFMPEG_PATH|FFPROBE_PATH)=' "$ROOT/.env"
     cat <<ENV
 NODE_ENV=production
+# The drill exercises production image layouts on a throwaway stack with CI keys/seed: run as the test tier so the
+# production preflight reports its violations (dev signing key, http URLs, seed users…) instead of refusing to start.
+KSP_ENVIRONMENT=test
+KSP_PREFLIGHT=warn
 COOKIE_SECURE=true
 LOG_LEVEL=warn
 API_PORT=$API_PORT
