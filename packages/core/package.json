@@ -48,7 +48,7 @@
     "pg-boss": "^12.34.0",
     "pino": "^10.3.1",
     "qrcode": "^1.5.4",
-    "zod": "^3.25.76"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/nodemailer": "^8.0.2",
