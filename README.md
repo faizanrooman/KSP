@@ -20,6 +20,14 @@ bucket only) produces detections that stay pending until a human approves them. 
 Media is always streamed through the API with short-lived tokens; storage URLs never reach clients. Details:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## One-command start
+
+```bash
+./start.sh        # Linux / macOS — services, first-run setup (secrets, deps, migrations, demo data, AI models), app, URLs
+start.bat         # Windows — same script inside WSL2 (Ubuntu); prints setup steps if WSL2 is missing
+./start.sh stop | restart | status | logs
+```
+
 ## Quick start (development host, no Docker)
 
 ```bash
