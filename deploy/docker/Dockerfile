@@ -161,9 +161,15 @@ FROM ${GOLANG_IMAGE} AS age
 # with older Go releases and fail the image scan on fixed Go-stdlib CVEs. `go install` verifies the module against the
 # Go checksum database (sum.golang.org).
 ARG AGE_VERSION=v1.3.2
+# Dependencies newer than age's own go.mod pins (fixed CVEs in golang.org/x/crypto); bump here when the scan asks for it.
+ARG AGE_X_CRYPTO_VERSION=v0.56.0
 ENV CGO_ENABLED=0 GOFLAGS=-trimpath GOTOOLCHAIN=local
-RUN go install "filippo.io/age/cmd/age@${AGE_VERSION}" "filippo.io/age/cmd/age-keygen@${AGE_VERSION}" \
- && install -m 0755 /go/bin/age /go/bin/age-keygen /usr/local/bin/ && /usr/local/bin/age --version
+WORKDIR /src/age-build
+RUN go mod init ksp/age-build >/dev/null \
+ && go get "filippo.io/age@${AGE_VERSION}" "golang.org/x/crypto@${AGE_X_CRYPTO_VERSION}" \
+ && go build -o /usr/local/bin/age filippo.io/age/cmd/age \
+ && go build -o /usr/local/bin/age-keygen filippo.io/age/cmd/age-keygen \
+ && /usr/local/bin/age --version
 
 FROM ${POSTGRES_IMAGE} AS backup
 # gosu (postgres entrypoint helper, a static Go binary) is not used here and is removed with the server binaries' helper.
