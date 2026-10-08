@@ -6,6 +6,7 @@
 import type { ReactNode } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
+import { t as tr } from '@/lib/i18n';
 export const SERIES = ['#2a78d6', '#eb6834', '#1baf7a'] as const;
 export const STATUS = { good: '#0ca30c', warning: '#fab219', serious: '#ec835a', critical: '#d03b3b', info: '#2a78d6' } as const;
 const GRID = '#e5e4e0';
@@ -20,7 +21,7 @@ export interface SeriesDef<T> {
 function DataTableView<T extends Record<string, unknown>>({ rows, x, xLabel, series }: { rows: T[]; x: keyof T & string; xLabel: string; series: Array<SeriesDef<T>> }) {
   return (
     <details className="mt-2 text-xs">
-      <summary className="cursor-pointer text-ink-600 hover:text-ink-900">Show data table</summary>
+      <summary className="cursor-pointer text-ink-600 hover:text-ink-900">{tr('Show data table')}</summary>
       <div className="mt-2 max-h-64 overflow-auto">
         <table className="min-w-full text-left">
           <thead>
@@ -105,14 +106,14 @@ export function CategoryBars<T extends Record<string, unknown>>({ title, rows, l
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <DataTableView rows={rows} x={label} xLabel="Category" series={[{ key: value, label: 'Value', format }]} />
+      <DataTableView rows={rows} x={label} xLabel="Category" series={[{ key: value, label: tr('Value'), format }]} />
     </ChartFigure>
   );
 }
 
 /** Utilisation meter with warning/critical threshold markers (text + marker, not colour alone). */
 export function ThresholdMeter({ percent, warn, critical, label }: { percent: number | null; warn: number; critical: number; label: string }) {
-  if (percent === null) return <p className="text-sm text-ink-600">Capacity not declared — set storagePolicy.capacityBytes in settings to track utilisation.</p>;
+  if (percent === null) return <p className="text-sm text-ink-600">{tr('Capacity not declared — set storagePolicy.capacityBytes in settings to track utilisation.')}</p>;
   const level = percent >= critical ? 'Critical' : percent >= warn ? 'Warning' : 'Normal';
   const color = percent >= critical ? STATUS.critical : percent >= warn ? STATUS.warning : STATUS.good;
   const p = Math.min(100, Math.max(0, percent));
@@ -127,8 +128,8 @@ export function ThresholdMeter({ percent, warn, critical, label }: { percent: nu
         {[warn, critical].map((t) => <div key={t} className="absolute -top-1 h-5 w-0.5 bg-ink-800" style={{ left: `${t}%` }} aria-hidden />)}
       </div>
       <div className="relative mt-1 h-4 text-[10px] text-ink-600" aria-hidden>
-        <span className="absolute -translate-x-1/2" style={{ left: `${warn}%` }}>warn {warn}%</span>
-        <span className="absolute -translate-x-1/2" style={{ left: `${critical}%` }}>crit {critical}%</span>
+        <span className="absolute -translate-x-1/2" style={{ left: `${warn}%` }}>{tr('warn')}{' '}{warn}%</span>
+        <span className="absolute -translate-x-1/2" style={{ left: `${critical}%` }}>{tr('crit')}{' '}{critical}%</span>
       </div>
     </div>
   );

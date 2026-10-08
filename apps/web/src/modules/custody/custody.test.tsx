@@ -33,10 +33,10 @@ describe('CustodyTab paging', () => {
         <CustodyTab evidence={{ id: 'x' } as never} />
       </QueryClientProvider>,
     );
-    expect(await screen.findByText('Showing 200 of 250 custody events')).toBeTruthy();
-    expect(screen.getByText(/All 250 ledger events/)).toBeTruthy(); // whole-chain verification, not just the page
+    expect(await screen.findByText((_, el) => /^Showing 200 of 250 custody events/.test(el?.textContent ?? '') && !el?.children.length)).toBeTruthy();
+    expect(await screen.findByText((_, el) => /All 250 ledger events/.test(el?.textContent ?? '') && !el?.querySelector('p, div'))).toBeTruthy(); // whole-chain verification, not just the page
     fireEvent.click(screen.getByRole('button', { name: 'Load more (50 of 50 remaining)' }));
-    expect(await screen.findByText('Showing 250 of 250 custody events')).toBeTruthy();
+    expect(await screen.findByText((_, el) => /^Showing 250 of 250 custody events/.test(el?.textContent ?? '') && !el?.children.length)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Load more/ })).toBeNull();
     expect(get).toHaveBeenCalledWith('/custody/evidence/x', { filter: 'custody', limit: 200, after: 200 });
     fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'all' } });

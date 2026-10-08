@@ -17,6 +17,7 @@ import { EvidencePlayer, type EvidencePlayerHandle } from '../video';
 import { useAiTasks, useCancelJob, useDetections, useEvidenceJobs, useEvidenceWatchlists, useRequestJob } from './api';
 import { Attributes, ConfidenceBar, CropThumb, ReviewBadge, TASK_COLORS, taskLabel } from './components';
 
+import { t as tr } from '@/lib/i18n';
 export function AiTab({ evidence }: { evidence: EvidenceSummary }) {
   const ev = evidence as EvidenceDetail;
   const { can } = useAuth();
@@ -24,8 +25,8 @@ export function AiTab({ evidence }: { evidence: EvidenceSummary }) {
   const canPlay = ev.permissions?.canPlay ?? false;
   return (
     <div className="space-y-4">
-      <Alert tone="amber" title="Advisory results">
-        AI output is never authoritative. Every detection stays <strong>pending</strong> until a reviewer approves or rejects it; face-recognition matches need two independent approvals.
+      <Alert tone="amber" title={tr('Advisory results')}>
+        {tr('AI output is never authoritative. Every detection stays')}<strong>{tr('pending')}</strong>{tr('until a reviewer approves or rejects it; face-recognition matches need two independent approvals.')}
       </Alert>
       {canRequest && <RequestForm evidence={ev} />}
       <JobsCard evidenceId={ev.id} canCancel={canRequest} />
@@ -46,7 +47,7 @@ function RequestForm({ evidence }: { evidence: EvidenceDetail }) {
   const toast = useToast();
   const mediaReady = evidence.mediaStatus === 'READY';
 
-  if (tasks.isLoading) return <Spinner label="Loading AI tasks…" />;
+  if (tasks.isLoading) return <Spinner label={tr('Loading AI tasks…')} />;
   if (tasks.error) return <ErrorState error={tasks.error} onRetry={() => void tasks.refetch()} />;
   const available = tasks.data!.items.filter((t) => t.available);
   const unavailable = tasks.data!.items.filter((t) => !t.available);
@@ -64,14 +65,14 @@ function RequestForm({ evidence }: { evidence: EvidenceDetail }) {
   };
 
   return (
-    <Card title={<span className="inline-flex items-center gap-2"><Bot className="h-4 w-4" aria-hidden /> Request analysis</span>}>
-      {!mediaReady && <Alert tone="blue">Analysis becomes available once media processing has produced the proxy (status: {evidence.mediaStatus}).</Alert>}
+    <Card title={<span className="inline-flex items-center gap-2"><Bot className="h-4 w-4" aria-hidden />{' '}{tr('Request analysis')}</span>}>
+      {!mediaReady && <Alert tone="blue">{tr('Analysis becomes available once media processing has produced the proxy (status:')}{' '}{evidence.mediaStatus}).</Alert>}
       {available.length === 0 ? (
-        <EmptyState title="No AI models are active" description="An administrator must register and activate models before analysis can run." />
+        <EmptyState title={tr('No AI models are active')} description={tr('An administrator must register and activate models before analysis can run.')} />
       ) : (
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submit(); }}>
           <fieldset>
-            <legend className="mb-2 text-sm font-medium text-ink-800">Tasks</legend>
+            <legend className="mb-2 text-sm font-medium text-ink-800">{tr('Tasks')}</legend>
             <div className="grid gap-2 sm:grid-cols-2">
               {available.map((t) => (
                 <div key={t.task} className="rounded border border-ink-200 p-2">
@@ -83,7 +84,7 @@ function RequestForm({ evidence }: { evidence: EvidenceDetail }) {
                   />
                   {sel.has(t.task) && (
                     <div className="mt-2 pl-6">
-                      <Field label="Threshold" htmlFor={`thr-${t.task}`} hint={`Default ${t.models[0]?.defaultThreshold}`}>
+                      <Field label={tr('Threshold')} htmlFor={`thr-${t.task}`} hint={`Default ${t.models[0]?.defaultThreshold}`}>
                         <Input id={`thr-${t.task}`} type="number" step="0.01" min={0.05} max={0.99} placeholder={String(t.models[0]?.defaultThreshold ?? '')} value={thresholds[t.task] ?? ''} onChange={(e) => setThresholds((x) => ({ ...x, [t.task]: e.target.value }))} className="w-28" />
                       </Field>
                     </div>
@@ -91,16 +92,16 @@ function RequestForm({ evidence }: { evidence: EvidenceDetail }) {
                 </div>
               ))}
             </div>
-            {unavailable.length > 0 && <p className="mt-2 text-xs text-ink-500">Unavailable (no active model): {unavailable.map((t) => t.label).join(', ')}</p>}
+            {unavailable.length > 0 && <p className="mt-2 text-xs text-ink-500">{tr('Unavailable (no active model):')}{' '}{unavailable.map((t) => t.label).join(', ')}</p>}
           </fieldset>
-          <Field label="Frames sampled per second" htmlFor="ai-fps" error={fpsErr} hint="Higher = more thorough and slower (CPU inference).">
+          <Field label={tr('Frames sampled per second')} htmlFor="ai-fps" error={fpsErr} hint={tr('Higher = more thorough and slower (CPU inference).')}>
             <Input id="ai-fps" type="number" step="0.1" min={AI_SAMPLE_FPS.min} max={AI_SAMPLE_FPS.max} value={fps} onChange={(e) => setFps(e.target.value)} className="w-28" />
           </Field>
           {needsLists && (
             <fieldset>
-              <legend className="mb-1 text-sm font-medium text-ink-800">Watchlists covering this jurisdiction</legend>
+              <legend className="mb-1 text-sm font-medium text-ink-800">{tr('Watchlists covering this jurisdiction')}</legend>
               {watchlists.isLoading ? <Spinner /> : watchlists.error ? <ErrorState error={watchlists.error} onRetry={() => void watchlists.refetch()} /> : watchlists.data!.items.length === 0 ? (
-                <p className="text-sm text-ink-600">No watchlists apply to this evidence.{sel.has('FACE_RECOGNITION') && ' Face recognition needs a FACE watchlist.'}</p>
+                <p className="text-sm text-ink-600">{tr('No watchlists apply to this evidence.')}{' '}{sel.has('FACE_RECOGNITION') && ' Face recognition needs a FACE watchlist.'}</p>
               ) : (
                 <div className="space-y-1">
                   {watchlists.data!.items.map((w) => (
@@ -111,9 +112,9 @@ function RequestForm({ evidence }: { evidence: EvidenceDetail }) {
               )}
             </fieldset>
           )}
-          {request.error && <Alert tone="red" title="Could not queue analysis">{errorMessage(request.error)}</Alert>}
+          {request.error && <Alert tone="red" title={tr('Could not queue analysis')}>{errorMessage(request.error)}</Alert>}
           <Button type="submit" disabled={!sel.size || !!fpsErr || !!thrErr || !mediaReady} loading={request.isPending} icon={<Play className="h-4 w-4" aria-hidden />}>
-            Run analysis
+            {tr('Run analysis')}
           </Button>
         </form>
       )}
@@ -126,33 +127,33 @@ function JobsCard({ evidenceId, canCancel }: { evidenceId: string; canCancel: bo
   const cancel = useCancelJob(evidenceId);
   const [confirm, setConfirm] = useState<AiJobDto | null>(null);
   return (
-    <Card title="Analysis jobs">
+    <Card title={tr('Analysis jobs')}>
       {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !q.data!.items.length ? (
-        <EmptyState title="No analysis yet" description="Request an analysis above to run AI models on the derived proxy of this video." />
+        <EmptyState title={tr('No analysis yet')} description={tr('Request an analysis above to run AI models on the derived proxy of this video.')} />
       ) : (
         <ul className="divide-y divide-ink-100">
           {q.data!.items.map((j) => (
             <li key={j.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
               <StatusBadge status={j.status} />
               <span className="font-medium text-ink-800">{j.tasks.map(taskLabel).join(', ')}</span>
-              <span className="text-xs text-ink-500">{formatDateTime(j.createdAt)} · {j.requestedBy.fullName} · {j.params.sampleFps} fps · {j.models.map((m) => `${m.code}@${m.version}`).join(', ')}</span>
+              <span className="text-xs text-ink-500">{formatDateTime(j.createdAt)} · {j.requestedBy.fullName} · {j.params.sampleFps}{' '}{tr('fps ·')}{' '}{j.models.map((m) => `${m.code}@${m.version}`).join(', ')}</span>
               {(j.status === 'RUNNING' || j.status === 'QUEUED') && (
-                <div className="flex w-56 items-center gap-2"><ProgressBar value={j.progress} label="Analysis progress" /><span className="text-xs tabular-nums text-ink-600">{Math.round(j.progress * 100)}%</span></div>
+                <div className="flex w-56 items-center gap-2"><ProgressBar value={j.progress} label={tr('Analysis progress')} /><span className="text-xs tabular-nums text-ink-600">{Math.round(j.progress * 100)}%</span></div>
               )}
               {j.status === 'COMPLETED' && (
                 <span className="text-xs text-ink-600">
-                  {j.stats.framesProcessed} frames · {Object.entries(j.stats.detections ?? {}).map(([t, n]) => `${n} ${taskLabel(t).toLowerCase()}`).join(', ') || 'no detections'} · {j.stats.msPerFrame} ms/frame
+                  {j.stats.framesProcessed}{' '}{tr('frames ·')}{' '}{Object.entries(j.stats.detections ?? {}).map(([t, n]) => `${n} ${taskLabel(t).toLowerCase()}`).join(', ') || 'no detections'} · {j.stats.msPerFrame}{' '}{tr('ms/frame')}
                 </span>
               )}
               {j.status === 'FAILED' && <span className="text-xs text-red-700">{j.error}</span>}
               {canCancel && (j.status === 'RUNNING' || j.status === 'QUEUED') && (
-                <Button size="sm" variant="secondary" icon={<XCircle className="h-4 w-4" aria-hidden />} onClick={() => setConfirm(j)}>Cancel</Button>
+                <Button size="sm" variant="secondary" icon={<XCircle className="h-4 w-4" aria-hidden />} onClick={() => setConfirm(j)}>{tr('Cancel')}</Button>
               )}
             </li>
           ))}
         </ul>
       )}
-      <ConfirmDialog open={!!confirm} title="Cancel analysis?" message="The worker stops at the next checkpoint; detections produced so far are kept (pending review)." confirmLabel="Cancel job" variant="danger"
+      <ConfirmDialog open={!!confirm} title={tr('Cancel analysis?')} message={tr('The worker stops at the next checkpoint; detections produced so far are kept (pending review).')} confirmLabel={tr('Cancel job')} variant="danger"
         loading={cancel.isPending} error={cancel.error} onCancel={() => setConfirm(null)} onConfirm={() => cancel.mutate(confirm!.id, { onSuccess: () => setConfirm(null) })} />
     </Card>
   );
@@ -183,27 +184,27 @@ function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPl
   return (
     <Card title={`Detections${q.data ? ` (${q.data.total})` : ''}`} actions={canPlay && items.length > 0 ? <Button size="sm" variant="secondary" onClick={() => setShowPlayer((v) => !v)}>{showPlayer ? 'Hide player' : 'Show on video'}</Button> : undefined}>
       <div className="mb-3 flex flex-wrap items-end gap-3">
-        <Field label="Task" htmlFor="d-task">
+        <Field label={tr('Task')} htmlFor="d-task">
           <Select id="d-task" value={f.task} onChange={(e) => setF({ ...f, task: e.target.value })}>
-            <option value="">All tasks</option>
+            <option value="">{tr('All tasks')}</option>
             {(['PERSON_DETECTION', 'OBJECT_DETECTION', 'FACE_DETECTION', 'FACE_RECOGNITION', 'ANPR', 'CLASSIFICATION'] as AiTask[]).map((t) => <option key={t} value={t}>{taskLabel(t)}</option>)}
           </Select>
         </Field>
-        <Field label="Review status" htmlFor="d-rs">
+        <Field label={tr('Review status')} htmlFor="d-rs">
           <Select id="d-rs" value={f.reviewStatus} onChange={(e) => setF({ ...f, reviewStatus: e.target.value })}>
-            <option value="">Any</option>
-            <option value="PENDING">Pending</option>
-            <option value="NEEDS_SECOND_REVIEW">Needs 2nd review</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
+            <option value="">{tr('Any')}</option>
+            <option value="PENDING">{tr('Pending')}</option>
+            <option value="NEEDS_SECOND_REVIEW">{tr('Needs 2nd review')}</option>
+            <option value="APPROVED">{tr('Approved')}</option>
+            <option value="REJECTED">{tr('Rejected')}</option>
           </Select>
         </Field>
-        <Field label="Min confidence" htmlFor="d-mc">
+        <Field label={tr('Min confidence')} htmlFor="d-mc">
           <Input id="d-mc" type="number" step="0.05" min={0} max={1} value={f.minConfidence} onChange={(e) => setF({ ...f, minConfidence: e.target.value })} className="w-24" />
         </Field>
       </div>
       {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !items.length ? (
-        <EmptyState title="No detections" description="Completed analyses with matching results appear here." />
+        <EmptyState title={tr('No detections')} description={tr('Completed analyses with matching results appear here.')} />
       ) : (
         <div className="space-y-4">
           {showPlayer && (
@@ -237,7 +238,7 @@ function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPl
                           <ReviewBadge status={d.reviewStatus} />
                         </div>
                         <ConfidenceBar value={d.confidence} threshold={d.threshold} />
-                        <div className="text-xs text-ink-500">at <span className="mono">{formatTimecode(d.frameTimeMs)}</span> · {d.model.code}@{d.model.version}</div>
+                        <div className="text-xs text-ink-500">{tr('at')}{' '}<span className="mono">{formatTimecode(d.frameTimeMs)}</span> · {d.model.code}@{d.model.version}</div>
                         <Attributes a={d.attributes} />
                       </div>
                     </button>
@@ -246,7 +247,7 @@ function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPl
               </ul>
             </section>
           ))}
-          <p className="text-xs text-ink-500">Review these results in the <Link className="text-brand-700 hover:underline" to={`/review?evidenceId=${evidence.id}`}>review queue</Link>.</p>
+          <p className="text-xs text-ink-500">{tr('Review these results in the')}{' '}<Link className="text-brand-700 hover:underline" to={`/review?evidenceId=${evidence.id}`}>{tr('review queue')}</Link>.</p>
         </div>
       )}
     </Card>
@@ -256,7 +257,7 @@ function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPl
 function Timeline({ items, durationMs, onPick }: { items: AiDetectionDto[]; durationMs: number; onPick: (d: AiDetectionDto) => void }) {
   const tasks = [...new Set(items.map((d) => d.task))];
   return (
-    <div className="space-y-1" role="group" aria-label="Detections timeline">
+    <div className="space-y-1" role="group" aria-label={tr('Detections timeline')}>
       {tasks.map((t) => (
         <div key={t} className="flex items-center gap-2">
           <span className="w-40 shrink-0 truncate text-xs text-ink-600">{taskLabel(t)}</span>

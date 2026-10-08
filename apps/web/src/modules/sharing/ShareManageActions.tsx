@@ -6,6 +6,7 @@ import { formatDateTime } from '@/lib/format';
 import { Alert, Button, Checkbox, ConfirmDialog, CopyButton, Field, Input, Modal, Textarea, useToast } from '@/components/ui';
 import type { CreatedShare, ShareDetail } from './types';
 
+import { t } from '@/lib/i18n';
 export interface ShareOptions { emailConfigured: boolean; maxShareDays: number }
 export const useShareOptions = () => useQuery({ queryKey: ['shares', 'options'], queryFn: () => api.get<ShareOptions>('/shares/options'), staleTime: 60_000 });
 
@@ -33,41 +34,41 @@ export function ShareManageActions({ share }: { share: ShareDetail }) {
   const close = () => { setDialog(null); reissue.reset(); setReason(''); };
   return (
     <>
-      {share.canUnlock && <Button variant="secondary" onClick={() => { unlock.reset(); setDialog('unlock'); }}>Unlock</Button>}
-      {share.canExtend && <Button variant="secondary" onClick={() => { extend.reset(); setDialog('extend'); }}>Extend</Button>}
+      {share.canUnlock && <Button variant="secondary" onClick={() => { unlock.reset(); setDialog('unlock'); }}>{t('Unlock')}</Button>}
+      {share.canExtend && <Button variant="secondary" onClick={() => { extend.reset(); setDialog('extend'); }}>{t('Extend')}</Button>}
       {share.canReissue && <Button variant="secondary" onClick={() => { reissue.reset(); setDialog('reissue'); }}>{opts.data?.emailConfigured ? 'Re-send link by e-mail' : 'Re-issue link'}</Button>}
-      <ConfirmDialog open={dialog === 'unlock'} title="Unlock share" requireReason reasonLabel="Why is it safe to unlock?" confirmLabel="Unlock"
+      <ConfirmDialog open={dialog === 'unlock'} title={t('Unlock share')} requireReason reasonLabel={t('Why is it safe to unlock?')} confirmLabel={t('Unlock')}
         message={`The share was locked after ${share.failedCodeAttempts} wrong access codes. Unlock only after confirming with the recipient that the attempts were theirs.`}
         loading={unlock.isPending} error={unlock.error} onConfirm={(r) => unlock.mutate(r)} onCancel={() => setDialog(null)} />
-      <Modal open={dialog === 'extend'} onClose={() => setDialog(null)} title="Extend share"
-        footer={<><Button variant="secondary" onClick={() => setDialog(null)}>Cancel</Button><Button disabled={reason.trim().length < 5} loading={extend.isPending} onClick={() => extend.mutate()}>Extend</Button></>}>
+      <Modal open={dialog === 'extend'} onClose={() => setDialog(null)} title={t('Extend share')}
+        footer={<><Button variant="secondary" onClick={() => setDialog(null)}>{t('Cancel')}</Button><Button disabled={reason.trim().length < 5} loading={extend.isPending} onClick={() => extend.mutate()}>{t('Extend')}</Button></>}>
         <div className="space-y-3 text-sm">
-          <p>Currently expires {formatDateTime(share.expiresAt)}. At most {opts.data?.maxShareDays ?? 30} days from now.</p>
-          <Field label="New expiry" htmlFor="sx-until" required><Input id="sx-until" type="datetime-local" value={until} max={localInput(max)} onChange={(e) => setUntil(e.target.value)} /></Field>
-          <Field label="Reason" htmlFor="sx-reason" required hint="At least 5 characters; recorded in the chain of custody."><Textarea id="sx-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+          <p>{t('Currently expires')}{' '}{formatDateTime(share.expiresAt)}{t('. At most')}{' '}{opts.data?.maxShareDays ?? 30}{' '}{t('days from now.')}</p>
+          <Field label={t('New expiry')} htmlFor="sx-until" required><Input id="sx-until" type="datetime-local" value={until} max={localInput(max)} onChange={(e) => setUntil(e.target.value)} /></Field>
+          <Field label={t('Reason')} htmlFor="sx-reason" required hint={t('At least 5 characters; recorded in the chain of custody.')}><Textarea id="sx-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
           {extend.error ? <Alert tone="red">{errorMessage(extend.error)}</Alert> : null}
         </div>
       </Modal>
-      <Modal open={dialog === 'reissue'} onClose={close} title="Re-issue share link"
-        footer={reissue.data ? <Button onClick={close}>Done</Button> : <><Button variant="secondary" onClick={close}>Cancel</Button><Button disabled={reason.trim().length < 5} loading={reissue.isPending} onClick={() => reissue.mutate()}>Re-issue</Button></>}>
+      <Modal open={dialog === 'reissue'} onClose={close} title={t('Re-issue share link')}
+        footer={reissue.data ? <Button onClick={close}>{t('Done')}</Button> : <><Button variant="secondary" onClick={close}>{t('Cancel')}</Button><Button disabled={reason.trim().length < 5} loading={reissue.isPending} onClick={() => reissue.mutate()}>{t('Re-issue')}</Button></>}>
         {reissue.data ? (
           <div className="space-y-3 text-sm">
             {deliveryText(reissue.data.delivery) && <Alert tone={reissue.data.delivery?.link === 'FAILED' || reissue.data.delivery?.accessCode === 'FAILED' ? 'red' : 'green'}>{deliveryText(reissue.data.delivery)}</Alert>}
-            <Alert tone="amber" title="Shown only once">The previous link no longer works.{reissue.data.accessCode ? ' The previous access code no longer works either.' : ' The access code is unchanged.'}</Alert>
-            <Field label="New link" htmlFor="sr-link"><div className="flex gap-2"><Input id="sr-link" readOnly value={reissue.data.link} className="mono text-xs" /><CopyButton value={reissue.data.link!} /></div></Field>
-            {reissue.data.accessCode && <Field label="New access code" htmlFor="sr-code"><div className="flex gap-2"><Input id="sr-code" readOnly value={reissue.data.accessCode} className="mono text-lg tracking-widest" /><CopyButton value={reissue.data.accessCode} /></div></Field>}
+            <Alert tone="amber" title={t('Shown only once')}>{t('The previous link no longer works.')}{' '}{reissue.data.accessCode ? ' The previous access code no longer works either.' : ' The access code is unchanged.'}</Alert>
+            <Field label={t('New link')} htmlFor="sr-link"><div className="flex gap-2"><Input id="sr-link" readOnly value={reissue.data.link} className="mono text-xs" /><CopyButton value={reissue.data.link!} /></div></Field>
+            {reissue.data.accessCode && <Field label={t('New access code')} htmlFor="sr-code"><div className="flex gap-2"><Input id="sr-code" readOnly value={reissue.data.accessCode} className="mono text-lg tracking-widest" /><CopyButton value={reissue.data.accessCode} /></div></Field>}
           </div>
         ) : (
           <div className="space-y-3 text-sm">
-            <p>A new link replaces the current one (the old link stops working). Use this when the recipient lost the link or it went to the wrong place.</p>
-            <Checkbox label="Also issue a new access code" description="The current code is stored only as a hash and cannot be shown again." checked={re.rotateAccessCode} onChange={(v) => setRe({ ...re, rotateAccessCode: v, emailAccessCode: v && re.emailAccessCode })} />
+            <p>{t('A new link replaces the current one (the old link stops working). Use this when the recipient lost the link or it went to the wrong place.')}</p>
+            <Checkbox label={t('Also issue a new access code')} description={t('The current code is stored only as a hash and cannot be shown again.')} checked={re.rotateAccessCode} onChange={(v) => setRe({ ...re, rotateAccessCode: v, emailAccessCode: v && re.emailAccessCode })} />
             {opts.data?.emailConfigured
               ? <Checkbox label={`E-mail the new link to ${share.recipient.email}`} checked={re.emailLink} onChange={(v) => setRe({ ...re, emailLink: v, emailAccessCode: v && re.emailAccessCode })} />
-              : <Alert tone="blue">E-mail delivery is not configured; give the recipient the new link yourself.</Alert>}
+              : <Alert tone="blue">{t('E-mail delivery is not configured; give the recipient the new link yourself.')}</Alert>}
             {opts.data?.emailConfigured && re.emailLink && re.rotateAccessCode && (
-              <Checkbox label="Also e-mail the new access code (separate message)" description="Not recommended: anyone with access to that mailbox could then open the share. Prefer phone/SMS for the code." checked={re.emailAccessCode} onChange={(v) => setRe({ ...re, emailAccessCode: v })} />
+              <Checkbox label={t('Also e-mail the new access code (separate message)')} description={t('Not recommended: anyone with access to that mailbox could then open the share. Prefer phone/SMS for the code.')} checked={re.emailAccessCode} onChange={(v) => setRe({ ...re, emailAccessCode: v })} />
             )}
-            <Field label="Reason" htmlFor="sr-reason" required hint="At least 5 characters; recorded in the chain of custody."><Textarea id="sr-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+            <Field label={t('Reason')} htmlFor="sr-reason" required hint={t('At least 5 characters; recorded in the chain of custody.')}><Textarea id="sr-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
             {reissue.error ? <Alert tone="red">{errorMessage(reissue.error)}</Alert> : null}
           </div>
         )}

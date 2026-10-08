@@ -8,6 +8,7 @@ import { formatBytes, shortHash } from '@/lib/format';
 import { Button, ConfirmDialog, useToast } from '@/components/ui';
 import { playbackKey } from './api';
 
+import { t } from '@/lib/i18n';
 /**
  * The evidence detail object (evidence module's EvidenceDetail) carries per-item flags computed by the API
  * (`permissions.canDownloadOriginal`, which also covers share-granted downloads). Missing flag = hidden.
@@ -37,18 +38,18 @@ function DownloadOriginal({ evidence }: { evidence: EvidenceSummary }) {
   return (
     <>
       <Button variant="secondary" size="sm" icon={<Download className="h-4 w-4" />} onClick={() => setOpen(true)}>
-        Download original
+        {t('Download original')}
       </Button>
       <ConfirmDialog
         open={open}
-        title="Download original evidence file"
+        title={t('Download original evidence file')}
         message={
           <div className="space-y-2">
-            <p>The unmodified original file will be downloaded. This download is recorded in the chain of custody under your name.</p>
-            {evidence.sha256 && <p className="mono break-all text-xs">SHA-256: {evidence.sha256}</p>}
+            <p>{t('The unmodified original file will be downloaded. This download is recorded in the chain of custody under your name.')}</p>
+            {evidence.sha256 && <p className="mono break-all text-xs">{t('SHA-256:')}{' '}{evidence.sha256}</p>}
           </div>
         }
-        confirmLabel="Download"
+        confirmLabel={t('Download')}
         loading={mut.isPending}
         error={mut.error}
         onConfirm={() => mut.mutate()}
@@ -77,13 +78,13 @@ function Reprocess({ evidence }: { evidence: EvidenceSummary }) {
   return (
     <>
       <Button variant="secondary" size="sm" icon={<RefreshCw className="h-4 w-4" />} onClick={() => setOpen(true)}>
-        Reprocess media
+        {t('Reprocess media')}
       </Button>
       <ConfirmDialog
         open={open}
-        title="Reprocess media"
-        message="All playback derivatives (proxy, adaptive stream, poster, thumbnails, sprite sheets) will be regenerated from the original. The original file and existing snapshots are not changed. Playback is unavailable until processing completes."
-        confirmLabel="Reprocess"
+        title={t('Reprocess media')}
+        message={t('All playback derivatives (proxy, adaptive stream, poster, thumbnails, sprite sheets) will be regenerated from the original. The original file and existing snapshots are not changed. Playback is unavailable until processing completes.')}
+        confirmLabel={t('Reprocess')}
         requireReason
         minReason={5}
         loading={mut.isPending}

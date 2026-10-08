@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { formatDateTime, shortHash } from '@/lib/format';
 import { Alert, Badge, Button, Card, DataTable, EmptyState, Field, Input, KeyValue, PageHeader, useToast, type Column } from '@/components/ui';
 
+import { t } from '@/lib/i18n';
 interface Checkpoint {
   id: number;
   headSeq: number;
@@ -61,18 +62,18 @@ export function LedgerPage() {
     onError: (_e, id) => setCpResults((s) => ({ ...s, [id]: 'error' })),
   });
   const cols: Column<Checkpoint>[] = [
-    { key: 'id', header: 'ID', render: (r) => <span className="mono">{r.id}</span> },
-    { key: 'at', header: 'Signed', render: (r) => formatDateTime(r.createdAt) },
-    { key: 'seq', header: 'Head seq', render: (r) => <span className="mono">{r.headSeq}</span> },
-    { key: 'hash', header: 'Head hash', render: (r) => <code className="mono text-xs" title={r.headHash}>{shortHash(r.headHash, 16)}</code> },
-    { key: 'key', header: 'Key', render: (r) => <span className="text-xs">{r.keyId} · {r.algorithm}</span> },
+    { key: 'id', header: t('ID'), render: (r) => <span className="mono">{r.id}</span> },
+    { key: 'at', header: t('Signed'), render: (r) => formatDateTime(r.createdAt) },
+    { key: 'seq', header: t('Head seq'), render: (r) => <span className="mono">{r.headSeq}</span> },
+    { key: 'hash', header: t('Head hash'), render: (r) => <code className="mono text-xs" title={r.headHash}>{shortHash(r.headHash, 16)}</code> },
+    { key: 'key', header: t('Key'), render: (r) => <span className="text-xs">{r.keyId} · {r.algorithm}</span> },
     {
-      key: 'v', header: 'Verification', render: (r) => {
+      key: 'v', header: t('Verification'), render: (r) => {
         const res = cpResults[r.id];
         if (!can('audit:verify')) return '—';
-        if (res === 'error') return <Badge tone="red">Error</Badge>;
-        if (res) return res.ok ? <Badge tone="green">Valid</Badge> : <Badge tone="red">{!res.signatureValid ? 'Bad signature' : !res.headMatches ? 'Head mismatch' : `Chain broken at ${res.chain.firstBadSeq}`}</Badge>;
-        return <Button size="sm" variant="secondary" loading={verifyCp.isPending && verifyCp.variables === r.id} onClick={() => verifyCp.mutate(r.id)}>Verify</Button>;
+        if (res === 'error') return <Badge tone="red">{t('Error')}</Badge>;
+        if (res) return res.ok ? <Badge tone="green">{t('Valid')}</Badge> : <Badge tone="red">{!res.signatureValid ? 'Bad signature' : !res.headMatches ? 'Head mismatch' : `Chain broken at ${res.chain.firstBadSeq}`}</Badge>;
+        return <Button size="sm" variant="secondary" loading={verifyCp.isPending && verifyCp.variables === r.id} onClick={() => verifyCp.mutate(r.id)}>{t('Verify')}</Button>;
       },
     },
   ];
@@ -80,64 +81,63 @@ export function LedgerPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Ledger verification"
-        subtitle="Recompute the SHA-256 hash chain of the audit ledger and check it against the signed checkpoints."
+        title={t('Ledger verification')}
+        subtitle={t('Recompute the SHA-256 hash chain of the audit ledger and check it against the signed checkpoints.')}
         actions={
           <div className="flex gap-2">
             {can('audit:export') && (
               <a className="inline-flex items-center gap-1.5 rounded-md border border-ink-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-800 shadow-sm hover:bg-ink-50" href="/api/v1/audit/checkpoints/export" download>
-                <Download className="h-4 w-4" aria-hidden /> Export checkpoints
+                <Download className="h-4 w-4" aria-hidden />{t('Export checkpoints')}
               </a>
             )}
-            {can('audit:verify') && <Button variant="secondary" loading={create.isPending} onClick={() => create.mutate()}>Sign checkpoint now</Button>}
+            {can('audit:verify') && <Button variant="secondary" loading={create.isPending} onClick={() => create.mutate()}>{t('Sign checkpoint now')}</Button>}
           </div>
         }
       />
       {can('audit:verify') ? (
-        <Card title="Verify the chain">
+        <Card title={t('Verify the chain')}>
           <form className="flex flex-wrap items-end gap-3" onSubmit={(e) => { e.preventDefault(); verify.mutate(); }}>
-            <Field label="From seq (optional)" htmlFor="lv-from"><Input id="lv-from" inputMode="numeric" value={from} onChange={(e) => setFrom(e.target.value.replace(/\D/g, ''))} /></Field>
-            <Field label="To seq (optional)" htmlFor="lv-to"><Input id="lv-to" inputMode="numeric" value={to} onChange={(e) => setTo(e.target.value.replace(/\D/g, ''))} /></Field>
-            <Button type="submit" icon={<ShieldCheck className="h-4 w-4" />} loading={verify.isPending}>Verify ledger</Button>
+            <Field label={t('From seq (optional)')} htmlFor="lv-from"><Input id="lv-from" inputMode="numeric" value={from} onChange={(e) => setFrom(e.target.value.replace(/\D/g, ''))} /></Field>
+            <Field label={t('To seq (optional)')} htmlFor="lv-to"><Input id="lv-to" inputMode="numeric" value={to} onChange={(e) => setTo(e.target.value.replace(/\D/g, ''))} /></Field>
+            <Button type="submit" icon={<ShieldCheck className="h-4 w-4" />} loading={verify.isPending}>{t('Verify ledger')}</Button>
           </form>
           {verify.error ? <div className="mt-3"><Alert tone="red">{errorMessage(verify.error)}</Alert></div> : null}
           {v && (
             <div className="mt-4 space-y-3">
               {v.ok ? (
-                <Alert tone="green" title="Ledger intact">{v.checked} events recomputed; {v.checkpoints.length} checkpoint(s) in range match and their signatures are valid.</Alert>
+                <Alert tone="green" title={t('Ledger intact')}>{v.checked}{' '}{t('events recomputed;')}{' '}{v.checkpoints.length}{' '}{t('checkpoint(s) in range match and their signatures are valid.')}</Alert>
               ) : (
-                <Alert tone="red" title="Verification FAILED">
+                <Alert tone="red" title={t('Verification FAILED')}>
                   {!v.chainOk ? `The hash chain breaks at seq ${v.firstBadSeq}. A critical AUDIT_CHAIN_BROKEN alert was raised.` : 'One or more checkpoints do not match the ledger or carry an invalid signature.'}
                 </Alert>
               )}
               <KeyValue items={[
-                { label: 'Events checked', value: v.checked },
-                { label: 'Head seq', value: v.headSeq ?? '—' },
-                { label: 'Head hash', value: v.headHash ?? '—', mono: true },
-                { label: 'Verified', value: `${formatDateTime(v.verifiedAt)} (${v.durationMs} ms)` },
+                { label: t('Events checked'), value: v.checked },
+                { label: t('Head seq'), value: v.headSeq ?? '—' },
+                { label: t('Head hash'), value: v.headHash ?? '—', mono: true },
+                { label: t('Verified'), value: `${formatDateTime(v.verifiedAt)} (${v.durationMs} ms)` },
               ]} />
             </div>
           )}
         </Card>
       ) : (
-        <Alert tone="blue">You can view checkpoints; verifying the ledger requires the audit:verify permission.</Alert>
+        <Alert tone="blue">{t('You can view checkpoints; verifying the ledger requires the audit:verify permission.')}</Alert>
       )}
-      <Card title="Signed checkpoints" bodyClassName="p-0">
+      <Card title={t('Signed checkpoints')} bodyClassName="p-0">
         <DataTable
-          caption="Audit checkpoints"
+          caption={t('Audit checkpoints')}
           columns={cols}
           rows={cps.data?.items}
           rowKey={(r) => String(r.id)}
           loading={cps.isFetching}
           error={cps.error}
           onRetry={() => void cps.refetch()}
-          empty={<EmptyState title="No checkpoints yet" description="The worker signs the ledger head every hour." />}
+          empty={<EmptyState title={t('No checkpoints yet')} description={t('The worker signs the ledger head every hour.')} />}
         />
       </Card>
-      <Card title="External notarisation">
+      <Card title={t('External notarisation')}>
         <p className="text-sm text-ink-700">
-          Export the checkpoints regularly to a location the database administrators cannot modify (WORM bucket in another account, notary service, or signed e-mail to the compliance officer).
-          Anyone holding an exported checkpoint can later prove that ledger history up to that point has not been rewritten, by comparing its head hash and signature with the live ledger. See docs/AUDIT.md.
+          {t('Export the checkpoints regularly to a location the database administrators cannot modify (WORM bucket in another account, notary service, or signed e-mail to the compliance officer). Anyone holding an exported checkpoint can later prove that ledger history up to that point has not been rewritten, by comparing its head hash and signature with the live ledger. See docs/AUDIT.md.')}
         </p>
       </Card>
     </div>

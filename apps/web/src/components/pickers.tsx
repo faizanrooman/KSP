@@ -5,6 +5,7 @@ import type { Permission } from '@ksp/shared';
 import { api } from '@/lib/api';
 import { Input, Select } from '@/components/ui';
 
+import { t as tr } from '@/lib/i18n';
 export interface OrgUnitOption {
   id: string;
   code: string;
@@ -106,7 +107,7 @@ export function UserPicker({ value, onChange, id, placeholder = 'Search by name,
             onChange(null);
           }}
         >
-          Change
+          {tr('Change')}
         </button>
       </div>
     );
@@ -154,9 +155,9 @@ export function UserPicker({ value, onChange, id, placeholder = 'Search by name,
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
       {open && (
-        <ul id={listId} role="listbox" aria-label="Matching users" className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-ink-200 bg-white py-1 text-sm shadow-lg">
-          {isFetching && !data && <li role="presentation" className="px-3 py-2 text-ink-500">Searching…</li>}
-          {data?.items.length === 0 && <li role="presentation" className="px-3 py-2 text-ink-500">No users found</li>}
+        <ul id={listId} role="listbox" aria-label={tr('Matching users')} className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-ink-200 bg-white py-1 text-sm shadow-lg">
+          {isFetching && !data && <li role="presentation" className="px-3 py-2 text-ink-500">{tr('Searching…')}</li>}
+          {data?.items.length === 0 && <li role="presentation" className="px-3 py-2 text-ink-500">{tr('No users found')}</li>}
           {items.map((u, i) => (
             <li
               key={u.id}

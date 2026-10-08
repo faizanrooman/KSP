@@ -19,6 +19,7 @@ import { AnnotationStudio } from './AnnotationStudio';
 import { EvidencePicker } from './EvidencePicker';
 import { TimelineView } from './TimelineView';
 
+import { t as tr } from '@/lib/i18n';
 type TabId = 'evidence' | 'compare' | 'review' | 'timeline' | 'related' | 'members';
 const URL_DEFAULTS = { tab: 'evidence', item: '', t: '' };
 
@@ -34,16 +35,16 @@ function EvidenceGrid({ ws, items, restrictedCount, editable, onReview }: { ws: 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-ink-600">{items.length} item(s){restrictedCount ? ` · ${restrictedCount} restricted` : ''}</p>
-        {editable && <Button icon={<Plus className="h-4 w-4" />} onClick={() => setPicker(true)}>Add evidence</Button>}
+        <p className="text-sm text-ink-600">{items.length}{' '}{tr('item(s)')}{' '}{restrictedCount ? ` · ${restrictedCount} restricted` : ''}</p>
+        {editable && <Button icon={<Plus className="h-4 w-4" />} onClick={() => setPicker(true)}>{tr('Add evidence')}</Button>}
       </div>
       {restrictedCount > 0 && (
-        <Alert tone="blue" title="Restricted items">
-          {restrictedCount} item(s) in this workspace were added by colleagues but are outside your access. They are listed without any details; being a workspace member does not grant access to evidence.
+        <Alert tone="blue" title={tr('Restricted items')}>
+          {restrictedCount}{' '}{tr('item(s) in this workspace were added by colleagues but are outside your access. They are listed without any details; being a workspace member does not grant access to evidence.')}
         </Alert>
       )}
       {!items.length ? (
-        <EmptyState icon={<Film className="h-6 w-6" />} title="No evidence yet" description={editable ? 'Add evidence you are authorised to see.' : 'The workspace editors have not added evidence you can see.'} />
+        <EmptyState icon={<Film className="h-6 w-6" />} title={tr('No evidence yet')} description={editable ? 'Add evidence you are authorised to see.' : 'The workspace editors have not added evidence you can see.'} />
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {items.map((it) => (
@@ -57,23 +58,23 @@ function EvidenceGrid({ ws, items, restrictedCount, editable, onReview }: { ws: 
                 <Link to={`/evidence/${it.evidenceId}`} className="mono text-xs font-semibold text-brand-800 hover:underline">{it.evidence.evidenceNumber ?? it.evidenceId}</Link>
                 <p className="text-sm font-medium">{it.evidence.title ?? 'Untitled'}</p>
                 <p className="text-xs text-ink-500">{it.evidence.orgUnit.name} · {formatDateTime(it.evidence.recordedAt)} · {formatDuration(it.evidence.durationMs)}</p>
-                <p className="text-xs text-ink-500">Sync offset {it.syncOffsetMs >= 0 ? '+' : '−'}{formatTimecode(Math.abs(it.syncOffsetMs))} · added by {it.addedBy.fullName}</p>
+                <p className="text-xs text-ink-500">{tr('Sync offset')}{' '}{it.syncOffsetMs >= 0 ? '+' : '−'}{formatTimecode(Math.abs(it.syncOffsetMs))}{' '}{tr('· added by')}{' '}{it.addedBy.fullName}</p>
                 {notes?.id === it.id ? (
                   <div className="space-y-1">
-                    <label htmlFor={`notes-${it.id}`} className="sr-only">Notes</label>
+                    <label htmlFor={`notes-${it.id}`} className="sr-only">{tr('Notes')}</label>
                     <Textarea id={`notes-${it.id}`} rows={2} value={notes.value} maxLength={2000} onChange={(e) => setNotes({ id: it.id, value: e.target.value })} />
                     <div className="flex justify-end gap-1">
-                      <Button size="sm" variant="secondary" onClick={() => setNotes(null)}>Cancel</Button>
-                      <Button size="sm" loading={patch.isPending} onClick={() => patch.mutate({ id: it.id, notes: notes.value.trim() }, { onSuccess: () => setNotes(null) })}>Save</Button>
+                      <Button size="sm" variant="secondary" onClick={() => setNotes(null)}>{tr('Cancel')}</Button>
+                      <Button size="sm" loading={patch.isPending} onClick={() => patch.mutate({ id: it.id, notes: notes.value.trim() }, { onSuccess: () => setNotes(null) })}>{tr('Save')}</Button>
                     </div>
                   </div>
                 ) : (
                   it.notes && <p className="whitespace-pre-wrap text-sm text-ink-700">{it.notes}</p>
                 )}
                 <div className="mt-auto flex flex-wrap gap-1 pt-2">
-                  <Button size="sm" variant="secondary" onClick={() => onReview(it.id)}>Review</Button>
-                  {editable && <Button size="sm" variant="ghost" icon={<Pencil className="h-4 w-4" />} onClick={() => setNotes({ id: it.id, value: it.notes ?? '' })}>Notes</Button>}
-                  {editable && <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} onClick={() => setRemove(it)}>Remove</Button>}
+                  <Button size="sm" variant="secondary" onClick={() => onReview(it.id)}>{tr('Review')}</Button>
+                  {editable && <Button size="sm" variant="ghost" icon={<Pencil className="h-4 w-4" />} onClick={() => setNotes({ id: it.id, value: it.notes ?? '' })}>{tr('Notes')}</Button>}
+                  {editable && <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} onClick={() => setRemove(it)}>{tr('Remove')}</Button>}
                 </div>
               </div>
             </li>
@@ -89,9 +90,9 @@ function EvidenceGrid({ ws, items, restrictedCount, editable, onReview }: { ws: 
       />
       <ConfirmDialog
         open={!!remove}
-        title="Remove from workspace"
+        title={tr('Remove from workspace')}
         message={`Remove ${remove?.evidence.evidenceNumber ?? 'this item'} from the workspace? The evidence itself is not changed; the removal is recorded in its chain of custody.`}
-        confirmLabel="Remove"
+        confirmLabel={tr('Remove')}
         variant="danger"
         loading={del.isPending}
         error={del.error}
@@ -140,10 +141,10 @@ function CompareView({ ws, items, editable, preset }: { ws: WorkspaceDetail; ite
     setLocal(map);
     if (editable) save.mutate(withTime.map((c) => ({ itemId: c.id, syncOffsetMs: map[c.id]! })), { onSuccess: () => toast.success('Aligned by recording time') });
   };
-  if (items.length < 1) return <EmptyState title="Nothing to compare" description="Add at least two videos to compare angles." />;
+  if (items.length < 1) return <EmptyState title={tr('Nothing to compare')} description={tr('Add at least two videos to compare angles.')} />;
   return (
     <div className="space-y-3">
-      <Card title="Videos (up to 4)">
+      <Card title={tr('Videos (up to 4)')}>
         <div className="flex flex-wrap gap-x-5 gap-y-1">
           {items.map((i) => (
             <Checkbox
@@ -156,13 +157,13 @@ function CompareView({ ws, items, editable, preset }: { ws: WorkspaceDetail; ite
           ))}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={alignByClock} disabled={!chosen.length}>Align by recording time</Button>
+          <Button size="sm" variant="secondary" onClick={alignByClock} disabled={!chosen.length}>{tr('Align by recording time')}</Button>
           <span className="text-xs text-ink-500">
             {editable ? (save.isPending ? 'Saving offsets…' : 'Offset changes are saved to the workspace.') : 'Read-only: offset changes are not saved.'}
           </span>
         </div>
       </Card>
-      {chosen.length ? <SyncPlayer key={sel.join('|')} items={syncItems} onOffsetsChange={onOffsets} /> : <EmptyState title="Select videos to compare" />}
+      {chosen.length ? <SyncPlayer key={sel.join('|')} items={syncItems} onOffsetsChange={onOffsets} /> : <EmptyState title={tr('Select videos to compare')} />}
     </div>
   );
 }
@@ -176,17 +177,17 @@ function RelatedPanel({ items, editable }: { items: VisibleItem[]; editable: boo
   const create = useWsMutation((b: { evidenceA: string; evidenceB: string; relation: RelationType; note?: string }) => api.post('/workspaces/relations', b));
   const del = useWsMutation((id: string) => api.delete(`/workspaces/relations/${id}`));
   const { can } = useAuth();
-  if (!current) return <EmptyState title="No evidence" />;
+  if (!current) return <EmptyState title={tr('No evidence')} />;
   return (
     <div className="space-y-3">
-      <Field label="Evidence" htmlFor="rel-item">
+      <Field label={tr('Evidence')} htmlFor="rel-item">
         <Select id="rel-item" value={current.id} onChange={(e) => setItemId(e.target.value)}>
           {items.map((i) => <option key={i.id} value={i.id}>{i.evidence.evidenceNumber ?? i.evidenceId} — {i.evidence.title ?? 'Untitled'}</option>)}
         </Select>
       </Field>
-      <Card title="Explicit relations">
+      <Card title={tr('Explicit relations')}>
         {relations.isLoading ? <Spinner /> : relations.error ? <ErrorState error={relations.error} onRetry={() => void relations.refetch()} /> : !relations.data?.items.length ? (
-          <p className="text-sm text-ink-500">No relations recorded.</p>
+          <p className="text-sm text-ink-500">{tr('No relations recorded.')}</p>
         ) : (
           <ul className="divide-y divide-ink-100">
             {relations.data.items.map((r) => {
@@ -196,7 +197,7 @@ function RelatedPanel({ items, editable }: { items: VisibleItem[]; editable: boo
                   <Badge tone="blue">{titleCase(r.relation)}</Badge>
                   <Link to={`/evidence/${other.id}`} className="mono text-xs text-brand-800 hover:underline">{other.evidenceNumber ?? other.id}</Link>
                   <span className="flex-1 truncate text-ink-600">{r.note}</span>
-                  {editable && <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label="Remove relation" onClick={() => del.mutate(r.id)} />}
+                  {editable && <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={tr('Remove relation')} onClick={() => del.mutate(r.id)} />}
                 </li>
               );
             })}
@@ -204,34 +205,34 @@ function RelatedPanel({ items, editable }: { items: VisibleItem[]; editable: boo
         )}
         {editable && items.length > 1 && (
           <div className="mt-3 grid gap-2 md:grid-cols-[1fr_12rem_1fr_auto] md:items-end">
-            <Field label="Related to" htmlFor="rel-other">
+            <Field label={tr('Related to')} htmlFor="rel-other">
               <Select id="rel-other" value={form.other} onChange={(e) => setForm({ ...form, other: e.target.value })}>
-                <option value="">Choose…</option>
+                <option value="">{tr('Choose…')}</option>
                 {items.filter((i) => i.id !== current.id).map((i) => <option key={i.id} value={i.evidenceId}>{i.evidence.evidenceNumber ?? i.evidenceId}</option>)}
               </Select>
             </Field>
-            <Field label="Relation" htmlFor="rel-type">
+            <Field label={tr('Relation')} htmlFor="rel-type">
               <Select id="rel-type" value={form.relation} onChange={(e) => setForm({ ...form, relation: e.target.value as RelationType })}>
                 {RELATIONS.map((r) => <option key={r} value={r}>{titleCase(r)}</option>)}
               </Select>
             </Field>
-            <Field label="Note" htmlFor="rel-note"><Input id="rel-note" value={form.note} maxLength={1000} onChange={(e) => setForm({ ...form, note: e.target.value })} /></Field>
+            <Field label={tr('Note')} htmlFor="rel-note"><Input id="rel-note" value={form.note} maxLength={1000} onChange={(e) => setForm({ ...form, note: e.target.value })} /></Field>
             <Button
               icon={<Link2 className="h-4 w-4" />}
               disabled={!form.other}
               loading={create.isPending}
               onClick={() => create.mutate({ evidenceA: current.evidenceId, evidenceB: form.other, relation: form.relation, note: form.note.trim() || undefined }, { onSuccess: () => setForm({ ...form, other: '', note: '' }) })}
             >
-              Relate
+              {tr('Relate')}
             </Button>
           </div>
         )}
         {(create.error || del.error) && <div className="mt-2"><Alert tone="red">{errorMessage(create.error ?? del.error)}</Alert></div>}
       </Card>
       {can('search:use') && (
-        <Card title="Suggested related evidence">
+        <Card title={tr('Suggested related evidence')}>
           {related.isLoading ? <Spinner /> : related.error ? <ErrorState error={related.error} onRetry={() => void related.refetch()} /> : !related.data?.items.length ? (
-            <p className="text-sm text-ink-500">No suggestions among the evidence you can see.</p>
+            <p className="text-sm text-ink-500">{tr('No suggestions among the evidence you can see.')}</p>
           ) : (
             <ul className="divide-y divide-ink-100">
               {related.data.items.map((r) => (
@@ -262,7 +263,7 @@ function MembersPanel({ ws }: { ws: WorkspaceDetail }) {
   const err = add.error ?? change.error ?? remove.error;
   return (
     <div className="space-y-3">
-      <Alert tone="blue">Members see only the evidence their own roles and jurisdiction allow. Adding someone here never grants access to evidence.</Alert>
+      <Alert tone="blue">{tr('Members see only the evidence their own roles and jurisdiction allow. Adding someone here never grants access to evidence.')}</Alert>
       <Card title={`Members (${ws.members.length})`}>
         <ul className="divide-y divide-ink-100">
           {ws.members.map((m) => (
@@ -270,8 +271,8 @@ function MembersPanel({ ws }: { ws: WorkspaceDetail }) {
               <span className="flex-1">{m.fullName} <span className="text-ink-500">{m.badgeNumber ?? `@${m.username}`}</span></span>
               {owner && m.role !== 'OWNER' ? (
                 <Select aria-label={`Role of ${m.fullName}`} value={m.role} onChange={(e) => change.mutate({ userId: m.userId, role: e.target.value })}>
-                  <option value="EDITOR">Editor</option>
-                  <option value="VIEWER">Viewer</option>
+                  <option value="EDITOR">{tr('Editor')}</option>
+                  <option value="VIEWER">{tr('Viewer')}</option>
                 </Select>
               ) : (
                 <Badge tone={m.role === 'OWNER' ? 'blue' : 'gray'}>{titleCase(m.role)}</Badge>
@@ -282,28 +283,28 @@ function MembersPanel({ ws }: { ws: WorkspaceDetail }) {
         </ul>
         {owner && (
           <div className="mt-3 grid gap-2 md:grid-cols-[1fr_10rem_auto] md:items-end">
-            <Field label="Add member" htmlFor="ws-member"><UserPicker id="ws-member" value={pick} onChange={setPick} /></Field>
-            <Field label="Role" htmlFor="ws-role">
+            <Field label={tr('Add member')} htmlFor="ws-member"><UserPicker id="ws-member" value={pick} onChange={setPick} /></Field>
+            <Field label={tr('Role')} htmlFor="ws-role">
               <Select id="ws-role" value={role} onChange={(e) => setRole(e.target.value as 'EDITOR' | 'VIEWER')}>
-                <option value="VIEWER">Viewer</option>
-                <option value="EDITOR">Editor</option>
+                <option value="VIEWER">{tr('Viewer')}</option>
+                <option value="EDITOR">{tr('Editor')}</option>
               </Select>
             </Field>
-            <Button icon={<UserPlus className="h-4 w-4" />} disabled={!pick} loading={add.isPending} onClick={() => pick && add.mutate({ userId: pick.id, role }, { onSuccess: () => setPick(null) })}>Add</Button>
+            <Button icon={<UserPlus className="h-4 w-4" />} disabled={!pick} loading={add.isPending} onClick={() => pick && add.mutate({ userId: pick.id, role }, { onSuccess: () => setPick(null) })}>{tr('Add')}</Button>
           </div>
         )}
         {err && <div className="mt-2"><Alert tone="red">{errorMessage(err)}</Alert></div>}
         {!owner && (
           <div className="mt-3 flex justify-end">
-            <Button variant="secondary" onClick={() => setLeave(true)}>Leave workspace</Button>
+            <Button variant="secondary" onClick={() => setLeave(true)}>{tr('Leave workspace')}</Button>
           </div>
         )}
       </Card>
       <ConfirmDialog
         open={leave}
-        title="Leave workspace"
-        message="You will lose access to this workspace until an owner adds you again."
-        confirmLabel="Leave"
+        title={tr('Leave workspace')}
+        message={tr('You will lose access to this workspace until an owner adds you again.')}
+        confirmLabel={tr('Leave')}
         variant="danger"
         loading={remove.isPending}
         error={remove.error}
@@ -322,17 +323,17 @@ function EditModal({ ws, open, onClose }: { ws: WorkspaceDetail; open: boolean; 
     <Modal
       open={open}
       onClose={onClose}
-      title="Edit workspace"
+      title={tr('Edit workspace')}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button disabled={!title.trim()} loading={save.isPending} onClick={() => save.mutate({ title: title.trim(), description: description.trim() || null }, { onSuccess: onClose })}>Save</Button>
+          <Button variant="secondary" onClick={onClose}>{tr('Cancel')}</Button>
+          <Button disabled={!title.trim()} loading={save.isPending} onClick={() => save.mutate({ title: title.trim(), description: description.trim() || null }, { onSuccess: onClose })}>{tr('Save')}</Button>
         </>
       }
     >
       <div className="space-y-3">
-        <Field label="Title" htmlFor="ws-title" required><Input id="ws-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} /></Field>
-        <Field label="Description" htmlFor="ws-desc"><Textarea id="ws-desc" rows={3} value={description} maxLength={5000} onChange={(e) => setDescription(e.target.value)} /></Field>
+        <Field label={tr('Title')} htmlFor="ws-title" required><Input id="ws-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} /></Field>
+        <Field label={tr('Description')} htmlFor="ws-desc"><Textarea id="ws-desc" rows={3} value={description} maxLength={5000} onChange={(e) => setDescription(e.target.value)} /></Field>
         {save.error && <Alert tone="red">{errorMessage(save.error)}</Alert>}
       </div>
     </Modal>
@@ -349,8 +350,8 @@ export function WorkspacePage() {
   const [preset, setPreset] = useState<{ ids: string[]; offsets: Record<string, number> } | null>(null);
   const setStatus = useWsMutation((status: 'ACTIVE' | 'ARCHIVED') => api.patch(`/workspaces/${id}`, { status }));
 
-  if (ws.isLoading || itemsQ.isLoading) return <Spinner label="Loading workspace…" />;
-  if (ws.error) return <ErrorState error={ws.error} onRetry={() => void ws.refetch()} title="Workspace not available" />;
+  if (ws.isLoading || itemsQ.isLoading) return <Spinner label={tr('Loading workspace…')} />;
+  if (ws.error) return <ErrorState error={ws.error} onRetry={() => void ws.refetch()} title={tr('Workspace not available')} />;
   if (itemsQ.error) return <ErrorState error={itemsQ.error} onRetry={() => void itemsQ.refetch()} />;
   const w = ws.data!;
   const all = itemsQ.data!.items;
@@ -366,18 +367,18 @@ export function WorkspacePage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        breadcrumb={<Link to="/workspaces" className="text-sm text-brand-700 hover:underline">Workspaces</Link>}
+        breadcrumb={<Link to="/workspaces" className="text-sm text-brand-700 hover:underline">{tr('Workspaces')}</Link>}
         title={<span className="inline-flex items-center gap-2">{w.title} <StatusBadge status={w.status} /></span>}
         subtitle={
           <span>
-            {w.case ? <>Case <Link className="text-brand-700 hover:underline" to={`/cases/${w.case.id}`}>{w.case.caseNumber}</Link> · </> : w.caseRestricted ? <><Lock className="inline h-3 w-3" aria-hidden /> Linked case restricted · </> : null}
-            Owner {w.owner.fullName} · {w.orgUnit.name} · your role: {titleCase(role)}
+            {w.case ? <>{tr('Case')}{' '}<Link className="text-brand-700 hover:underline" to={`/cases/${w.case.id}`}>{w.case.caseNumber}</Link> · </> : w.caseRestricted ? <><Lock className="inline h-3 w-3" aria-hidden />{' '}{tr('Linked case restricted ·')}{' '}</> : null}
+            {tr('Owner')}{' '}{w.owner.fullName} · {w.orgUnit.name}{' '}{tr('· your role:')}{' '}{titleCase(role)}
             {w.description && <span className="block text-ink-600">{w.description}</span>}
           </span>
         }
         actions={
           <>
-            {editable && <Button variant="secondary" icon={<Pencil className="h-4 w-4" />} onClick={() => setEdit(true)}>Edit</Button>}
+            {editable && <Button variant="secondary" icon={<Pencil className="h-4 w-4" />} onClick={() => setEdit(true)}>{tr('Edit')}</Button>}
             {role === 'OWNER' && (
               <Button variant="secondary" icon={w.status === 'ACTIVE' ? <Archive className="h-4 w-4" /> : <ArchiveRestore className="h-4 w-4" />} onClick={() => setArchive(true)}>
                 {w.status === 'ACTIVE' ? 'Archive' : 'Re-activate'}
@@ -386,15 +387,15 @@ export function WorkspacePage() {
           </>
         }
       />
-      {w.status === 'ARCHIVED' && <Alert tone="amber">This workspace is archived and read-only.</Alert>}
+      {w.status === 'ARCHIVED' && <Alert tone="amber">{tr('This workspace is archived and read-only.')}</Alert>}
       <Tabs<TabId>
         tabs={[
-          { id: 'evidence', label: 'Evidence', count: all.length },
-          { id: 'compare', label: 'Compare' },
-          { id: 'review', label: 'Review & annotate' },
-          { id: 'timeline', label: 'Timeline' },
-          { id: 'related', label: 'Related' },
-          { id: 'members', label: 'Members', count: w.members.length },
+          { id: 'evidence', label: tr('Evidence'), count: all.length },
+          { id: 'compare', label: tr('Compare') },
+          { id: 'review', label: tr('Review & annotate') },
+          { id: 'timeline', label: tr('Timeline') },
+          { id: 'related', label: tr('Related') },
+          { id: 'members', label: tr('Members'), count: w.members.length },
         ]}
         value={tab}
         onChange={(v) => setUrl({ tab: v, item: '', t: '' })}
@@ -404,7 +405,7 @@ export function WorkspacePage() {
       {tab === 'review' &&
         (reviewItem ? (
           <div className="space-y-3">
-            <Field label="Video" htmlFor="review-item">
+            <Field label={tr('Video')} htmlFor="review-item">
               <Select id="review-item" value={reviewItem.id} onChange={(e) => setUrl({ item: e.target.value, t: '' })}>
                 {visible.map((i) => <option key={i.id} value={i.id}>{i.evidence.evidenceNumber ?? i.evidenceId} — {i.evidence.title ?? 'Untitled'}</option>)}
               </Select>
@@ -412,7 +413,7 @@ export function WorkspacePage() {
             <AnnotationStudio key={`${reviewItem.id}:${url.t}`} evidenceId={reviewItem.evidenceId} workspaceId={w.id} editable={editable} initialTimeMs={Number.isFinite(t) && t > 0 ? t : undefined} />
           </div>
         ) : (
-          <EmptyState title="No evidence to review" />
+          <EmptyState title={tr('No evidence to review')} />
         ))}
       {tab === 'timeline' && (
         <TimelineView

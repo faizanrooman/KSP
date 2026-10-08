@@ -6,6 +6,7 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Alert, Button, Field, Input } from '@/components/ui';
 
+import { LanguageSwitcher, t } from '@/lib/i18n';
 function AuthFrame({ title, children, subtitle, signOut }: { title: string; subtitle?: string; children: ReactNode; signOut?: boolean }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -15,11 +16,12 @@ function AuthFrame({ title, children, subtitle, signOut }: { title: string; subt
         <div className="mb-6 flex items-center justify-center gap-3 text-white">
           <ShieldCheck className="h-10 w-10 text-brand-300" aria-hidden />
           <div>
-            <p className="text-lg font-semibold">Karnataka State Police</p>
-            <p className="text-sm text-brand-200">Video Evidence Management System</p>
+            <p className="text-lg font-semibold">{t('Karnataka State Police')}</p>
+            <p className="text-sm text-brand-200">{t('Video Evidence Management System')}</p>
           </div>
         </div>
         <div className="card p-6">
+          <div className="mb-3 flex justify-end"><LanguageSwitcher /></div>
           <h1 className="mb-1">{title}</h1>
           {subtitle && <p className="mb-4 text-sm text-ink-500">{subtitle}</p>}
           {children}
@@ -34,12 +36,12 @@ function AuthFrame({ title, children, subtitle, signOut }: { title: string; subt
                 navigate('/login', { replace: true });
               }}
             >
-              Sign out
+              {t('Sign out')}
             </button>
           </p>
         )}
         <p className="mt-4 text-center text-xs text-brand-200">
-          This system is for authorised police personnel only. Access and activity are logged and monitored.
+          {t('This system is for authorised police personnel only. Access and activity are logged and monitored.')}
         </p>
       </div>
     </main>
@@ -100,21 +102,21 @@ export function LoginPage() {
 
   if (mfaToken) {
     return (
-      <AuthFrame title="Two-step verification" subtitle={useRecovery ? 'Enter one of your one-time recovery codes.' : 'Enter the 6-digit code from your authenticator app.'}>
+      <AuthFrame title={t('Two-step verification')} subtitle={useRecovery ? 'Enter one of your one-time recovery codes.' : 'Enter the 6-digit code from your authenticator app.'}>
         <form onSubmit={submitCode} className="space-y-4">
           {error && <Alert tone="red">{error}</Alert>}
           <Field label={useRecovery ? 'Recovery code' : 'Verification code'} htmlFor="code" required>
             <Input id="code" autoFocus autoComplete="one-time-code" inputMode={useRecovery ? 'text' : 'numeric'} pattern={useRecovery ? undefined : '\\d{6}'} maxLength={useRecovery ? 32 : 6} value={code} onChange={(e) => setCode(e.target.value)} required />
           </Field>
           <Button type="submit" className="w-full" loading={busy}>
-            Verify
+            {t('Verify')}
           </Button>
           <div className="flex justify-between text-sm">
             <button type="button" className="text-brand-700 hover:underline" onClick={() => { setUseRecovery((v) => !v); setCode(''); setError(null); }}>
               {useRecovery ? 'Use authenticator code' : 'Use a recovery code'}
             </button>
             <button type="button" className="text-ink-600 hover:underline" onClick={() => { setMfaToken(null); setUseRecovery(false); setCode(''); setError(null); }}>
-              Back
+              {t('Back')}
             </button>
           </div>
         </form>
@@ -123,17 +125,17 @@ export function LoginPage() {
   }
 
   return (
-    <AuthFrame title="Sign in">
+    <AuthFrame title={t('Sign in')}>
       <form onSubmit={submitPassword} className="space-y-4">
         {error && <Alert tone="red">{error}</Alert>}
-        <Field label="Username" htmlFor="username" required>
+        <Field label={t('Username')} htmlFor="username" required>
           <Input id="username" autoFocus autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
         </Field>
-        <Field label="Password" htmlFor="password" required>
+        <Field label={t('Password')} htmlFor="password" required>
           <Input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </Field>
         <Button type="submit" className="w-full" loading={busy}>
-          Sign in
+          {t('Sign in')}
         </Button>
       </form>
     </AuthFrame>
@@ -166,23 +168,23 @@ export function ChangePasswordPage({ forced }: { forced?: boolean }) {
   const form = (
     <form onSubmit={submit} className="space-y-4">
       {error && <Alert tone="red">{error}</Alert>}
-      {done && <Alert tone="green">Password changed. Other sessions have been signed out.</Alert>}
-      <Field label="Current password" htmlFor="cur" required>
+      {done && <Alert tone="green">{t('Password changed. Other sessions have been signed out.')}</Alert>}
+      <Field label={t('Current password')} htmlFor="cur" required>
         <Input id="cur" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
       </Field>
-      <Field label="New password" htmlFor="new" required hint="At least 12 characters with upper- and lower-case letters, a digit and a symbol. Must differ from recent passwords.">
+      <Field label={t('New password')} htmlFor="new" required hint={t('At least 12 characters with upper- and lower-case letters, a digit and a symbol. Must differ from recent passwords.')}>
         <Input id="new" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} required />
       </Field>
-      <Field label="Confirm new password" htmlFor="conf" required>
+      <Field label={t('Confirm new password')} htmlFor="conf" required>
         <Input id="conf" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
       </Field>
       <Button type="submit" loading={busy}>
-        Change password
+        {t('Change password')}
       </Button>
     </form>
   );
   return forced ? (
-    <AuthFrame title="Change your password" subtitle="Your password must be changed before you can continue." signOut>
+    <AuthFrame title={t('Change your password')} subtitle={t('Your password must be changed before you can continue.')} signOut>
       {form}
     </AuthFrame>
   ) : (
@@ -225,10 +227,10 @@ export function MfaEnrollPanel({ forced, onDone }: { forced?: boolean; onDone?: 
 
   const body = codes ? (
     <div className="space-y-4">
-      <Alert tone="green" title="Two-step verification enabled">
-        Save these one-time recovery codes somewhere safe. Each can be used once if you lose your authenticator. They will not be shown again.
+      <Alert tone="green" title={t('Two-step verification enabled')}>
+        {t('Save these one-time recovery codes somewhere safe. Each can be used once if you lose your authenticator. They will not be shown again.')}
       </Alert>
-      <ul aria-label="Recovery codes" className="grid grid-cols-2 gap-2 rounded-md bg-ink-50 p-3 font-mono text-sm">
+      <ul aria-label={t('Recovery codes')} className="grid grid-cols-2 gap-2 rounded-md bg-ink-50 p-3 font-mono text-sm">
         {codes.map((c) => (
           <li key={c}>{c}</li>
         ))}
@@ -239,35 +241,35 @@ export function MfaEnrollPanel({ forced, onDone }: { forced?: boolean; onDone?: 
           onDone?.();
         }}
       >
-        I have saved my recovery codes
+        {t('I have saved my recovery codes')}
       </Button>
     </div>
   ) : setup ? (
     <form onSubmit={confirmCode} className="space-y-4">
       {error && <Alert tone="red">{error}</Alert>}
-      <p className="text-sm text-ink-600">Scan this QR code with an authenticator app (e.g. Google Authenticator, Microsoft Authenticator), then enter the 6-digit code it shows.</p>
-      <img src={setup.qrDataUrl} alt="QR code for authenticator enrolment" className="mx-auto h-48 w-48" />
+      <p className="text-sm text-ink-600">{t('Scan this QR code with an authenticator app (e.g. Google Authenticator, Microsoft Authenticator), then enter the 6-digit code it shows.')}</p>
+      <img src={setup.qrDataUrl} alt={t('QR code for authenticator enrolment')} className="mx-auto h-48 w-48" />
       <p className="text-center text-xs text-ink-500">
-        Manual entry key: <span className="mono select-all break-all" data-testid="mfa-secret">{setup.secret}</span>
+        {t('Manual entry key:')}<span className="mono select-all break-all" data-testid="mfa-secret">{setup.secret}</span>
       </p>
-      <Field label="Verification code" htmlFor="mfa-code" required>
+      <Field label={t('Verification code')} htmlFor="mfa-code" required>
         <Input id="mfa-code" inputMode="numeric" pattern="\d{6}" maxLength={6} autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} required />
       </Field>
       <Button type="submit" loading={busy}>
-        Verify and enable
+        {t('Verify and enable')}
       </Button>
     </form>
   ) : (
     <div className="space-y-4">
       {error && <Alert tone="red">{error}</Alert>}
-      <p className="text-sm text-ink-600">Two-step verification protects your account with a time-based code from an authenticator app in addition to your password.</p>
+      <p className="text-sm text-ink-600">{t('Two-step verification protects your account with a time-based code from an authenticator app in addition to your password.')}</p>
       <Button onClick={start} loading={busy}>
-        Set up authenticator
+        {t('Set up authenticator')}
       </Button>
     </div>
   );
   return forced ? (
-    <AuthFrame title="Set up two-step verification" subtitle="Your role requires multi-factor authentication." signOut>
+    <AuthFrame title={t('Set up two-step verification')} subtitle={t('Your role requires multi-factor authentication.')} signOut>
       {body}
     </AuthFrame>
   ) : (

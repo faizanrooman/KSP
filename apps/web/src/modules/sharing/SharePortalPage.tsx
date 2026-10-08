@@ -13,6 +13,7 @@ import type { PortalItem, PortalSession, PortalShare } from './types';
 import { blockedText, openFailure, refreshDelayMs, storeKey } from './portal-helpers';
 
 
+import { t as tr } from '@/lib/i18n';
 function portal<T>(method: string, path: string, session: string | null, body?: unknown): Promise<T> {
   return request<T>(method, `/share-portal${path}`, { body, noRefresh: true, headers: session ? { 'x-share-session': session } : {} });
 }
@@ -65,14 +66,14 @@ export function SharePortalPage() {
         <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3">
           <ShieldCheck className="h-6 w-6 text-brand-700" aria-hidden />
           <div>
-            <div className="text-sm font-semibold text-ink-900">Karnataka State Police — Secure Evidence Share</div>
-            <div className="text-xs text-ink-600">Access is logged. Redistribution is prohibited.</div>
+            <div className="text-sm font-semibold text-ink-900">{tr('Karnataka State Police — Secure Evidence Share')}</div>
+            <div className="text-xs text-ink-600">{tr('Access is logged. Redistribution is prohibited.')}</div>
           </div>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6">
         {loading ? (
-          <div className="flex items-center gap-2 text-sm text-ink-600"><Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Loading…</div>
+          <div className="flex items-center gap-2 text-sm text-ink-600"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />{' '}{tr('Loading…')}</div>
         ) : !session || !share ? (
           <CodeForm token={token} onOpened={onOpened} notice={fatal} />
         ) : (
@@ -102,16 +103,16 @@ function CodeForm({ token, onOpened, notice }: { token: string; onOpened: (r: Po
       setBusy(false);
     }
   };
-  if (blocked) return <Alert tone="red" title="This share is not available">{blockedText(blocked)}</Alert>;
+  if (blocked) return <Alert tone="red" title={tr('This share is not available')}>{blockedText(blocked)}</Alert>;
   return (
     <form onSubmit={submit} className="mx-auto max-w-sm space-y-4 rounded-lg border border-ink-200 bg-white p-6 shadow-sm">
-      <div className="flex items-center gap-2 text-ink-900"><Lock className="h-5 w-5" aria-hidden /><h1 className="text-lg font-semibold">Enter your access code</h1></div>
-      <p className="text-sm text-ink-600">The access code was sent to you separately from this link.</p>
-      <Field label="Access code" htmlFor="sp-code">
+      <div className="flex items-center gap-2 text-ink-900"><Lock className="h-5 w-5" aria-hidden /><h1 className="text-lg font-semibold">{tr('Enter your access code')}</h1></div>
+      <p className="text-sm text-ink-600">{tr('The access code was sent to you separately from this link.')}</p>
+      <Field label={tr('Access code')} htmlFor="sp-code">
         <Input id="sp-code" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(e) => setCode(e.target.value.replace(/\s/g, ''))} className="mono text-lg tracking-widest" />
       </Field>
       {error && <Alert tone="red">{error}</Alert>}
-      <Button type="submit" className="w-full" loading={busy} disabled={code.length < 4}>Open</Button>
+      <Button type="submit" className="w-full" loading={busy} disabled={code.length < 4}>{tr('Open')}</Button>
     </form>
   );
 }
@@ -120,16 +121,16 @@ function Viewer({ share, items, selected, onSelect, session, onEnded }: { share:
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-ink-200 bg-white p-4 text-sm">
-        <div className="font-medium text-ink-900">Shared with {share.recipient.name}{share.recipient.organisation ? `, ${share.recipient.organisation}` : ''}</div>
-        <div className="text-ink-700">Purpose: {share.purpose}</div>
+        <div className="font-medium text-ink-900">{tr('Shared with')}{' '}{share.recipient.name}{share.recipient.organisation ? `, ${share.recipient.organisation}` : ''}</div>
+        <div className="text-ink-700">{tr('Purpose:')}{' '}{share.purpose}</div>
         <div className="mt-1 text-xs text-ink-600">
-          Shared by {[share.sharedBy.rank, share.sharedBy.name].filter(Boolean).join(' ')} ({share.sharedBy.unit}) · available until {formatDateTime(share.expiresAt)}
+          {tr('Shared by')}{' '}{[share.sharedBy.rank, share.sharedBy.name].filter(Boolean).join(' ')} ({share.sharedBy.unit}{tr(') · available until')}{' '}{formatDateTime(share.expiresAt)}
           {share.maxViews ? ` · view ${share.viewCount} of ${share.maxViews}` : ''}
           {share.permissions.watermark ? ' · video is watermarked with your identity' : ''}
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
-        <nav aria-label="Shared items" className="rounded-lg border border-ink-200 bg-white">
+        <nav aria-label={tr('Shared items')} className="rounded-lg border border-ink-200 bg-white">
           <ul className="divide-y divide-ink-100">
             {items.map((i) => (
               <li key={i.evidenceId}>
@@ -137,13 +138,13 @@ function Viewer({ share, items, selected, onSelect, session, onEnded }: { share:
                   className={`w-full px-3 py-2 text-left text-sm hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${selected?.evidenceId === i.evidenceId ? 'bg-brand-50' : ''}`}>
                   <div className="mono text-xs">{i.evidenceNumber}</div>
                   <div className="text-ink-700">{i.title ?? 'Untitled'}</div>
-                  <div className="text-xs text-ink-500">{formatDuration(i.durationMs)} · recorded {formatDateTime(i.recordedAt)}</div>
+                  <div className="text-xs text-ink-500">{formatDuration(i.durationMs)}{' '}{tr('· recorded')}{' '}{formatDateTime(i.recordedAt)}</div>
                 </button>
               </li>
             ))}
           </ul>
         </nav>
-        {selected ? <ItemPlayer key={selected.evidenceId} item={selected} share={share} session={session} onEnded={onEnded} /> : <Alert>No items are available in this share.</Alert>}
+        {selected ? <ItemPlayer key={selected.evidenceId} item={selected} share={share} session={session} onEnded={onEnded} /> : <Alert>{tr('No items are available in this share.')}</Alert>}
       </div>
     </div>
   );
@@ -261,10 +262,10 @@ function ItemPlayer({ item, share, session, onEnded }: { item: PortalItem; share
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {share.permissions.allowDownload && <Button variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === 'download'} onClick={() => void download('watermarked')}>Download {share.permissions.watermark ? 'watermarked copy' : 'copy'}</Button>}
-        {share.permissions.allowOriginal && <Button variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === 'original'} onClick={() => void download('original')}>Download original</Button>}
-        {share.permissions.allowPrint && <Button variant="secondary" icon={<Printer className="h-4 w-4" />} loading={busy === 'print'} disabled={pb?.status !== 'READY'} onClick={() => void print()}>Print current frame</Button>}
-        <span className="text-xs text-ink-500">Every view, download and print is recorded.</span>
+        {share.permissions.allowDownload && <Button variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === 'download'} onClick={() => void download('watermarked')}>{tr('Download')}{' '}{share.permissions.watermark ? 'watermarked copy' : 'copy'}</Button>}
+        {share.permissions.allowOriginal && <Button variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === 'original'} onClick={() => void download('original')}>{tr('Download original')}</Button>}
+        {share.permissions.allowPrint && <Button variant="secondary" icon={<Printer className="h-4 w-4" />} loading={busy === 'print'} disabled={pb?.status !== 'READY'} onClick={() => void print()}>{tr('Print current frame')}</Button>}
+        <span className="text-xs text-ink-500">{tr('Every view, download and print is recorded.')}</span>
       </div>
       {error && <Alert tone="red">{error}</Alert>}
     </section>

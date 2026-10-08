@@ -24,6 +24,7 @@ import { AI_READ_PERMS, anyOf, auditResultsViewed, detectionDto, detectionQuery,
 import modelRoutes from './models.js';
 import watchlistRoutes from './watchlists.js';
 import trainingRoutes from './training.js';
+import faceSearchRoutes from './face-search.js';
 
 export const prefix = '/ai';
 
@@ -63,6 +64,7 @@ export default async function ai(fastify: FastifyInstance) {
   await app.register(modelRoutes);
   await app.register(watchlistRoutes);
   await app.register(trainingRoutes);
+  await app.register(faceSearchRoutes);
 
   app.get('/tasks', {
     preHandler: anyOf('ai:request', 'ai:review', 'ai:models_manage'),

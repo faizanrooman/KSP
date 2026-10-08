@@ -11,6 +11,7 @@ import { caseKey, type CaseDetail } from './types';
 import { PriorityBadge } from './CasesListPage';
 import { DiaryTab, EvidenceTab, OverviewTab, StatusButton, TeamTab, TimelineTab } from './case-parts';
 
+import { t as tr } from '@/lib/i18n';
 const TAB_DEFAULTS = { tab: 'overview' };
 
 export function useCaseDetail(id: string) {
@@ -26,21 +27,21 @@ export function CaseDetailPage() {
   const { canAny } = useAuth();
   const [url, setUrl] = useUrlState(TAB_DEFAULTS);
   const q = useCaseDetail(id);
-  if (q.isLoading) return <Spinner label="Loading case…" />;
+  if (q.isLoading) return <Spinner label={tr('Loading case…')} />;
   if (q.error) {
     if (q.error instanceof ApiError && q.error.status === 404) {
-      return <EmptyState heading="h1" title="Case not found" description="It does not exist or is outside your jurisdiction." action={<Link className="text-brand-700 hover:underline" to="/cases">Back to cases</Link>} />;
+      return <EmptyState heading="h1" title={tr('Case not found')} description={tr('It does not exist or is outside your jurisdiction.')} action={<Link className="text-brand-700 hover:underline" to="/cases">{tr('Back to cases')}</Link>} />;
     }
     return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
   }
   const c = q.data!;
   const ext = CASE_TABS.filter((t) => !t.anyOf?.length || canAny(...t.anyOf));
   const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'evidence', label: 'Evidence', count: c.evidenceCount },
-    { id: 'team', label: 'Team', count: c.members.length + (c.investigatingOfficer ? 1 : 0) + (c.supervisor ? 1 : 0) },
-    { id: 'diary', label: 'Case diary' },
-    { id: 'timeline', label: 'Timeline' },
+    { id: 'overview', label: tr('Overview') },
+    { id: 'evidence', label: tr('Evidence'), count: c.evidenceCount },
+    { id: 'team', label: tr('Team'), count: c.members.length + (c.investigatingOfficer ? 1 : 0) + (c.supervisor ? 1 : 0) },
+    { id: 'diary', label: tr('Case diary') },
+    { id: 'timeline', label: tr('Timeline') },
     ...ext.map((t) => ({ id: `x-${t.id}`, label: t.label })),
   ];
   const active = tabs.some((t) => t.id === url.tab) ? url.tab : 'overview';
@@ -48,12 +49,12 @@ export function CaseDetailPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        breadcrumb={<Link to="/cases" className="text-brand-700 hover:underline">Cases</Link>}
+        breadcrumb={<Link to="/cases" className="text-brand-700 hover:underline">{tr('Cases')}</Link>}
         title={<span><span className="font-mono">{c.caseNumber}</span> · {c.title}</span>}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={c.status} /> <PriorityBadge priority={c.priority} /> {c.orgUnit.name} · opened {formatDate(c.openedAt)}
-            {c.fir && <> · FIR <Link className="mono text-brand-700 hover:underline" to={`/firs/${c.fir.id}`}>{c.fir.displayNumber}</Link></>}
+            <StatusBadge status={c.status} /> <PriorityBadge priority={c.priority} /> {c.orgUnit.name}{' '}{tr('· opened')}{' '}{formatDate(c.openedAt)}
+            {c.fir && <>{' '}{tr('· FIR')}{' '}<Link className="mono text-brand-700 hover:underline" to={`/firs/${c.fir.id}`}>{c.fir.displayNumber}</Link></>}
           </span>
         }
         actions={c.permissions.canManage ? <StatusButton caseItem={c} /> : undefined}

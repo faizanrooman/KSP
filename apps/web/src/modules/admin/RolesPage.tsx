@@ -9,6 +9,7 @@ import { Alert, Badge, Button, Card, ConfirmDialog, DataTable, EmptyState, Error
 import { useRoles } from './shared';
 import type { PermissionCatalogue, Role } from './types';
 
+import { t } from '@/lib/i18n';
 function useCatalogue() {
   return useQuery({ queryKey: ['admin', 'permissions'], queryFn: () => api.get<PermissionCatalogue>('/roles/permissions'), staleTime: 10 * 60_000 });
 }
@@ -18,17 +19,17 @@ export function RolesListPage() {
   const navigate = useNavigate();
   const q = useRoles();
   const cols: Column<Role>[] = [
-    { key: 'name', header: 'Role', render: (r) => (<div><p className="font-medium text-brand-800">{r.name} {r.isSystem && <Badge tone="blue">System</Badge>}</p><p className="mono text-xs text-ink-500">{r.code}</p>{r.description && <p className="text-xs text-ink-600">{r.description}</p>}</div>) },
-    { key: 'perms', header: 'Permissions', render: (r) => r.permissions.length },
-    { key: 'assign', header: 'Active assignments', render: (r) => r.assignmentCount },
-    { key: 'updated', header: 'Updated', render: (r) => <span className="whitespace-nowrap text-sm">{formatDateTime(r.updatedAt)}</span> },
-    { key: 'sod', header: <span className="sr-only">Warnings</span>, render: (r) => (r.sodViolations.length ? <Badge tone="red"><AlertTriangle className="mr-1 h-3 w-3" aria-hidden />SoD conflict</Badge> : null) },
+    { key: 'name', header: t('Role'), render: (r) => (<div><p className="font-medium text-brand-800">{r.name} {r.isSystem && <Badge tone="blue">{t('System')}</Badge>}</p><p className="mono text-xs text-ink-500">{r.code}</p>{r.description && <p className="text-xs text-ink-600">{r.description}</p>}</div>) },
+    { key: 'perms', header: t('Permissions'), render: (r) => r.permissions.length },
+    { key: 'assign', header: t('Active assignments'), render: (r) => r.assignmentCount },
+    { key: 'updated', header: t('Updated'), render: (r) => <span className="whitespace-nowrap text-sm">{formatDateTime(r.updatedAt)}</span> },
+    { key: 'sod', header: <span className="sr-only">{t('Warnings')}</span>, render: (r) => (r.sodViolations.length ? <Badge tone="red"><AlertTriangle className="mr-1 h-3 w-3" aria-hidden />{t('SoD conflict')}</Badge> : null) },
   ];
   return (
     <div className="space-y-4">
-      <PageHeader title="Roles & permissions" subtitle="A role is a permission set; it is granted to a user at an org unit and applies to that unit's whole subtree." actions={can('roles:manage') ? <Button icon={<Plus className="h-4 w-4" />} onClick={() => navigate('/admin/roles/new')}>New role</Button> : undefined} />
+      <PageHeader title={t('Roles & permissions')} subtitle={t('A role is a permission set; it is granted to a user at an org unit and applies to that unit\'s whole subtree.')} actions={can('roles:manage') ? <Button icon={<Plus className="h-4 w-4" />} onClick={() => navigate('/admin/roles/new')}>{t('New role')}</Button> : undefined} />
       <Card bodyClassName="p-0">
-        <DataTable caption="Roles" columns={cols} rows={q.data?.items} rowKey={(r) => r.id} loading={q.isFetching} error={q.error} onRetry={() => void q.refetch()} onRowClick={(r) => navigate(`/admin/roles/${r.id}`)} empty={<EmptyState title="No roles" />} />
+        <DataTable caption={t('Roles')} columns={cols} rows={q.data?.items} rowKey={(r) => r.id} loading={q.isFetching} error={q.error} onRetry={() => void q.refetch()} onRowClick={(r) => navigate(`/admin/roles/${r.id}`)} empty={<EmptyState title={t('No roles')} />} />
       </Card>
     </div>
   );
@@ -46,7 +47,7 @@ function PermissionMatrix({ catalogue, value, onChange, readOnly }: { catalogue:
   return (
     <div className="space-y-3">
       {conflicts.length > 0 && (
-        <Alert tone="red" title="Separation-of-duties conflict">
+        <Alert tone="red" title={t('Separation-of-duties conflict')}>
           <ul className="list-disc pl-5">{conflicts.map((c) => <li key={c.a + c.b}>{c.message} (<span className="mono">{c.a}</span> + <span className="mono">{c.b}</span>)</li>)}</ul>
         </Alert>
       )}
@@ -71,7 +72,7 @@ function PermissionMatrix({ catalogue, value, onChange, readOnly }: { catalogue:
                       <input id={`perm-${p.code}`} type="checkbox" className="mt-0.5 h-4 w-4 rounded border-ink-300 text-brand-700 focus:ring-brand-500" checked={value.has(p.code)} disabled={readOnly} onChange={(e) => toggle(p.code, e.target.checked)} aria-describedby={`perm-${p.code}-d`} />
                       <label htmlFor={`perm-${p.code}`} className="text-sm">
                         <span className={inConflict ? 'mono font-semibold text-red-700' : 'mono text-ink-900'}>{p.code}</span>
-                        {inConflict && <span className="sr-only"> (in conflict)</span>}
+                        {inConflict && <span className="sr-only">{' '}{t('(in conflict)')}</span>}
                         <span id={`perm-${p.code}-d`} className="block text-xs text-ink-500">{p.description}</span>
                       </label>
                     </li>
@@ -132,25 +133,25 @@ export function RoleDetailPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        breadcrumb={<Link to="/admin/roles" className="hover:underline">Roles</Link>}
-        title={isNew ? 'New role' : <span className="flex items-center gap-2">{role.data!.name} {role.data!.isSystem && <Badge tone="blue">System</Badge>}</span>}
-        subtitle={isNew ? 'Custom roles start empty; grant only what the job requires.' : <span className="mono">{role.data!.code} · {role.data!.assignmentCount} active assignment(s)</span>}
-        actions={!isNew && !readOnly && !role.data!.isSystem ? <Button variant="danger" disabled={role.data!.totalAssignmentCount > 0} title={role.data!.totalAssignmentCount > 0 ? 'Revoke all assignments first' : undefined} onClick={() => { del.reset(); setConfirmDelete(true); }}>Delete role</Button> : undefined}
+        breadcrumb={<Link to="/admin/roles" className="hover:underline">{t('Roles')}</Link>}
+        title={isNew ? 'New role' : <span className="flex items-center gap-2">{role.data!.name} {role.data!.isSystem && <Badge tone="blue">{t('System')}</Badge>}</span>}
+        subtitle={isNew ? 'Custom roles start empty; grant only what the job requires.' : <span className="mono">{role.data!.code} · {role.data!.assignmentCount}{' '}{t('active assignment(s)')}</span>}
+        actions={!isNew && !readOnly && !role.data!.isSystem ? <Button variant="danger" disabled={role.data!.totalAssignmentCount > 0} title={role.data!.totalAssignmentCount > 0 ? 'Revoke all assignments first' : undefined} onClick={() => { del.reset(); setConfirmDelete(true); }}>{t('Delete role')}</Button> : undefined}
       />
-      {holdsRole && !readOnly && <Alert tone="blue">You hold this role yourself, so you cannot change its permissions (another administrator must).</Alert>}
+      {holdsRole && !readOnly && <Alert tone="blue">{t('You hold this role yourself, so you cannot change its permissions (another administrator must).')}</Alert>}
       <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (valid) save.mutate(); }}>
-        <Card title="Details">
+        <Card title={t('Details')}>
           <div className="grid gap-3 sm:grid-cols-2">
             {isNew && (
-              <Field label="Code" htmlFor="r-code" required hint="Upper-case letters, digits, underscore. Cannot be changed later.">
+              <Field label={t('Code')} htmlFor="r-code" required hint={t('Upper-case letters, digits, underscore. Cannot be changed later.')}>
                 <Input id="r-code" value={c.code} onChange={(e) => set({ code: e.target.value.toUpperCase() })} maxLength={41} />
               </Field>
             )}
-            <Field label="Name" htmlFor="r-name" required>
+            <Field label={t('Name')} htmlFor="r-name" required>
               <Input id="r-name" value={c.name} onChange={(e) => set({ name: e.target.value })} maxLength={120} disabled={readOnly} />
             </Field>
             <div className="sm:col-span-2">
-              <Field label="Description" htmlFor="r-desc">
+              <Field label={t('Description')} htmlFor="r-desc">
                 <Textarea id="r-desc" rows={2} value={c.description} onChange={(e) => set({ description: e.target.value })} maxLength={1000} disabled={readOnly} />
               </Field>
             </div>
@@ -162,19 +163,19 @@ export function RoleDetailPage() {
         {save.error ? (
           <Alert tone="red" title={err?.code === 'SOD_VIOLATION' ? 'Separation of duties' : err?.code === 'PRIVILEGE_ESCALATION' ? 'Not allowed' : 'Could not save'}>
             {errorMessage(save.error)}
-            {missing.length > 0 && <p className="mt-1">You do not hold: <span className="mono">{missing.join(', ')}</span></p>}
+            {missing.length > 0 && <p className="mt-1">{t('You do not hold:')}{' '}<span className="mono">{missing.join(', ')}</span></p>}
           </Alert>
         ) : null}
         {!readOnly && (
           // Sticky: the permission matrix is taller than the viewport; saving must not require scrolling to the end.
           <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-2 border-t border-ink-200 bg-ink-50/95 px-4 py-3 backdrop-blur lg:-mx-6 lg:px-6">
-            {dirty && <span className="mr-auto text-sm text-amber-800">Unsaved changes</span>}
-            {dirty && <Button variant="secondary" onClick={() => { setDraft(null); save.reset(); }}>Discard changes</Button>}
+            {dirty && <span className="mr-auto text-sm text-amber-800">{t('Unsaved changes')}</span>}
+            {dirty && <Button variant="secondary" onClick={() => { setDraft(null); save.reset(); }}>{t('Discard changes')}</Button>}
             <Button type="submit" disabled={!valid || (!isNew && !dirty)} loading={save.isPending}>{isNew ? 'Create role' : 'Save changes'}</Button>
           </div>
         )}
       </form>
-      <ConfirmDialog open={confirmDelete} title="Delete role" message={`Delete the custom role “${role.data?.name ?? ''}”? This cannot be undone.`} confirmLabel="Delete" variant="danger" loading={del.isPending} error={del.error} onConfirm={() => del.mutate()} onCancel={() => setConfirmDelete(false)} />
+      <ConfirmDialog open={confirmDelete} title={t('Delete role')} message={`Delete the custom role “${role.data?.name ?? ''}”? This cannot be undone.`} confirmLabel={t('Delete')} variant="danger" loading={del.isPending} error={del.error} onConfirm={() => del.mutate()} onCancel={() => setConfirmDelete(false)} />
     </div>
   );
 }

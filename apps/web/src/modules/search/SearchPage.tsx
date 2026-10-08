@@ -17,6 +17,7 @@ import {
   type FacetName, type SearchCriteria, type SearchItem, type SearchSort,
 } from './api';
 
+import { t as tr } from '@/lib/i18n';
 const DEFAULTS = { c: '', page: '1', sort: '' };
 const PAGE_SIZE = 25;
 const SORT_LABEL: Record<SearchSort, string> = {
@@ -141,29 +142,29 @@ function AdvancedPanel({ initial, onApply, onClose }: { initial: SearchCriteria;
     </Field>
   );
   return (
-    <Card title="Advanced filters" actions={<Button variant="ghost" size="sm" icon={<X className="h-4 w-4" />} onClick={onClose} aria-label="Close advanced filters" />}>
+    <Card title={tr('Advanced filters')} actions={<Button variant="ghost" size="sm" icon={<X className="h-4 w-4" />} onClick={onClose} aria-label={tr('Close advanced filters')} />}>
       <form onSubmit={submit} className="space-y-4">
-        <Section title="Identity & people">
+        <Section title={tr('Identity & people')}>
           <div className="grid gap-3 md:grid-cols-3">
-            {inp('evidenceNumber', 'Evidence number (prefix)', { placeholder: 'KSP-CUBBONPARK-2026-' })}
-            <Field label="Station / jurisdiction" htmlFor="adv-org">
+            {inp('evidenceNumber', 'Evidence number (prefix)', { placeholder: tr('KSP-CUBBONPARK-2026-') })}
+            <Field label={tr('Station / jurisdiction')} htmlFor="adv-org">
               <OrgUnitSelect id="adv-org" value={d.orgUnitId} onChange={(v) => set('orgUnitId', v)} />
             </Field>
-            {inp('officerBadge', 'Officer badge number', { placeholder: 'KSP-FO-1001' })}
+            {inp('officerBadge', 'Officer badge number', { placeholder: tr('KSP-FO-1001') })}
             {inp('deviceSerial', 'Device serial')}
             {inp('caseNumber', 'Case number (prefix)')}
             <div className="grid grid-cols-3 gap-2">
               <div className="col-span-3 md:col-span-1">{inp('firNumber', 'FIR number')}</div>
               <div className="col-span-3 md:col-span-1">{inp('firYear', 'FIR year', { inputMode: 'numeric', placeholder: '2026' })}</div>
               <div className="col-span-3 md:col-span-1">
-                <Field label="FIR station" htmlFor="adv-firorg">
-                  <OrgUnitSelect id="adv-firorg" value={d.firOrgUnitId} onChange={(v) => set('firOrgUnitId', v)} stationsOnly emptyLabel="Any" />
+                <Field label={tr('FIR station')} htmlFor="adv-firorg">
+                  <OrgUnitSelect id="adv-firorg" value={d.firOrgUnitId} onChange={(v) => set('firOrgUnitId', v)} stationsOnly emptyLabel={tr('Any')} />
                 </Field>
               </div>
             </div>
           </div>
         </Section>
-        <Section title="Time">
+        <Section title={tr('Time')}>
           <div className="grid gap-3 md:grid-cols-4">
             {inp('recordedFrom', 'Recorded from', { type: 'datetime-local' })}
             {inp('recordedTo', 'Recorded to', { type: 'datetime-local' })}
@@ -171,28 +172,28 @@ function AdvancedPanel({ initial, onApply, onClose }: { initial: SearchCriteria;
             {inp('createdTo', 'Uploaded to', { type: 'datetime-local' })}
           </div>
         </Section>
-        <Section title="Location (radius)">
+        <Section title={tr('Location (radius)')}>
           <div className="grid gap-3 md:grid-cols-3">
             {inp('lat', 'Latitude', { inputMode: 'decimal', placeholder: '12.9763' })}
             {inp('lon', 'Longitude', { inputMode: 'decimal', placeholder: '77.5929' })}
             {inp('radiusKm', 'Radius (km)', { inputMode: 'decimal', placeholder: '1' })}
           </div>
         </Section>
-        <Section title="Classification & lifecycle">
+        <Section title={tr('Classification & lifecycle')}>
           <div className="grid gap-3 md:grid-cols-3">
             {inp('tags', 'Tags (comma separated)')}
-            <Field label="Match tags" htmlFor="adv-tagmode">
+            <Field label={tr('Match tags')} htmlFor="adv-tagmode">
               <Select id="adv-tagmode" value={d.tagMode} onChange={(e) => set('tagMode', e.target.value as 'any' | 'all')}>
-                <option value="any">Any of the tags</option>
-                <option value="all">All of the tags</option>
+                <option value="any">{tr('Any of the tags')}</option>
+                <option value="all">{tr('All of the tags')}</option>
               </Select>
             </Field>
             {inp('categories', 'Categories (comma separated)')}
-            <Field label="Legal hold" htmlFor="adv-hold">
+            <Field label={tr('Legal hold')} htmlFor="adv-hold">
               <Select id="adv-hold" value={d.legalHold} onChange={(e) => set('legalHold', e.target.value as Draft['legalHold'])}>
-                <option value="">Any</option>
-                <option value="true">Under legal hold</option>
-                <option value="false">Not on hold</option>
+                <option value="">{tr('Any')}</option>
+                <option value="true">{tr('Under legal hold')}</option>
+                <option value="false">{tr('Not on hold')}</option>
               </Select>
             </Field>
           </div>
@@ -200,26 +201,26 @@ function AdvancedPanel({ initial, onApply, onClose }: { initial: SearchCriteria;
           <CheckGroup legend="Processing state" values={MEDIA_STATUSES} selected={d.mediaStatuses} onChange={(v) => set('mediaStatuses', v)} />
           <CheckGroup legend="Storage tier (all tiers are searchable)" values={STORAGE_TIERS.filter((t) => t !== 'STAGING')} selected={d.storageTiers} onChange={(v) => set('storageTiers', v)} />
         </Section>
-        <Section title="AI-derived (reviewed results)">
+        <Section title={tr('AI-derived (reviewed results)')}>
           <CheckGroup legend="AI task" values={AI_TASKS} selected={d.aiTasks} onChange={(v) => set('aiTasks', v)} />
           <div className="grid gap-3 md:grid-cols-3">
-            {inp('aiLabels', 'Objects / labels', { placeholder: 'person, car, knife' })}
-            {inp('aiColors', 'Colours', { placeholder: 'red, white' })}
-            {inp('plateText', 'Licence plate (prefix)', { placeholder: 'KA01AB' })}
+            {inp('aiLabels', 'Objects / labels', { placeholder: tr('person, car, knife') })}
+            {inp('aiColors', 'Colours', { placeholder: tr('red, white') })}
+            {inp('plateText', 'Licence plate (prefix)', { placeholder: tr('KA01AB') })}
             {inp('watchlist', 'Watchlist entry ids')}
             {inp('minConfidence', 'Minimum confidence (%)', { inputMode: 'numeric', placeholder: '70' })}
           </div>
           <Checkbox
-            label="Include unreviewed AI results"
-            description="Adds AI detections that no human reviewer has approved yet (rejected results are never included). Such matches are labelled “Unreviewed AI” and must not be relied on without review."
+            label={tr('Include unreviewed AI results')}
+            description={tr('Adds AI detections that no human reviewer has approved yet (rejected results are never included). Such matches are labelled “Unreviewed AI” and must not be relied on without review.')}
             checked={d.includeUnreviewed}
             onChange={(v) => set('includeUnreviewed', v)}
           />
         </Section>
         {error && <Alert tone="red">{error}</Alert>}
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setD(toDraft({}))}>Clear form</Button>
-          <Button type="submit" icon={<Filter className="h-4 w-4" />}>Apply filters</Button>
+          <Button variant="secondary" onClick={() => setD(toDraft({}))}>{tr('Clear form')}</Button>
+          <Button type="submit" icon={<Filter className="h-4 w-4" />}>{tr('Apply filters')}</Button>
         </div>
       </form>
     </Card>
@@ -250,10 +251,10 @@ function ResultCard({ item }: { item: SearchItem }) {
           <Link to={`/evidence/${item.id}`} className="mono text-xs font-semibold text-brand-800 hover:underline">{item.evidenceNumber ?? item.id}</Link>
           <StatusBadge status={item.status} />
           {item.storageTier !== 'ACTIVE' && <Badge tone="blue">{titleCase(item.storageTier)}</Badge>}
-          {item.legalHold && <Badge tone="amber"><Lock className="mr-1 inline h-3 w-3" aria-hidden />Legal hold</Badge>}
-          {m.score !== null && <span className="text-xs text-ink-500">score {m.score}</span>}
+          {item.legalHold && <Badge tone="amber"><Lock className="mr-1 inline h-3 w-3" aria-hidden />{tr('Legal hold')}</Badge>}
+          {m.score !== null && <span className="text-xs text-ink-500">{tr('score')}{' '}{m.score}</span>}
         </div>
-        <p className="font-medium text-ink-900 [overflow-wrap:anywhere]">{item.title ?? <span className="text-ink-500">Untitled</span>}</p>
+        <p className="font-medium text-ink-900 [overflow-wrap:anywhere]">{item.title ?? <span className="text-ink-500">{tr('Untitled')}</span>}</p>
         {m.snippet && <Snippet parts={m.snippet} />}
         <p className="text-xs text-ink-500">
           {item.orgUnit.name}
@@ -265,7 +266,7 @@ function ResultCard({ item }: { item: SearchItem }) {
           <div className="flex flex-wrap gap-1">{item.tags.map((t) => <Badge key={t}>{t}</Badge>)}</div>
         )}
         {m.ai.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1" role="group" aria-label="Matching AI moments">
+          <div className="flex flex-wrap items-center gap-1.5 pt-1" role="group" aria-label={tr('Matching AI moments')}>
             <Sparkles className="h-3.5 w-3.5 text-brand-700" aria-hidden />
             {m.ai.map((a) => (
               <Link
@@ -277,10 +278,10 @@ function ResultCard({ item }: { item: SearchItem }) {
                 {a.label}
                 {a.colorName ? ` · ${a.colorName}` : ''}
                 {a.plateText ? ` · ${a.plateText}` : ''} · {Math.round(a.confidence * 100)}% @ {formatTimecode(a.frameTimeMs)}
-                {a.unreviewed && <span className="font-semibold"> · Unreviewed AI</span>}
+                {a.unreviewed && <span className="font-semibold">{' '}{tr('· Unreviewed AI')}</span>}
               </Link>
             ))}
-            {m.aiTotal > m.ai.length && <span className="text-xs text-ink-500">+{m.aiTotal - m.ai.length} more</span>}
+            {m.aiTotal > m.ai.length && <span className="text-xs text-ink-500">+{m.aiTotal - m.ai.length}{' '}{tr('more')}</span>}
           </div>
         )}
       </div>
@@ -294,17 +295,17 @@ function SavedSearchesMenu({ onPick }: { onPick: (c: SearchCriteria) => void }) 
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="secondary" icon={<Bookmark className="h-4 w-4" />} onClick={() => setOpen(true)}>Saved searches</Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="Saved searches">
+      <Button variant="secondary" icon={<Bookmark className="h-4 w-4" />} onClick={() => setOpen(true)}>{tr('Saved searches')}</Button>
+      <Modal open={open} onClose={() => setOpen(false)} title={tr('Saved searches')}>
         {saved.isLoading ? <Spinner /> : saved.error ? <ErrorState error={saved.error} onRetry={() => void saved.refetch()} /> : !saved.data?.items.length ? (
-          <EmptyState title="No saved searches" description="Run a search and choose “Save search” to keep it here." />
+          <EmptyState title={tr('No saved searches')} description={tr('Run a search and choose “Save search” to keep it here.')} />
         ) : (
           <ul className="divide-y divide-ink-100">
             {saved.data.items.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-2 py-2">
                 <button type="button" className="text-left text-sm font-medium text-brand-800 hover:underline" onClick={() => { onPick(s.criteria); setOpen(false); }}>
                   {s.name}
-                  <span className="block text-xs font-normal text-ink-500">{countCriteria(s.criteria)} filter(s){s.criteria.text ? ` · “${s.criteria.text}”` : ''}</span>
+                  <span className="block text-xs font-normal text-ink-500">{countCriteria(s.criteria)}{' '}{tr('filter(s)')}{' '}{s.criteria.text ? ` · “${s.criteria.text}”` : ''}</span>
                 </button>
                 <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} aria-label={`Delete saved search ${s.name}`} loading={del.isPending && del.variables === s.id} onClick={() => del.mutate(s.id)} />
               </li>
@@ -329,22 +330,22 @@ function SaveSearchButton({ criteria }: { criteria: SearchCriteria }) {
   };
   return (
     <>
-      <Button variant="secondary" icon={<Save className="h-4 w-4" />} onClick={() => { setName(criteria.text ?? ''); save.reset(); setOpen(true); }}>Save search</Button>
+      <Button variant="secondary" icon={<Save className="h-4 w-4" />} onClick={() => { setName(criteria.text ?? ''); save.reset(); setOpen(true); }}>{tr('Save search')}</Button>
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Save this search"
+        title={tr('Save this search')}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button loading={save.isPending} disabled={!name.trim()} onClick={submit}>Save</Button>
+            <Button variant="secondary" onClick={() => setOpen(false)}>{tr('Cancel')}</Button>
+            <Button loading={save.isPending} disabled={!name.trim()} onClick={submit}>{tr('Save')}</Button>
           </>
         }
       >
-        <Field label="Name" htmlFor="saved-name" required>
+        <Field label={tr('Name')} htmlFor="saved-name" required>
           <Input id="saved-name" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} autoFocus />
         </Field>
-        <p className="mt-2 text-xs text-ink-500">Saved searches store the criteria only; results are re-evaluated against your access every time.</p>
+        <p className="mt-2 text-xs text-ink-500">{tr('Saved searches store the criteria only; results are re-evaluated against your access every time.')}</p>
         {save.error && <div className="mt-2"><Alert tone="red">{errorMessage(save.error)}</Alert></div>}
       </Modal>
     </>
@@ -380,29 +381,29 @@ export function SearchPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Search evidence" subtitle="Full-text, metadata, location, case/FIR and AI-derived search across all storage tiers — limited to evidence you are authorised to see." />
+      <PageHeader title={tr('Search evidence')} subtitle={tr('Full-text, metadata, location, case/FIR and AI-derived search across all storage tiers — limited to evidence you are authorised to see.')} />
       <form onSubmit={submitText} className="flex flex-wrap items-end gap-2" role="search">
         <div className="min-w-[16rem] flex-1">
-          <label htmlFor="search-text" className="sr-only">Search text</label>
-          <Input id="search-text" value={text} onChange={(e) => setText(e.target.value)} placeholder='Words, evidence number, file name… e.g. robbery "MG Road" -traffic' maxLength={200} />
+          <label htmlFor="search-text" className="sr-only">{tr('Search text')}</label>
+          <Input id="search-text" value={text} onChange={(e) => setText(e.target.value)} placeholder={tr('Words, evidence number, file name… e.g. robbery "MG Road" -traffic')} maxLength={200} />
         </div>
-        <Button type="submit" icon={<Search className="h-4 w-4" />}>Search</Button>
+        <Button type="submit" icon={<Search className="h-4 w-4" />}>{tr('Search')}</Button>
         <Button variant="secondary" icon={<Filter className="h-4 w-4" />} onClick={() => setAdvanced((v) => !v)} aria-expanded={advanced}>
-          Filters{active ? ` (${active})` : ''}
+          {tr('Filters')}{' '}{active ? ` (${active})` : ''}
         </Button>
         <SavedSearchesMenu onPick={apply} />
         <SaveSearchButton criteria={criteria} />
-        {(active > 0 || criteria.text) && <Button variant="ghost" onClick={() => { setText(''); setUrl({ c: '', page: '1', sort: '' }); }}>Reset</Button>}
+        {(active > 0 || criteria.text) && <Button variant="ghost" onClick={() => { setText(''); setUrl({ c: '', page: '1', sort: '' }); }}>{tr('Reset')}</Button>}
       </form>
       {advanced && <AdvancedPanel key={url.c} initial={criteria} onApply={(c) => { apply(c); setAdvanced(false); }} onClose={() => setAdvanced(false)} />}
       {criteria.ai?.reviewStatus === 'ANY_NON_REJECTED' && (
-        <Alert tone="amber" title="Unreviewed AI results included">Matches marked “Unreviewed AI” come from detections that no human reviewer has approved. Verify them before relying on them.</Alert>
+        <Alert tone="amber" title={tr('Unreviewed AI results included')}>{tr('Matches marked “Unreviewed AI” come from detections that no human reviewer has approved. Verify them before relying on them.')}</Alert>
       )}
       {criteria.location && (
-        <p className="flex items-center gap-1 text-xs text-ink-600"><MapPin className="h-3.5 w-3.5" aria-hidden />Within {criteria.location.radiusKm} km of {criteria.location.lat}, {criteria.location.lon}</p>
+        <p className="flex items-center gap-1 text-xs text-ink-600"><MapPin className="h-3.5 w-3.5" aria-hidden />{tr('Within')}{' '}{criteria.location.radiusKm}{' '}{tr('km of')}{' '}{criteria.location.lat}, {criteria.location.lon}</p>
       )}
       <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <aside aria-label="Facets" className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-1">
+        <aside aria-label={tr('Facets')} className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-1">
           {data?.facets ? (
             (Object.keys(FACET_LABEL) as FacetName[]).map((f) =>
               data.facets![f].length ? (
@@ -420,30 +421,30 @@ export function SearchPage() {
                 </Card>
               ) : null,
             )
-          ) : q.isLoading ? <Spinner label="Loading facets…" /> : null}
-          {data?.facetsTruncated && <p className="text-xs text-ink-500">Facets computed over the first 10,000 matches.</p>}
+          ) : q.isLoading ? <Spinner label={tr('Loading facets…')} /> : null}
+          {data?.facetsTruncated && <p className="text-xs text-ink-500">{tr('Facets computed over the first 10,000 matches.')}</p>}
         </aside>
-        <section aria-label="Results" className="space-y-3">
+        <section aria-label={tr('Results')} className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-ink-600" aria-live="polite">
               {data ? `${data.total.toLocaleString('en-IN')}${data.totalApprox ? '+' : ''} result${data.total === 1 && !data.totalApprox ? '' : 's'}` : ' '}
-              {data && <span className="text-ink-500"> · {data.tookMs} ms</span>}
-              {q.isFetching && !q.isLoading && <span className="ml-2 text-ink-500">Updating…</span>}
+              {data && <span className="text-ink-500"> · {data.tookMs}{' '}{tr('ms')}</span>}
+              {q.isFetching && !q.isLoading && <span className="ml-2 text-ink-500">{tr('Updating…')}</span>}
             </p>
             <label className="flex items-center gap-2 text-sm">
-              <span className="text-ink-600">Sort</span>
-              <Select value={sort ?? ''} onChange={(e) => setUrl({ sort: e.target.value, page: '1' })} aria-label="Sort results">
-                <option value="">Default ({criteria.text ? 'relevance' : 'recorded, newest'})</option>
+              <span className="text-ink-600">{tr('Sort')}</span>
+              <Select value={sort ?? ''} onChange={(e) => setUrl({ sort: e.target.value, page: '1' })} aria-label={tr('Sort results')}>
+                <option value="">{tr('Default (')}{criteria.text ? 'relevance' : 'recorded, newest'})</option>
                 {SEARCH_SORTS.map((s) => <option key={s} value={s}>{SORT_LABEL[s]}</option>)}
               </Select>
             </label>
           </div>
           {q.isLoading ? (
-            <Spinner label="Searching…" />
+            <Spinner label={tr('Searching…')} />
           ) : q.error ? (
-            <ErrorState error={q.error} onRetry={() => void q.refetch()} title="Search failed" />
+            <ErrorState error={q.error} onRetry={() => void q.refetch()} title={tr('Search failed')} />
           ) : !data?.items.length ? (
-            <EmptyState title="No matching evidence" description={active || criteria.text ? 'Try fewer filters or different words. Only evidence you are authorised to see is searched.' : 'No evidence is visible to you yet.'} />
+            <EmptyState title={tr('No matching evidence')} description={active || criteria.text ? 'Try fewer filters or different words. Only evidence you are authorised to see is searched.' : 'No evidence is visible to you yet.'} />
           ) : (
             <>
               <ul className="space-y-2">{data.items.map((it) => <ResultCard key={it.id} item={it} />)}</ul>

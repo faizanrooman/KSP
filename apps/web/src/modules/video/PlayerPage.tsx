@@ -6,6 +6,7 @@ import { formatTimecode } from '@/lib/format';
 import { CopyButton, PageHeader } from '@/components/ui';
 import { EvidencePlayer, type EvidencePlayerHandle } from './EvidencePlayer';
 
+import { t as tr } from '@/lib/i18n';
 /** Full-page player: /evidence/:id/player?t=<ms> */
 export function PlayerPage() {
   const { id = '' } = useParams();
@@ -26,11 +27,11 @@ export function PlayerPage() {
       <PageHeader
         title={ev.data?.evidenceNumber ?? 'Evidence player'}
         subtitle={ev.data?.title ?? undefined}
-        breadcrumb={<Link to={`/evidence/${id}`} className="text-brand-700 hover:underline">← Back to evidence</Link>}
+        breadcrumb={<Link to={`/evidence/${id}`} className="text-brand-700 hover:underline">{tr('← Back to evidence')}</Link>}
         actions={
           <span className="flex items-center gap-2 text-xs text-ink-600">
-            Link to <span className="mono">{formatTimecode(now)}</span>
-            <CopyButton value={link} label="Copy link" />
+            {tr('Link to')}<span className="mono">{formatTimecode(now)}</span>
+            <CopyButton value={link} label={tr('Copy link')} />
           </span>
         }
       />

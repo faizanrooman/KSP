@@ -5,6 +5,7 @@ import type { EvidenceAction, EvidenceSummary } from '@/lib/extensions';
 import { Button } from '@/components/ui';
 import { ShareDialog } from './ShareDialog';
 
+import { t } from '@/lib/i18n';
 type WithFlags = EvidenceSummary & { permissions?: { canShare?: boolean; canDownloadOriginal?: boolean } };
 
 function ShareButton({ evidence }: { evidence: EvidenceSummary }) {
@@ -13,7 +14,7 @@ function ShareButton({ evidence }: { evidence: EvidenceSummary }) {
   if (ev.permissions?.canShare !== true) return null;
   return (
     <>
-      <Button variant="secondary" size="sm" icon={<Share2 className="h-4 w-4" />} onClick={() => setOpen(true)}>Share</Button>
+      <Button variant="secondary" size="sm" icon={<Share2 className="h-4 w-4" />} onClick={() => setOpen(true)}>{t('Share')}</Button>
       {open && <ShareDialog items={[{ id: ev.id, evidenceNumber: ev.evidenceNumber, canDownloadOriginal: ev.permissions?.canDownloadOriginal === true }]} onClose={() => setOpen(false)} />}
     </>
   );

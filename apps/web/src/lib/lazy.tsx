@@ -9,6 +9,7 @@
 import { Component, lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 import { Button, Spinner } from '@/components/ui';
 
+import { t } from '@/lib/i18n';
 /**
  * `lazyPage(() => import('./EvidenceListPage'), 'EvidenceListPage')` → a lazy component with the named export's
  * exact props. The loader must be an inline `import()` so Vite can split it.
@@ -29,9 +30,9 @@ class ChunkErrorBoundary extends Component<{ children: ReactNode }, { error: Err
     if (!this.state.error) return this.props.children;
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-10 text-center" role="alert">
-        <p className="font-medium text-ink-800">This part of the application could not be loaded</p>
-        <p className="max-w-lg text-sm text-ink-600">{this.state.error.message || 'Network error'} — the application may have been updated.</p>
-        <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>Reload</Button>
+        <p className="font-medium text-ink-800">{t('This part of the application could not be loaded')}</p>
+        <p className="max-w-lg text-sm text-ink-600">{this.state.error.message || 'Network error'}{' '}{t('— the application may have been updated.')}</p>
+        <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>{t('Reload')}</Button>
       </div>
     );
   }

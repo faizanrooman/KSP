@@ -7,6 +7,7 @@ import { Alert, Button, Card, DataTable, EmptyState, ErrorState, Field, Input, P
 import { OrgUnitSelect, UserPicker, type UserOption } from '@/components/pickers';
 import { SchedulesCard } from './SchedulesCard';
 
+import { t as tr } from '@/lib/i18n';
 interface ReportType { code: string; title: string; description: string; requires: string[]; extraParams: string[]; available: boolean; jurisdiction: string[] }
 interface ReportRun {
   id: string; reportType: string; title: string; format: string; status: string; rowCount: number | null; sha256: string | null; contentSha256: string | null;
@@ -60,54 +61,54 @@ export function ReportsPage() {
   });
 
   const cols: Column<ReportRun>[] = [
-    { key: 'title', header: 'Report', render: (r) => <span className={r.id === q.run ? 'font-semibold text-brand-700' : 'font-medium text-ink-900'}>{r.title}{r.scheduleId && <span className="ml-1 text-xs font-normal text-ink-500">(scheduled)</span>}</span> },
-    { key: 'format', header: 'Format', render: (r) => r.format },
-    { key: 'period', header: 'Period', render: (r) => (r.params.from || r.params.to ? `${r.params.from?.slice(0, 10) ?? '…'} → ${r.params.to?.slice(0, 10) ?? '…'}` : 'All time'), className: 'whitespace-nowrap' },
-    { key: 'scope', header: 'Scope', render: (r) => r.orgUnit?.name ?? <span className="font-mono text-xs">{r.params.jurisdiction.join(', ')}</span> },
-    { key: 'status', header: 'Status', render: (r) => (r.status === 'FAILED' ? <span title={r.error ?? ''}><StatusBadge status={r.status} /></span> : <StatusBadge status={r.status} />) },
-    { key: 'rows', header: 'Rows', render: (r) => r.rowCount ?? '—', className: 'text-right tabular-nums' },
-    { key: 'size', header: 'Size', render: (r) => formatBytes(r.sizeBytes), className: 'whitespace-nowrap' },
-    { key: 'sha', header: 'SHA-256', render: (r) => (r.sha256 ? <span className="font-mono text-xs" title={r.sha256}>{shortHash(r.sha256)}</span> : '—') },
-    { key: 'at', header: 'Requested', render: (r) => formatDateTime(r.createdAt), className: 'whitespace-nowrap' },
-    { key: 'dl', header: <span className="sr-only">Download</span>, render: (r) => (r.status === 'COMPLETED' ? <Button variant="secondary" onClick={() => download.mutate(r.id)} loading={download.isPending && download.variables === r.id}>Download</Button> : null) },
+    { key: 'title', header: tr('Report'), render: (r) => <span className={r.id === q.run ? 'font-semibold text-brand-700' : 'font-medium text-ink-900'}>{r.title}{r.scheduleId && <span className="ml-1 text-xs font-normal text-ink-500">{tr('(scheduled)')}</span>}</span> },
+    { key: 'format', header: tr('Format'), render: (r) => r.format },
+    { key: 'period', header: tr('Period'), render: (r) => (r.params.from || r.params.to ? `${r.params.from?.slice(0, 10) ?? '…'} → ${r.params.to?.slice(0, 10) ?? '…'}` : 'All time'), className: 'whitespace-nowrap' },
+    { key: 'scope', header: tr('Scope'), render: (r) => r.orgUnit?.name ?? <span className="font-mono text-xs">{r.params.jurisdiction.join(', ')}</span> },
+    { key: 'status', header: tr('Status'), render: (r) => (r.status === 'FAILED' ? <span title={r.error ?? ''}><StatusBadge status={r.status} /></span> : <StatusBadge status={r.status} />) },
+    { key: 'rows', header: tr('Rows'), render: (r) => r.rowCount ?? '—', className: 'text-right tabular-nums' },
+    { key: 'size', header: tr('Size'), render: (r) => formatBytes(r.sizeBytes), className: 'whitespace-nowrap' },
+    { key: 'sha', header: tr('SHA-256'), render: (r) => (r.sha256 ? <span className="font-mono text-xs" title={r.sha256}>{shortHash(r.sha256)}</span> : '—') },
+    { key: 'at', header: tr('Requested'), render: (r) => formatDateTime(r.createdAt), className: 'whitespace-nowrap' },
+    { key: 'dl', header: <span className="sr-only">{tr('Download')}</span>, render: (r) => (r.status === 'COMPLETED' ? <Button variant="secondary" onClick={() => download.mutate(r.id)} loading={download.isPending && download.variables === r.id}>{tr('Download')}</Button> : null) },
   ];
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Reports" subtitle="Evidence and compliance reports. Data is limited to your jurisdiction; every request and download is audited." />
-      <Card title="New report">
+      <PageHeader title={tr('Reports')} subtitle={tr('Evidence and compliance reports. Data is limited to your jurisdiction; every request and download is audited.')} />
+      <Card title={tr('New report')}>
         {types.isLoading ? <Spinner /> : types.error ? <ErrorState error={types.error} onRetry={() => void types.refetch()} /> : (
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
             <div className="grid gap-3 md:grid-cols-3">
-              <Field label="Report type" htmlFor="rep-type" required>
+              <Field label={tr('Report type')} htmlFor="rep-type" required>
                 <Select id="rep-type" value={type} required onChange={(e) => setType(e.target.value)}>
-                  <option value="">Choose…</option>
+                  <option value="">{tr('Choose…')}</option>
                   {types.data!.items.map((t) => <option key={t.code} value={t.code} disabled={!t.available}>{t.title}{t.available ? '' : ' (not permitted)'}</option>)}
                 </Select>
               </Field>
-              <Field label="Format" htmlFor="rep-format"><Select id="rep-format" value={format} onChange={(e) => setFormat(e.target.value)}>{types.data!.formats.map((f) => <option key={f}>{f}</option>)}</Select></Field>
-              <Field label="Station / unit" htmlFor="rep-org" hint="Must be inside your jurisdiction"><OrgUnitSelect scope="reports:generate" id="rep-org" value={orgUnitId} onChange={setOrgUnitId} emptyLabel="All in my jurisdiction" /></Field>
-              <Field label="From" htmlFor="rep-from"><Input id="rep-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-              <Field label="To" htmlFor="rep-to"><Input id="rep-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
-              {selected?.extraParams.includes('inactiveDays') && <Field label="Inactive after (days)" htmlFor="rep-inactive"><Input id="rep-inactive" type="number" min={1} max={3650} value={inactiveDays} onChange={(e) => setInactiveDays(e.target.value)} /></Field>}
-              {selected?.extraParams.includes('actorId') && <Field label="Only this user (optional)" htmlFor="rep-actor"><UserPicker id="rep-actor" value={actor} onChange={setActor} /></Field>}
+              <Field label={tr('Format')} htmlFor="rep-format"><Select id="rep-format" value={format} onChange={(e) => setFormat(e.target.value)}>{types.data!.formats.map((f) => <option key={f}>{f}</option>)}</Select></Field>
+              <Field label={tr('Station / unit')} htmlFor="rep-org" hint={tr('Must be inside your jurisdiction')}><OrgUnitSelect scope="reports:generate" id="rep-org" value={orgUnitId} onChange={setOrgUnitId} emptyLabel={tr('All in my jurisdiction')} /></Field>
+              <Field label={tr('From')} htmlFor="rep-from"><Input id="rep-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+              <Field label={tr('To')} htmlFor="rep-to"><Input id="rep-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+              {selected?.extraParams.includes('inactiveDays') && <Field label={tr('Inactive after (days)')} htmlFor="rep-inactive"><Input id="rep-inactive" type="number" min={1} max={3650} value={inactiveDays} onChange={(e) => setInactiveDays(e.target.value)} /></Field>}
+              {selected?.extraParams.includes('actorId') && <Field label={tr('Only this user (optional)')} htmlFor="rep-actor"><UserPicker id="rep-actor" value={actor} onChange={setActor} /></Field>}
             </div>
-            {selected && <p className="text-sm text-ink-700">{selected.description} <span className="text-ink-500">Jurisdiction: <span className="font-mono">{selected.jurisdiction.join(', ')}</span></span></p>}
+            {selected && <p className="text-sm text-ink-700">{selected.description} <span className="text-ink-500">{tr('Jurisdiction:')}{' '}<span className="font-mono">{selected.jurisdiction.join(', ')}</span></span></p>}
             {create.error && <Alert tone="red">{errorMessage(create.error)}</Alert>}
-            <Button type="submit" disabled={!type} loading={create.isPending}>Run report</Button>
+            <Button type="submit" disabled={!type} loading={create.isPending}>{tr('Run report')}</Button>
           </form>
         )}
       </Card>
       {types.data && <SchedulesCard types={types.data.items} formats={types.data.formats} />}
-      <Card title="My report runs">
-        <DataTable columns={cols} rows={runs.data?.items} rowKey={(r) => r.id} loading={runs.isLoading} error={runs.error} onRetry={() => void runs.refetch()} caption="My report runs"
-          empty={<EmptyState title="No reports yet" description="Run a report above; CSV, PDF and JSON are supported." />} />
+      <Card title={tr('My report runs')}>
+        <DataTable columns={cols} rows={runs.data?.items} rowKey={(r) => r.id} loading={runs.isLoading} error={runs.error} onRetry={() => void runs.refetch()} caption={tr('My report runs')}
+          empty={<EmptyState title={tr('No reports yet')} description={tr('Run a report above; CSV, PDF and JSON are supported.')} />} />
         {runs.data && <Pagination page={page} pageSize={20} total={runs.data.total} onPage={(p) => setQ({ page: String(p) })} />}
       </Card>
       {(shared.data?.items.length ?? 0) > 0 && (
-        <Card title="Shared with me (scheduled reports)">
-          <DataTable columns={[...cols.slice(0, 1), { key: 'owner', header: 'Owner', render: (r) => r.requestedBy?.name ?? '—' }, ...cols.slice(1)]} rows={shared.data?.items} rowKey={(r) => r.id}
-            loading={shared.isLoading} error={shared.error} onRetry={() => void shared.refetch()} caption="Scheduled report runs shared with me" empty={<EmptyState title="Nothing shared with you" />} />
+        <Card title={tr('Shared with me (scheduled reports)')}>
+          <DataTable columns={[...cols.slice(0, 1), { key: 'owner', header: tr('Owner'), render: (r) => r.requestedBy?.name ?? '—' }, ...cols.slice(1)]} rows={shared.data?.items} rowKey={(r) => r.id}
+            loading={shared.isLoading} error={shared.error} onRetry={() => void shared.refetch()} caption={tr('Scheduled report runs shared with me')} empty={<EmptyState title={tr('Nothing shared with you')} />} />
         </Card>
       )}
     </div>

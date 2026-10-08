@@ -11,6 +11,7 @@ import { localToIso, OneTimePasswordDialog, useRoles } from './shared';
 import { profileBody, ProfileFields, type ProfileForm } from './UserCreatePage';
 import type { RoleAssignment, SessionItem, UserDetail } from './types';
 
+import { t } from '@/lib/i18n';
 type Action = 'DISABLED' | 'LOCKED' | 'ACTIVE' | 'unlock' | 'reset-password' | 'reset-mfa' | 'revoke-all';
 
 const ACTIONS: Record<Action, { title: string; label: string; message: string; variant: 'primary' | 'danger'; reason: boolean }> = {
@@ -43,7 +44,7 @@ function EditProfileModal({ user, onClose }: { user: UserDetail; onClose: () => 
     },
   });
   return (
-    <Modal open onClose={onClose} title={`Edit ${user.fullName}`} size="lg" footer={<><Button variant="secondary" onClick={onClose} disabled={m.isPending}>Cancel</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={f.fullName.trim().length < 2}>Save</Button></>}>
+    <Modal open onClose={onClose} title={`Edit ${user.fullName}`} size="lg" footer={<><Button variant="secondary" onClick={onClose} disabled={m.isPending}>{t('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={f.fullName.trim().length < 2}>{t('Save')}</Button></>}>
       <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <ProfileFields f={f} setF={setF} idPrefix="ep" />
         {m.error ? <Alert tone="red">{errorMessage(m.error)}</Alert> : null}
@@ -72,25 +73,25 @@ function GrantRoleModal({ user, onClose }: { user: UserDetail; onClose: () => vo
   const role = roles.data?.items.find((r) => r.id === roleId);
   const missing = m.error instanceof ApiError && m.error.code === 'PRIVILEGE_ESCALATION' ? ((m.error.details as { missing?: string[] })?.missing ?? []) : [];
   return (
-    <Modal open onClose={onClose} title="Grant role" footer={<><Button variant="secondary" onClick={onClose} disabled={m.isPending}>Cancel</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={!roleId || !orgUnitId}>Grant</Button></>}>
+    <Modal open onClose={onClose} title={t('Grant role')} footer={<><Button variant="secondary" onClick={onClose} disabled={m.isPending}>{t('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={!roleId || !orgUnitId}>{t('Grant')}</Button></>}>
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (roleId && orgUnitId) m.mutate(); }}>
-        <Field label="Role" htmlFor="gr-role" required>
+        <Field label={t('Role')} htmlFor="gr-role" required>
           <Select id="gr-role" value={roleId} onChange={(e) => setRoleId(e.target.value)} disabled={roles.isLoading}>
-            <option value="">Select a role…</option>
+            <option value="">{t('Select a role…')}</option>
             {roles.data?.items.map((r) => <option key={r.id} value={r.id}>{r.name}{r.isSystem ? '' : ' (custom)'}</option>)}
           </Select>
         </Field>
-        {role && <p className="text-xs text-ink-600">{role.description ?? ''} {role.permissions.length} permission(s).</p>}
-        <Field label="At unit" htmlFor="gr-org" required hint="The role applies to this unit and every unit below it.">
-          <OrgUnitSelect id="gr-org" scope="roles:manage" value={orgUnitId} onChange={setOrgUnitId} emptyLabel="Select a unit…" />
+        {role && <p className="text-xs text-ink-600">{role.description ?? ''} {role.permissions.length}{' '}{t('permission(s).')}</p>}
+        <Field label={t('At unit')} htmlFor="gr-org" required hint={t('The role applies to this unit and every unit below it.')}>
+          <OrgUnitSelect id="gr-org" scope="roles:manage" value={orgUnitId} onChange={setOrgUnitId} emptyLabel={t('Select a unit…')} />
         </Field>
-        <Field label="Expires (optional, IST)" htmlFor="gr-exp" hint="Leave blank for a permanent assignment.">
+        <Field label={t('Expires (optional, IST)')} htmlFor="gr-exp" hint={t('Leave blank for a permanent assignment.')}>
           <Input id="gr-exp" type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
         </Field>
         {m.error ? (
           <Alert tone="red" title={m.error instanceof ApiError && m.error.code === 'SOD_VIOLATION' ? 'Separation of duties' : 'Not granted'}>
             {errorMessage(m.error)}
-            {missing.length > 0 && <p className="mt-1">Permissions you do not hold at that unit: <span className="mono">{missing.join(', ')}</span></p>}
+            {missing.length > 0 && <p className="mt-1">{t('Permissions you do not hold at that unit:')}{' '}<span className="mono">{missing.join(', ')}</span></p>}
           </Alert>
         ) : null}
       </form>
@@ -145,69 +146,69 @@ export function UserDetailPage() {
   const manageRoles = can('roles:manage') && !u.isSelf;
 
   const roleCols: Column<RoleAssignment>[] = [
-    { key: 'role', header: 'Role', render: (r) => (<div><p className="font-medium">{r.roleName}</p><p className="mono text-xs text-ink-500">{r.roleCode}{r.isSystemRole ? '' : ' · custom'}</p></div>) },
-    { key: 'org', header: 'At unit', render: (r) => (<span>{r.orgUnitName}{!r.orgUnitActive && <Badge tone="gray" className="ml-1">Inactive</Badge>}</span>) },
-    { key: 'granted', header: 'Granted', render: (r) => (<div className="text-sm"><p>{formatDateTime(r.grantedAt)}</p><p className="text-xs text-ink-500">{r.grantedBy ? `by ${r.grantedBy.fullName}` : 'by system'}</p></div>) },
-    { key: 'exp', header: 'Expires', render: (r) => (r.expired ? <Badge tone="gray">Expired {formatDateTime(r.expiresAt)}</Badge> : r.expiresAt ? formatDateTime(r.expiresAt) : 'Never') },
-    ...(manageRoles ? [{ key: 'a', header: <span className="sr-only">Actions</span>, render: (r: RoleAssignment) => <Button size="sm" variant="ghost" onClick={() => { revokeRole.reset(); setRevoke(r); }}>Revoke</Button> }] : []),
+    { key: 'role', header: t('Role'), render: (r) => (<div><p className="font-medium">{r.roleName}</p><p className="mono text-xs text-ink-500">{r.roleCode}{r.isSystemRole ? '' : ' · custom'}</p></div>) },
+    { key: 'org', header: t('At unit'), render: (r) => (<span>{r.orgUnitName}{!r.orgUnitActive && <Badge tone="gray" className="ml-1">{t('Inactive')}</Badge>}</span>) },
+    { key: 'granted', header: t('Granted'), render: (r) => (<div className="text-sm"><p>{formatDateTime(r.grantedAt)}</p><p className="text-xs text-ink-500">{r.grantedBy ? `by ${r.grantedBy.fullName}` : 'by system'}</p></div>) },
+    { key: 'exp', header: t('Expires'), render: (r) => (r.expired ? <Badge tone="gray">{t('Expired')}{' '}{formatDateTime(r.expiresAt)}</Badge> : r.expiresAt ? formatDateTime(r.expiresAt) : 'Never') },
+    ...(manageRoles ? [{ key: 'a', header: <span className="sr-only">{t('Actions')}</span>, render: (r: RoleAssignment) => <Button size="sm" variant="ghost" onClick={() => { revokeRole.reset(); setRevoke(r); }}>{t('Revoke')}</Button> }] : []),
   ];
   const sessCols: Column<SessionItem>[] = [
-    { key: 'started', header: 'Started', render: (r) => formatDateTime(r.createdAt) },
-    { key: 'seen', header: 'Last active', render: (r) => formatDateTime(r.lastSeenAt) },
-    { key: 'ip', header: 'IP address', render: (r) => <span className="mono text-xs">{r.ip ?? '—'}</span> },
-    { key: 'ua', header: 'Client', render: (r) => <span className="line-clamp-2 max-w-xs text-xs text-ink-600">{r.userAgent ?? '—'}</span> },
-    { key: 'mfa', header: 'MFA', render: (r) => (r.mfaVerified ? <Badge tone="green">Verified</Badge> : <Badge>Password only</Badge>) },
-    { key: 'exp', header: 'Idle expiry', render: (r) => formatDateTime(r.idleExpiresAt) },
-    ...(manage ? [{ key: 'a', header: <span className="sr-only">Actions</span>, render: (r: SessionItem) => <Button size="sm" variant="ghost" loading={revokeSession.isPending && revokeSession.variables === r.id} onClick={() => revokeSession.mutate(r.id)}>Revoke</Button> }] : []),
+    { key: 'started', header: t('Started'), render: (r) => formatDateTime(r.createdAt) },
+    { key: 'seen', header: t('Last active'), render: (r) => formatDateTime(r.lastSeenAt) },
+    { key: 'ip', header: t('IP address'), render: (r) => <span className="mono text-xs">{r.ip ?? '—'}</span> },
+    { key: 'ua', header: t('Client'), render: (r) => <span className="line-clamp-2 max-w-xs text-xs text-ink-600">{r.userAgent ?? '—'}</span> },
+    { key: 'mfa', header: t('MFA'), render: (r) => (r.mfaVerified ? <Badge tone="green">{t('Verified')}</Badge> : <Badge>{t('Password only')}</Badge>) },
+    { key: 'exp', header: t('Idle expiry'), render: (r) => formatDateTime(r.idleExpiresAt) },
+    ...(manage ? [{ key: 'a', header: <span className="sr-only">{t('Actions')}</span>, render: (r: SessionItem) => <Button size="sm" variant="ghost" loading={revokeSession.isPending && revokeSession.variables === r.id} onClick={() => revokeSession.mutate(r.id)}>{t('Revoke')}</Button> }] : []),
   ];
   const cfg = action ? ACTIONS[action] : null;
 
   return (
     <div className="space-y-4">
       <PageHeader
-        breadcrumb={<Link to="/admin/users" className="hover:underline">Users</Link>}
-        title={<span className="flex items-center gap-2">{u.fullName} <StatusBadge status={u.status} />{u.locked && u.status !== 'LOCKED' && <Badge tone="red">Locked out</Badge>}</span>}
+        breadcrumb={<Link to="/admin/users" className="hover:underline">{t('Users')}</Link>}
+        title={<span className="flex items-center gap-2">{u.fullName} <StatusBadge status={u.status} />{u.locked && u.status !== 'LOCKED' && <Badge tone="red">{t('Locked out')}</Badge>}</span>}
         subtitle={<span className="mono">@{u.username}{u.badgeNumber ? ` · ${u.badgeNumber}` : ''}</span>}
-        actions={manage ? <Button variant="secondary" icon={<Pencil className="h-4 w-4" />} onClick={() => setEdit(true)}>Edit profile</Button> : undefined}
+        actions={manage ? <Button variant="secondary" icon={<Pencil className="h-4 w-4" />} onClick={() => setEdit(true)}>{t('Edit profile')}</Button> : undefined}
       />
-      {u.isSelf && <Alert tone="blue">This is your own account. Status, credential and role changes must be made by another administrator.</Alert>}
+      {u.isSelf && <Alert tone="blue">{t('This is your own account. Status, credential and role changes must be made by another administrator.')}</Alert>}
       {u.status !== 'ACTIVE' && u.statusReason && <Alert tone="amber" title={`Account ${u.status.toLowerCase()} ${formatDateTime(u.statusChangedAt)}`}>{u.statusReason}</Alert>}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card title="Profile" className="lg:col-span-2">
+        <Card title={t('Profile')} className="lg:col-span-2">
           <KeyValue items={[
-            { label: 'Home unit', value: u.homeOrgUnit.name },
-            { label: 'Email', value: u.email ?? '—' },
-            { label: 'Rank', value: u.rank ?? '—' },
-            { label: 'Designation', value: u.designation ?? '—' },
-            { label: 'Phone', value: u.phone ?? '—' },
-            { label: 'Created', value: `${formatDateTime(u.createdAt)}${u.createdBy ? ` by ${u.createdBy.fullName}` : ''}` },
+            { label: t('Home unit'), value: u.homeOrgUnit.name },
+            { label: t('Email'), value: u.email ?? '—' },
+            { label: t('Rank'), value: u.rank ?? '—' },
+            { label: t('Designation'), value: u.designation ?? '—' },
+            { label: t('Phone'), value: u.phone ?? '—' },
+            { label: t('Created'), value: `${formatDateTime(u.createdAt)}${u.createdBy ? ` by ${u.createdBy.fullName}` : ''}` },
           ]} />
         </Card>
-        <Card title="Security">
+        <Card title={t('Security')}>
           <KeyValue columns={1} items={[
-            { label: 'Last sign-in', value: `${formatDateTime(u.lastLoginAt)}${u.lastLoginIp ? ` from ${u.lastLoginIp}` : ''}` },
-            { label: 'MFA', value: u.mfaEnabled ? <Badge tone="green">Enrolled {formatDateTime(u.mfaEnrolledAt)}</Badge> : <Badge>Not enrolled</Badge> },
-            { label: 'Password', value: `${u.mustChangePassword ? 'Must change at next sign-in · ' : ''}changed ${formatDateTime(u.passwordChangedAt)}` },
-            { label: 'Failed sign-ins', value: `${u.failedLoginCount}${u.lockedUntil ? ` · locked until ${formatDateTime(u.lockedUntil)}` : ''}` },
-            { label: 'Active sessions', value: u.activeSessions },
+            { label: t('Last sign-in'), value: `${formatDateTime(u.lastLoginAt)}${u.lastLoginIp ? ` from ${u.lastLoginIp}` : ''}` },
+            { label: t('MFA'), value: u.mfaEnabled ? <Badge tone="green">{t('Enrolled')}{' '}{formatDateTime(u.mfaEnrolledAt)}</Badge> : <Badge>{t('Not enrolled')}</Badge> },
+            { label: t('Password'), value: `${u.mustChangePassword ? 'Must change at next sign-in · ' : ''}changed ${formatDateTime(u.passwordChangedAt)}` },
+            { label: t('Failed sign-ins'), value: `${u.failedLoginCount}${u.lockedUntil ? ` · locked until ${formatDateTime(u.lockedUntil)}` : ''}` },
+            { label: t('Active sessions'), value: u.activeSessions },
           ]} />
           {manage && (
             <div className="mt-4 flex flex-wrap gap-2">
-              {u.status === 'ACTIVE' && <Button size="sm" variant="danger" icon={<UserX className="h-4 w-4" />} onClick={() => { act.reset(); setAction('DISABLED'); }}>Disable</Button>}
-              {u.status === 'ACTIVE' && <Button size="sm" variant="secondary" icon={<Lock className="h-4 w-4" />} onClick={() => { act.reset(); setAction('LOCKED'); }}>Lock</Button>}
-              {u.status !== 'ACTIVE' && u.status !== 'LOCKED' && <Button size="sm" variant="success" icon={<UserCheck className="h-4 w-4" />} onClick={() => { act.reset(); setAction('ACTIVE'); }}>Re-activate</Button>}
-              {(u.locked || u.status === 'LOCKED') && u.status !== 'DISABLED' && <Button size="sm" variant="secondary" icon={<Unlock className="h-4 w-4" />} onClick={() => { act.reset(); setAction('unlock'); }}>Unlock</Button>}
-              <Button size="sm" variant="secondary" icon={<KeyRound className="h-4 w-4" />} onClick={() => { act.reset(); setAction('reset-password'); }}>Reset password</Button>
-              {u.mfaEnabled && <Button size="sm" variant="secondary" icon={<ShieldOff className="h-4 w-4" />} onClick={() => { act.reset(); setAction('reset-mfa'); }}>Reset MFA</Button>}
+              {u.status === 'ACTIVE' && <Button size="sm" variant="danger" icon={<UserX className="h-4 w-4" />} onClick={() => { act.reset(); setAction('DISABLED'); }}>{t('Disable')}</Button>}
+              {u.status === 'ACTIVE' && <Button size="sm" variant="secondary" icon={<Lock className="h-4 w-4" />} onClick={() => { act.reset(); setAction('LOCKED'); }}>{t('Lock')}</Button>}
+              {u.status !== 'ACTIVE' && u.status !== 'LOCKED' && <Button size="sm" variant="success" icon={<UserCheck className="h-4 w-4" />} onClick={() => { act.reset(); setAction('ACTIVE'); }}>{t('Re-activate')}</Button>}
+              {(u.locked || u.status === 'LOCKED') && u.status !== 'DISABLED' && <Button size="sm" variant="secondary" icon={<Unlock className="h-4 w-4" />} onClick={() => { act.reset(); setAction('unlock'); }}>{t('Unlock')}</Button>}
+              <Button size="sm" variant="secondary" icon={<KeyRound className="h-4 w-4" />} onClick={() => { act.reset(); setAction('reset-password'); }}>{t('Reset password')}</Button>
+              {u.mfaEnabled && <Button size="sm" variant="secondary" icon={<ShieldOff className="h-4 w-4" />} onClick={() => { act.reset(); setAction('reset-mfa'); }}>{t('Reset MFA')}</Button>}
             </div>
           )}
         </Card>
       </div>
-      <Card title="Role assignments" bodyClassName="p-0" actions={manageRoles && u.status !== 'DISABLED' ? <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setGrant(true)}>Grant role</Button> : undefined}>
-        <DataTable caption="Role assignments" columns={roleCols} rows={u.roles} rowKey={(r) => r.id} empty={<EmptyState title="No roles" description="This account has no permissions." />} />
+      <Card title={t('Role assignments')} bodyClassName="p-0" actions={manageRoles && u.status !== 'DISABLED' ? <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setGrant(true)}>{t('Grant role')}</Button> : undefined}>
+        <DataTable caption={t('Role assignments')} columns={roleCols} rows={u.roles} rowKey={(r) => r.id} empty={<EmptyState title={t('No roles')} description={t('This account has no permissions.')} />} />
       </Card>
-      <Card title="Active sessions" bodyClassName="p-0" actions={manage && (sessions.data?.items.length ?? 0) > 0 ? <Button size="sm" variant="secondary" icon={<LogOut className="h-4 w-4" />} onClick={() => { act.reset(); setAction('revoke-all'); }}>Revoke all</Button> : undefined}>
-        <DataTable caption="Active sessions" columns={sessCols} rows={sessions.data?.items} rowKey={(r) => r.id} loading={sessions.isFetching} error={sessions.error} onRetry={() => void sessions.refetch()} empty={<EmptyState title="No active sessions" />} />
+      <Card title={t('Active sessions')} bodyClassName="p-0" actions={manage && (sessions.data?.items.length ?? 0) > 0 ? <Button size="sm" variant="secondary" icon={<LogOut className="h-4 w-4" />} onClick={() => { act.reset(); setAction('revoke-all'); }}>{t('Revoke all')}</Button> : undefined}>
+        <DataTable caption={t('Active sessions')} columns={sessCols} rows={sessions.data?.items} rowKey={(r) => r.id} loading={sessions.isFetching} error={sessions.error} onRetry={() => void sessions.refetch()} empty={<EmptyState title={t('No active sessions')} />} />
       </Card>
 
       {edit && <EditProfileModal user={u} onClose={() => setEdit(false)} />}
@@ -226,9 +227,9 @@ export function UserDetailPage() {
       />
       <ConfirmDialog
         open={!!revoke}
-        title="Revoke role"
-        message={revoke ? <>Remove <strong>{revoke.roleName}</strong> at <strong>{revoke.orgUnitName}</strong> from {u.fullName}? Takes effect immediately.</> : ''}
-        confirmLabel="Revoke"
+        title={t('Revoke role')}
+        message={revoke ? <>{t('Remove')}{' '}<strong>{revoke.roleName}</strong>{' '}{t('at')}{' '}<strong>{revoke.orgUnitName}</strong>{' '}{t('from')}{' '}{u.fullName}{t('? Takes effect immediately.')}</> : ''}
+        confirmLabel={t('Revoke')}
         variant="danger"
         requireReason
         loading={revokeRole.isPending}

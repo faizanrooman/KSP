@@ -12,6 +12,8 @@ import type { Readable } from 'node:stream';
 import { appendAudit, sql, systemActor, type AuditActor } from '@ksp/core';
 import { normalizePlate, type AiJobInput, type AiJobParams, type AiJobStats, type AiTask } from '@ksp/shared';
 import type { AiContext } from './context.js';
+import { SfaceEmbedder } from './models/sface.js';
+import { FaceEmbeddingDetector } from './models/face-embedding.js';
 import { analysisSize, sampleFrames, videoInfo } from './frames.js';
 import { crop, encodeJpeg, type Box, type RgbImage } from './image.js';
 import { anprDetector, baseDetector, faceRecognitionDetector, FilteredDetector, MemoDetector, type Detector, type ModelRow, type RawDetection } from './models/index.js';
@@ -129,6 +131,9 @@ export async function runJob(ctx: AiContext, job: ClaimedJob, opts: { signal?: A
       .where('e.watchlist_id', 'in', wlIds)
       .execute();
 
+    const recognitionModel = needed.has('FACE_DETECTION') && !needed.has('FACE_RECOGNITION')
+      ? ((await ctx.db.selectFrom('ai_models').selectAll().where('task', '=', 'FACE_RECOGNITION').where('status', '=', 'ACTIVE').executeTakeFirst()) as unknown as ModelRow | undefined)
+      : undefined;
     const runs: TaskRun[] = [];
     const emitted: Pending[] = [];
     const mkTracker = (task: AiTask, model: ModelRow, threshold: number) =>
@@ -142,6 +147,12 @@ export async function runJob(ctx: AiContext, job: ClaimedJob, opts: { signal?: A
       if (task === 'PERSON_DETECTION' || task === 'OBJECT_DETECTION' || task === 'FACE_DETECTION') {
         const key = `${m.artifact_uri}#${m.artifact_sha256}`;
         detector = new FilteredDetector(m, baseFor(m, task), minThrFor(key));
+        if (task === 'FACE_DETECTION' && recognitionModel) {
+          // Tender §20 (repository-wide suspect search): every detected face is embedded with the active recognition
+          // model so it can be matched later — no identity is claimed here; the embedding is just stored.
+          detector = new FaceEmbeddingDetector(detector, new SfaceEmbedder(recognitionModel), recognitionModel.id);
+          stats.faceEmbeddingModel = `${recognitionModel.code}@${recognitionModel.version}`;
+        }
       } else if (task === 'FACE_RECOGNITION') {
         const gallery: GalleryEntry[] = entries
           .filter((e) => e.kind === 'FACE' && e.embedding && e.model_id === m.id)

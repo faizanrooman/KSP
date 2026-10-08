@@ -25,6 +25,7 @@ import { AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, In
 import { errorMessage } from '@/lib/api';
 import { titleCase } from '@/lib/format';
 
+import { t as tr, tNode } from '@/lib/i18n';
 export { clsx };
 
 // ---------------------------------------------------------------------------------------------
@@ -97,11 +98,11 @@ export function Field({ label, hint, error, children, required, htmlFor }: { lab
   return (
     <div>
       <label className="label" htmlFor={controlId}>
-        {label}
+        {tr(label)}
         {required && <span className="ml-0.5 text-red-600" aria-hidden>*</span>}
       </label>
       {control}
-      {hint && !error && <p id={hintId} className="mt-1 text-xs text-ink-500">{hint}</p>}
+      {hint && !error && <p id={hintId} className="mt-1 text-xs text-ink-500">{tr(hint)}</p>}
       {error && <p id={errorId} className="mt-1 text-xs text-red-700" role="alert">{error}</p>}
     </div>
   );
@@ -132,7 +133,7 @@ export function Checkbox({ label, checked, onChange, disabled, description }: { 
     <div className="flex items-start gap-2">
       <input id={id} type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 rounded border-ink-300 text-brand-700 focus:ring-brand-500" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <label htmlFor={id} className="text-sm text-ink-800">
-        {label}
+        {tr(label)}
         {description && <span className="block text-xs text-ink-500">{description}</span>}
       </label>
     </div>
@@ -147,7 +148,7 @@ export function Card({ title, actions, children, className, bodyClassName }: { t
     <section className={clsx('card', className)} aria-labelledby={named ? titleId : undefined}>
       {(title || actions) && (
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-4 py-3">
-          {named ? <h2 id={titleId}>{title}</h2> : title}
+          {named ? <h2 id={titleId}>{tr(title)}</h2> : title}
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>
       )}
@@ -161,8 +162,8 @@ export function PageHeader({ title, subtitle, actions, breadcrumb }: { title: Re
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
         {breadcrumb && <div className="mb-1 text-xs text-ink-500">{breadcrumb}</div>}
-        <h1 className="break-words">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-ink-500">{subtitle}</p>}
+        <h1 className="break-words">{tNode(title)}</h1>
+        {subtitle && <p className="mt-1 text-sm text-ink-500">{tNode(subtitle)}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -194,7 +195,7 @@ const STATUS_TONES: Record<string, Tone> = {
 };
 export function StatusBadge({ status }: { status: string | null | undefined }) {
   if (!status) return <Badge>—</Badge>;
-  return <Badge tone={STATUS_TONES[status] ?? 'gray'} className="whitespace-nowrap">{titleCase(status)}</Badge>;
+  return <Badge tone={STATUS_TONES[status] ?? 'gray'} className="whitespace-nowrap">{tr(titleCase(status))}</Badge>;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -213,7 +214,7 @@ export function EmptyState({ title, description, action, icon, heading }: { titl
     <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
       <div className="text-ink-300" aria-hidden>{icon ?? <Inbox className="h-10 w-10" aria-hidden />}</div>
       <Title className={clsx('font-medium text-ink-700', heading && 'text-base')}>{title}</Title>
-      {description && <p className="max-w-md text-sm text-ink-500">{description}</p>}
+      {description && <p className="max-w-md text-sm text-ink-500">{tNode(description)}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );
@@ -223,11 +224,11 @@ export function ErrorState({ error, onRetry, title = 'Something went wrong' }: {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-10 text-center" role="alert">
       <AlertTriangle className="h-8 w-8 text-red-500" aria-hidden />
-      <p className="font-medium text-ink-800">{title}</p>
+      <p className="font-medium text-ink-800">{tr(title)}</p>
       <p className="max-w-lg text-sm text-ink-600">{errorMessage(error)}</p>
       {onRetry && (
         <Button variant="secondary" size="sm" onClick={onRetry}>
-          Retry
+          {tr('Retry')}
         </Button>
       )}
     </div>
@@ -284,7 +285,7 @@ export function DataTable<T>({
 }) {
   if (error) return <ErrorState error={error} onRetry={onRetry} />;
   if (loading && !rows) return <Spinner />;
-  if (!rows || rows.length === 0) return <>{empty ?? <EmptyState title="No records found" />}</>;
+  if (!rows || rows.length === 0) return <>{empty ?? <EmptyState title={tr('No records found')} />}</>;
   return (
     // `relative`: absolutely positioned descendants (sr-only column headers) are contained by the scroller; without it
     // they were positioned against the page and widened it at ≤1024 px (UI-B-02).
@@ -300,11 +301,11 @@ export function DataTable<T>({
                 <th key={c.key} scope="col" className={clsx('whitespace-nowrap px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-600', c.className)} aria-sort={active ? (desc ? 'descending' : 'ascending') : undefined}>
                   {c.sortKey && onSort ? (
                     <button type="button" className="inline-flex items-center gap-1 uppercase" onClick={() => onSort(active && !desc ? `-${c.sortKey}` : c.sortKey!)}>
-                      {c.header}
+                      {tNode(c.header)}
                       {active && <span aria-hidden>{desc ? '↓' : '↑'}</span>}
                     </button>
                   ) : (
-                    c.header
+                    tNode(c.header)
                   )}
                 </th>
               );
@@ -339,16 +340,16 @@ export function Pagination({ page, pageSize, total, onPage }: { page: number; pa
   const from = (page - 1) * pageSize + 1;
   const to = Math.min(total, page * pageSize);
   return (
-    <nav className="flex items-center justify-between border-t border-ink-100 px-3 py-2 text-sm text-ink-600" aria-label="Pagination">
+    <nav className="flex items-center justify-between border-t border-ink-100 px-3 py-2 text-sm text-ink-600" aria-label={tr('Pagination')}>
       <span>
-        {from}–{to} of {total.toLocaleString('en-IN')}
+        {from}–{to}{' '}{tr('of')}{' '}{total.toLocaleString('en-IN')}
       </span>
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Previous page" icon={<ChevronLeft className="h-4 w-4" />} />
+        <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label={tr('Previous page')} icon={<ChevronLeft className="h-4 w-4" />} />
         <span className="px-2">
-          Page {page} / {pages}
+          {tr('Page')}{' '}{page} / {pages}
         </span>
-        <Button variant="ghost" size="sm" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Next page" icon={<ChevronRight className="h-4 w-4" />} />
+        <Button variant="ghost" size="sm" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label={tr('Next page')} icon={<ChevronRight className="h-4 w-4" />} />
       </div>
     </nav>
   );
@@ -465,8 +466,8 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: {
       {/* Header and footer stay visible; only the body scrolls, and the dialog never exceeds the viewport. */}
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={clsx('flex max-h-[calc(100dvh-6vh-1rem)] w-full flex-col rounded-lg bg-white shadow-xl', width)}>
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-ink-100 px-5 py-3">
-          <h2 id={titleId} className="min-w-0 break-words">{title}</h2>
-          <button type="button" onClick={() => onCloseRef.current()} className="-mr-1 shrink-0 rounded p-1 text-ink-500 hover:bg-ink-100" aria-label="Close dialog">
+          <h2 id={titleId} className="min-w-0 break-words">{tr(title)}</h2>
+          <button type="button" onClick={() => onCloseRef.current()} className="-mr-1 shrink-0 rounded p-1 text-ink-500 hover:bg-ink-100" aria-label={tr('Close dialog')}>
             <X className="h-5 w-5" />
           </button>
         </header>
@@ -529,10 +530,10 @@ export function ConfirmDialog({
       footer={
         <>
           <Button variant="secondary" onClick={onCancel} disabled={loading}>
-            Cancel
+            {tr('Cancel')}
           </Button>
           <Button variant={variant} onClick={() => onConfirm(reason.trim())} disabled={!valid} loading={loading}>
-            {confirmLabel}
+            {tr(confirmLabel)}
           </Button>
         </>
       }
@@ -580,7 +581,7 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: Array<
           onClick={() => onChange(t.id)}
           className={clsx('-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium', value === t.id ? 'border-brand-700 text-brand-800' : 'border-transparent text-ink-600 hover:text-ink-900')}
         >
-          {t.label}
+          {tNode(t.label)}
           {t.count !== undefined && <span className="ml-1.5 rounded bg-ink-100 px-1.5 text-xs text-ink-600">{t.count}</span>}
         </button>
       ))}
@@ -595,7 +596,7 @@ export function KeyValue({ items, columns = 2 }: { items: Array<{ label: string;
         const it = i as { label: string; value: ReactNode; mono?: boolean };
         return (
           <div key={it.label} className="min-w-0">
-            <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">{it.label}</dt>
+            <dt className="text-xs font-medium uppercase tracking-wide text-ink-500">{tr(it.label)}</dt>
             <dd className={clsx('mt-0.5 break-words text-ink-900', it.mono && 'mono break-all')}>{it.value ?? '—'}</dd>
           </div>
         );
@@ -607,7 +608,7 @@ export function KeyValue({ items, columns = 2 }: { items: Array<{ label: string;
 export function Stat({ label, value, sub, tone: t }: { label: string; value: ReactNode; sub?: ReactNode; tone?: 'red' | 'amber' | 'green' }) {
   return (
     <div className="card px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-500">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-ink-500">{tr(label)}</p>
       <p className={clsx('mt-1 text-2xl font-semibold', t === 'red' ? 'text-red-700' : t === 'amber' ? 'text-amber-700' : t === 'green' ? 'text-emerald-700' : 'text-ink-900')}>{value}</p>
       {sub && <p className="mt-0.5 text-xs text-ink-500">{sub}</p>}
     </div>
@@ -670,7 +671,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div key={t.id} className={clsx('pointer-events-auto flex items-start gap-2 rounded-md px-3 py-2 text-sm text-white shadow-lg', t.tone === 'success' ? 'bg-emerald-700' : t.tone === 'error' ? 'bg-red-700' : 'bg-ink-800')} role={t.tone === 'error' ? 'alert' : 'status'}>
             <span className="flex-1">{t.message}</span>
-            <button type="button" aria-label="Dismiss" onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))}>
+            <button type="button" aria-label={tr('Dismiss')} onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))}>
               <X className="h-4 w-4" />
             </button>
           </div>

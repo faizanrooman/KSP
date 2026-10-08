@@ -9,6 +9,7 @@ import { Alert, Button, Card, ConfirmDialog, DataTable, EmptyState, ErrorState, 
 import { aiKeys, useModels, useTrainingExports } from './api';
 import { taskLabel } from './components';
 
+import { t as tr } from '@/lib/i18n';
 export function ModelsPage() {
   const q = useModels();
   const qc = useQueryClient();
@@ -20,30 +21,30 @@ export function ModelsPage() {
     onSuccess: (m) => { toast.success(`${m.code}@${m.version} is now ${m.status}`); setConfirm(null); void qc.invalidateQueries({ queryKey: aiKeys.models }); void qc.invalidateQueries({ queryKey: aiKeys.tasks }); },
   });
   const cols: Column<AiModelDto>[] = [
-    { key: 'task', header: 'Task', render: (m) => taskLabel(m.task) },
-    { key: 'model', header: 'Model', render: (m) => <div><div className="font-medium">{m.name}</div><div className="mono text-xs text-ink-500">{m.code}@{m.version} · {m.runtime}</div></div> },
-    { key: 'status', header: 'Status', render: (m) => <StatusBadge status={m.status} /> },
-    { key: 'thr', header: 'Default threshold', render: (m) => m.defaultThreshold.toFixed(3) },
-    { key: 'licence', header: 'Licence', render: (m) => <span className="text-xs">{String((m.config as { licence?: string }).licence ?? '—')}</span> },
-    { key: 'sha', header: 'Artefact SHA-256', render: (m) => <code className="mono text-xs" title={m.artifactSha256 ?? ''}>{shortHash(m.artifactSha256)}</code> },
-    { key: 'metrics', header: 'Metrics', render: (m) => <span className="text-xs">{Object.keys(m.metrics).length ? Object.entries(m.metrics).filter(([, v]) => typeof v === 'number').map(([k, v]) => `${k} ${v}`).join(', ') || 'recorded' : 'none'}</span> },
-    { key: 'when', header: 'Activated', render: (m) => (m.activatedAt ? formatDateTime(m.activatedAt) : '—') },
+    { key: 'task', header: tr('Task'), render: (m) => taskLabel(m.task) },
+    { key: 'model', header: tr('Model'), render: (m) => <div><div className="font-medium">{m.name}</div><div className="mono text-xs text-ink-500">{m.code}@{m.version} · {m.runtime}</div></div> },
+    { key: 'status', header: tr('Status'), render: (m) => <StatusBadge status={m.status} /> },
+    { key: 'thr', header: tr('Default threshold'), render: (m) => m.defaultThreshold.toFixed(3) },
+    { key: 'licence', header: tr('Licence'), render: (m) => <span className="text-xs">{String((m.config as { licence?: string }).licence ?? '—')}</span> },
+    { key: 'sha', header: tr('Artefact SHA-256'), render: (m) => <code className="mono text-xs" title={m.artifactSha256 ?? ''}>{shortHash(m.artifactSha256)}</code> },
+    { key: 'metrics', header: tr('Metrics'), render: (m) => <span className="text-xs">{Object.keys(m.metrics).length ? Object.entries(m.metrics).filter(([, v]) => typeof v === 'number').map(([k, v]) => `${k} ${v}`).join(', ') || 'recorded' : 'none'}</span> },
+    { key: 'when', header: tr('Activated'), render: (m) => (m.activatedAt ? formatDateTime(m.activatedAt) : '—') },
     {
-      key: 'actions', header: <span className="sr-only">Actions</span>, render: (m) => (
+      key: 'actions', header: <span className="sr-only">{tr('Actions')}</span>, render: (m) => (
         <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={() => setEdit(m)}>Edit</Button>
-          {m.status !== 'ACTIVE' && <Button size="sm" variant="secondary" onClick={() => setConfirm({ m, op: 'activate' })}>Activate</Button>}
-          {m.status !== 'RETIRED' && <Button size="sm" variant="ghost" onClick={() => setConfirm({ m, op: 'retire' })}>Retire</Button>}
+          <Button size="sm" variant="ghost" onClick={() => setEdit(m)}>{tr('Edit')}</Button>
+          {m.status !== 'ACTIVE' && <Button size="sm" variant="secondary" onClick={() => setConfirm({ m, op: 'activate' })}>{tr('Activate')}</Button>}
+          {m.status !== 'RETIRED' && <Button size="sm" variant="ghost" onClick={() => setConfirm({ m, op: 'retire' })}>{tr('Retire')}</Button>}
         </div>
       ),
     },
   ];
   return (
     <div className="space-y-4">
-      <PageHeader title="AI models" subtitle="Lifecycle: evaluate → register STAGED with metrics → activate (retires the previous version) → retire. New versions are registered via the API or `npm run fetch-models`." />
+      <PageHeader title={tr('AI models')} subtitle={tr('Lifecycle: evaluate → register STAGED with metrics → activate (retires the previous version) → retire. New versions are registered via the API or `npm run fetch-models`.')} />
       <Card>
         <DataTable columns={cols} rows={q.data?.items} rowKey={(m) => m.id} loading={q.isLoading} error={q.error} onRetry={() => void q.refetch()}
-          empty={<EmptyState title="No models registered" description="Run `npm run fetch-models -w @ksp/ai-worker` on the AI host to download, verify and register the pinned models." />} />
+          empty={<EmptyState title={tr('No models registered')} description={tr('Run `npm run fetch-models -w @ksp/ai-worker` on the AI host to download, verify and register the pinned models.')} />} />
       </Card>
       <TrainingExports />
       <ConfirmDialog open={!!confirm} title={confirm?.op === 'activate' ? 'Activate model version' : 'Retire model version'}
@@ -69,11 +70,11 @@ function EditModel({ m, onClose }: { m: AiModelDto; onClose: () => void }) {
   });
   return (
     <Modal open size="lg" title={`Edit ${m.code}@${m.version}`} onClose={onClose}
-      footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={!parsed || !thrOk} loading={save.isPending} onClick={() => save.mutate()}>Save</Button></>}>
+      footer={<><Button variant="secondary" onClick={onClose}>{tr('Cancel')}</Button><Button disabled={!parsed || !thrOk} loading={save.isPending} onClick={() => save.mutate()}>{tr('Save')}</Button></>}>
       <div className="space-y-3">
-        <Field label="Default threshold" htmlFor="em-thr" error={thrOk ? null : 'Between 0.01 and 0.99'}><Input id="em-thr" type="number" step="0.01" value={thr} onChange={(e) => setThr(e.target.value)} className="w-28" /></Field>
-        <Field label="Evaluation metrics (JSON)" htmlFor="em-met" error={parsed ? null : 'Invalid JSON'} hint="Record precision/recall and the evaluation dataset before activating."><Textarea id="em-met" rows={8} className="mono" value={metrics} onChange={(e) => setMetrics(e.target.value)} /></Field>
-        <Field label="Notes" htmlFor="em-notes"><Textarea id="em-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+        <Field label={tr('Default threshold')} htmlFor="em-thr" error={thrOk ? null : 'Between 0.01 and 0.99'}><Input id="em-thr" type="number" step="0.01" value={thr} onChange={(e) => setThr(e.target.value)} className="w-28" /></Field>
+        <Field label={tr('Evaluation metrics (JSON)')} htmlFor="em-met" error={parsed ? null : 'Invalid JSON'} hint={tr('Record precision/recall and the evaluation dataset before activating.')}><Textarea id="em-met" rows={8} className="mono" value={metrics} onChange={(e) => setMetrics(e.target.value)} /></Field>
+        <Field label={tr('Notes')} htmlFor="em-notes"><Textarea id="em-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
         {save.error && <Alert tone="red">{errorMessage(save.error)}</Alert>}
       </div>
     </Modal>
@@ -91,22 +92,22 @@ function TrainingExports() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: aiKeys.exports }),
   });
   return (
-    <Card title="Training dataset exports">
-      <p className="mb-3 text-sm text-ink-600">Reviewed detections (approved and label-corrected as positives, rejected as negatives) with crops, as JSONL + COCO, written to the reports bucket. Crops are evidence-derived personal data: handle under the data-protection policy.</p>
+    <Card title={tr('Training dataset exports')}>
+      <p className="mb-3 text-sm text-ink-600">{tr('Reviewed detections (approved and label-corrected as positives, rejected as negatives) with crops, as JSONL + COCO, written to the reports bucket. Crops are evidence-derived personal data: handle under the data-protection policy.')}</p>
       <form className="mb-4 flex flex-wrap items-end gap-3" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
-        <Field label="Task" htmlFor="te-task"><Select id="te-task" value={task} onChange={(e) => setTask(e.target.value as AiTask)}>{AI_TASKS.map((t) => <option key={t} value={t}>{taskLabel(t)}</option>)}</Select></Field>
-        <Field label="From" htmlFor="te-from"><Input id="te-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-        <Field label="To" htmlFor="te-to"><Input id="te-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
-        <Button type="submit" loading={create.isPending} disabled={!from || !to || to <= from}>Export dataset</Button>
+        <Field label={tr('Task')} htmlFor="te-task"><Select id="te-task" value={task} onChange={(e) => setTask(e.target.value as AiTask)}>{AI_TASKS.map((t) => <option key={t} value={t}>{taskLabel(t)}</option>)}</Select></Field>
+        <Field label={tr('From')} htmlFor="te-from"><Input id="te-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+        <Field label={tr('To')} htmlFor="te-to"><Input id="te-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+        <Button type="submit" loading={create.isPending} disabled={!from || !to || to <= from}>{tr('Export dataset')}</Button>
       </form>
       {create.error && <Alert tone="red">{errorMessage(create.error)}</Alert>}
-      {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !q.data!.items.length ? <EmptyState title="No exports yet" /> : (
+      {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !q.data!.items.length ? <EmptyState title={tr('No exports yet')} /> : (
         <ul className="divide-y divide-ink-100 text-sm">
           {q.data!.items.map((e) => (
             <li key={e.id} className="flex flex-wrap items-center gap-3 py-2">
               <StatusBadge status={e.status} />
               <span>{taskLabel(e.task)}</span>
-              <span className="text-xs text-ink-500">{e.filter.from.slice(0, 10)} → {e.filter.to.slice(0, 10)} · {e.sampleCount} samples · {formatDateTime(e.createdAt)}</span>
+              <span className="text-xs text-ink-500">{e.filter.from.slice(0, 10)} → {e.filter.to.slice(0, 10)} · {e.sampleCount}{' '}{tr('samples ·')}{' '}{formatDateTime(e.createdAt)}</span>
               {e.error && <span className="text-xs text-red-700">{e.error}</span>}
               {e.files.map((f) => (
                 <a key={f} className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline" href={buildUrl(`/ai/training-exports/${e.id}/files/${f}`)}><Download className="h-3.5 w-3.5" aria-hidden />{f}</a>

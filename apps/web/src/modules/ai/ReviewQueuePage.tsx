@@ -12,6 +12,7 @@ import { Alert, Badge, Button, Card, Checkbox, clsx, EmptyState, ErrorState, Fie
 import { useHistory, useReview, useReviewQueue, type QueueItem } from './api';
 import { Attributes, ConfidenceBar, CropThumb, ReviewBadge, taskLabel } from './components';
 
+import { t as tr } from '@/lib/i18n';
 const DEFAULTS = { task: '', status: '', label: '', minConfidence: '', maxConfidence: '', evidenceId: '', sort: '-confidence', page: '1', pageSize: '24' };
 
 export function ReviewQueuePage() {
@@ -87,40 +88,40 @@ export function ReviewQueuePage() {
   const busy = one.isPending || bulk.isPending;
   return (
     <div className="space-y-4">
-      <PageHeader title="AI review queue" subtitle="AI results are advisory until a reviewer decides. Face-recognition matches need two different approvers." />
+      <PageHeader title={tr('AI review queue')} subtitle={tr('AI results are advisory until a reviewer decides. Face-recognition matches need two different approvers.')} />
       <Card>
         <form className="flex flex-wrap items-end gap-3" onSubmit={(e) => e.preventDefault()}>
-          <Field label="Task" htmlFor="rq-task">
+          <Field label={tr('Task')} htmlFor="rq-task">
             <Select id="rq-task" value={url.task} onChange={(e) => setUrl({ task: e.target.value })}>
-              <option value="">All</option>
+              <option value="">{tr('All')}</option>
               {AI_TASKS.map((t) => <option key={t} value={t}>{taskLabel(t)}</option>)}
             </Select>
           </Field>
-          <Field label="Status" htmlFor="rq-status">
+          <Field label={tr('Status')} htmlFor="rq-status">
             <Select id="rq-status" value={url.status} onChange={(e) => setUrl({ status: e.target.value })}>
-              <option value="">Pending + 2nd review</option>
-              <option value="PENDING">Pending</option>
-              <option value="NEEDS_SECOND_REVIEW">Needs 2nd review</option>
+              <option value="">{tr('Pending + 2nd review')}</option>
+              <option value="PENDING">{tr('Pending')}</option>
+              <option value="NEEDS_SECOND_REVIEW">{tr('Needs 2nd review')}</option>
             </Select>
           </Field>
-          <Field label="Label" htmlFor="rq-label"><Input id="rq-label" value={url.label} onChange={(e) => setUrl({ label: e.target.value })} className="w-32" /></Field>
-          <Field label="Min conf." htmlFor="rq-min"><Input id="rq-min" type="number" step="0.05" min={0} max={1} value={url.minConfidence} onChange={(e) => setUrl({ minConfidence: e.target.value })} className="w-20" /></Field>
-          <Field label="Max conf." htmlFor="rq-max"><Input id="rq-max" type="number" step="0.05" min={0} max={1} value={url.maxConfidence} onChange={(e) => setUrl({ maxConfidence: e.target.value })} className="w-20" /></Field>
-          <Field label="Sort" htmlFor="rq-sort">
+          <Field label={tr('Label')} htmlFor="rq-label"><Input id="rq-label" value={url.label} onChange={(e) => setUrl({ label: e.target.value })} className="w-32" /></Field>
+          <Field label={tr('Min conf.')} htmlFor="rq-min"><Input id="rq-min" type="number" step="0.05" min={0} max={1} value={url.minConfidence} onChange={(e) => setUrl({ minConfidence: e.target.value })} className="w-20" /></Field>
+          <Field label={tr('Max conf.')} htmlFor="rq-max"><Input id="rq-max" type="number" step="0.05" min={0} max={1} value={url.maxConfidence} onChange={(e) => setUrl({ maxConfidence: e.target.value })} className="w-20" /></Field>
+          <Field label={tr('Sort')} htmlFor="rq-sort">
             <Select id="rq-sort" value={url.sort} onChange={(e) => setUrl({ sort: e.target.value })}>
-              <option value="-confidence">Confidence (high first)</option>
-              <option value="confidence">Confidence (low first)</option>
-              <option value="-created_at">Newest</option>
-              <option value="created_at">Oldest</option>
-              <option value="frame_time">Evidence / time</option>
+              <option value="-confidence">{tr('Confidence (high first)')}</option>
+              <option value="confidence">{tr('Confidence (low first)')}</option>
+              <option value="-created_at">{tr('Newest')}</option>
+              <option value="created_at">{tr('Oldest')}</option>
+              <option value="frame_time">{tr('Evidence / time')}</option>
             </Select>
           </Field>
-          {url.evidenceId && <Badge tone="blue">Evidence filter active</Badge>}
-          <Button variant="ghost" onClick={reset}>Clear filters</Button>
+          {url.evidenceId && <Badge tone="blue">{tr('Evidence filter active')}</Badge>}
+          <Button variant="ghost" onClick={reset}>{tr('Clear filters')}</Button>
         </form>
         <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-ink-500">
-          <Checkbox label="Keyboard shortcuts" checked={shortcuts} onChange={toggleShortcuts} />
-          <p className="flex items-center gap-2" id="rq-shortcuts"><Keyboard className="h-4 w-4" aria-hidden /> J/K move · A approve · R reject · S second review · X select · H history</p>
+          <Checkbox label={tr('Keyboard shortcuts')} checked={shortcuts} onChange={toggleShortcuts} />
+          <p className="flex items-center gap-2" id="rq-shortcuts"><Keyboard className="h-4 w-4" aria-hidden />{' '}{tr('J/K move · A approve · R reject · S second review · X select · H history')}</p>
         </div>
         <p className="sr-only" aria-live="polite" data-testid="rq-current">
           {current ? `Item ${Math.min(cursor, items.length - 1) + 1} of ${items.length}: ${taskLabel(current.task)} ${current.correctedLabel ?? current.label}, ${Math.round(current.confidence * 100)}% confidence, ${current.reviewStatus.replace(/_/g, ' ').toLowerCase()}` : ''}
@@ -128,20 +129,20 @@ export function ReviewQueuePage() {
       </Card>
 
       {selected.size > 0 && (
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-md border border-brand-200 bg-brand-50 p-2 text-sm" role="region" aria-label="Bulk actions">
-          <span className="font-medium">{selected.size} selected</span>
-          <Button size="sm" variant="success" loading={bulk.isPending} onClick={() => act([...selected], 'APPROVE')}>Approve selected</Button>
-          <Button size="sm" variant="danger" onClick={() => setPrompt({ ids: [...selected], action: 'REJECT' })}>Reject selected…</Button>
-          <Button size="sm" variant="secondary" onClick={() => setPrompt({ ids: [...selected], action: 'REQUEST_SECOND_REVIEW' })}>Second review…</Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-md border border-brand-200 bg-brand-50 p-2 text-sm" role="region" aria-label={tr('Bulk actions')}>
+          <span className="font-medium">{selected.size}{' '}{tr('selected')}</span>
+          <Button size="sm" variant="success" loading={bulk.isPending} onClick={() => act([...selected], 'APPROVE')}>{tr('Approve selected')}</Button>
+          <Button size="sm" variant="danger" onClick={() => setPrompt({ ids: [...selected], action: 'REJECT' })}>{tr('Reject selected…')}</Button>
+          <Button size="sm" variant="secondary" onClick={() => setPrompt({ ids: [...selected], action: 'REQUEST_SECOND_REVIEW' })}>{tr('Second review…')}</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{tr('Clear')}</Button>
         </div>
       )}
 
-      {q.isLoading ? <Spinner label="Loading queue…" /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !items.length ? (
-        <EmptyState icon={<CheckCircle2 className="h-8 w-8" aria-hidden />} title="Nothing to review" description="No AI results match these filters in your jurisdiction." />
+      {q.isLoading ? <Spinner label={tr('Loading queue…')} /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !items.length ? (
+        <EmptyState icon={<CheckCircle2 className="h-8 w-8" aria-hidden />} title={tr('Nothing to review')} description={tr('No AI results match these filters in your jurisdiction.')} />
       ) : (
         <>
-          <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3" aria-label="Review items">
+          <ul className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3" aria-label={tr('Review items')}>
             {items.map((d, i) => (
               <QueueCard key={d.id} d={d} active={i === cursor} selected={selected.has(d.id)} busy={busy}
                 onFocus={() => setCursor(i)}
@@ -171,29 +172,29 @@ function QueueCard({ d, active, selected, busy, onFocus, onSelect, onApprove, on
         <CropThumb d={d} size="lg" />
         <div className="min-w-0 flex-1 space-y-1.5 text-sm">
           <div className="flex items-start justify-between gap-2">
-            <Checkbox label="Select" checked={selected} onChange={onSelect} />
+            <Checkbox label={tr('Select')} checked={selected} onChange={onSelect} />
             <ReviewBadge status={d.reviewStatus} />
           </div>
           <div className="text-xs font-medium uppercase text-ink-500">{taskLabel(d.task)}</div>
           <div className="break-words text-base font-semibold text-ink-900">{d.correctedLabel ?? d.label}{d.correctedLabel && <span className="ml-2 text-xs font-normal text-ink-500 line-through">{d.label}</span>}</div>
           <ConfidenceBar value={d.confidence} threshold={d.threshold} />
-          <div className="text-xs text-ink-600">Model <span className="mono">{d.model.code}@{d.model.version}</span> · threshold {Math.round(d.threshold * 100)}%</div>
+          <div className="text-xs text-ink-600">{tr('Model')}{' '}<span className="mono">{d.model.code}@{d.model.version}</span>{' '}{tr('· threshold')}{' '}{Math.round(d.threshold * 100)}%</div>
           <div className="text-xs text-ink-600">
             <Link className="text-brand-700 hover:underline" to={`/evidence/${d.evidenceId}?tab=playback&t=${d.frameTimeMs}`}>{d.evidenceNumber ?? d.evidenceId.slice(0, 8)} @ {formatTimecode(d.frameTimeMs)}</Link>
             {' · '}{formatDateTime(d.createdAt)}
           </div>
           <Attributes a={d.attributes} />
-          {d.dualApproval && <p className="flex items-center gap-1 text-xs text-violet-800"><ShieldAlert className="h-3.5 w-3.5" aria-hidden /> Needs 2 approvals ({d.approvals}/2)</p>}
-          {d.reviewedByMe && <p className="text-xs text-ink-500">You already reviewed this — a different reviewer must decide.</p>}
+          {d.dualApproval && <p className="flex items-center gap-1 text-xs text-violet-800"><ShieldAlert className="h-3.5 w-3.5" aria-hidden />{' '}{tr('Needs 2 approvals (')}{d.approvals}/2)</p>}
+          {d.reviewedByMe && <p className="text-xs text-ink-500">{tr('You already reviewed this — a different reviewer must decide.')}</p>}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" variant="success" disabled={busy || d.reviewedByMe} onClick={onApprove} icon={<CheckCircle2 className="h-4 w-4" aria-hidden />}>Approve</Button>
-        <Button size="sm" variant="danger" disabled={busy} onClick={() => onPrompt('REJECT')} icon={<XCircle className="h-4 w-4" aria-hidden />}>Reject</Button>
-        <Button size="sm" variant="secondary" disabled={busy} onClick={() => onPrompt('REQUEST_SECOND_REVIEW')}>2nd review</Button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => onPrompt('CORRECT_LABEL')} icon={<Tag className="h-4 w-4" aria-hidden />}>Correct label</Button>
-        <Button size="sm" variant="ghost" onClick={() => onPrompt('COMMENT')}>Comment</Button>
-        <Button size="sm" variant="ghost" onClick={onHistory} icon={<History className="h-4 w-4" aria-hidden />}>History</Button>
+        <Button size="sm" variant="success" disabled={busy || d.reviewedByMe} onClick={onApprove} icon={<CheckCircle2 className="h-4 w-4" aria-hidden />}>{tr('Approve')}</Button>
+        <Button size="sm" variant="danger" disabled={busy} onClick={() => onPrompt('REJECT')} icon={<XCircle className="h-4 w-4" aria-hidden />}>{tr('Reject')}</Button>
+        <Button size="sm" variant="secondary" disabled={busy} onClick={() => onPrompt('REQUEST_SECOND_REVIEW')}>{tr('2nd review')}</Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => onPrompt('CORRECT_LABEL')} icon={<Tag className="h-4 w-4" aria-hidden />}>{tr('Correct label')}</Button>
+        <Button size="sm" variant="ghost" onClick={() => onPrompt('COMMENT')}>{tr('Comment')}</Button>
+        <Button size="sm" variant="ghost" onClick={onHistory} icon={<History className="h-4 w-4" aria-hidden />}>{tr('History')}</Button>
       </div>
     </li>
   );
@@ -217,10 +218,10 @@ function PromptDialog({ prompt, loading, onClose, onSubmit }: { prompt: { ids: s
   const invalid = (t.required && comment.trim().length < 3) || (prompt.action === 'CORRECT_LABEL' && !label.trim());
   return (
     <Modal open title={`${t.title}${prompt.ids.length > 1 ? ` (${prompt.ids.length} items)` : ''}`} onClose={onClose}
-      footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant={prompt.action === 'REJECT' ? 'danger' : 'primary'} disabled={invalid} loading={loading} onClick={() => onSubmit({ comment: comment.trim() || undefined, correctedLabel: label.trim() || undefined })}>{t.button}</Button></>}>
+      footer={<><Button variant="secondary" onClick={onClose}>{tr('Cancel')}</Button><Button variant={prompt.action === 'REJECT' ? 'danger' : 'primary'} disabled={invalid} loading={loading} onClick={() => onSubmit({ comment: comment.trim() || undefined, correctedLabel: label.trim() || undefined })}>{t.button}</Button></>}>
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (!invalid) onSubmit({ comment: comment.trim() || undefined, correctedLabel: label.trim() || undefined }); }}>
         {prompt.action === 'CORRECT_LABEL' && (
-          <Field label="Correct label" htmlFor="pd-label" required hint="Used for retraining datasets; for evidence tags it becomes the tag."><Input id="pd-label" value={label} onChange={(e) => setLabel(e.target.value)} autoFocus /></Field>
+          <Field label={tr('Correct label')} htmlFor="pd-label" required hint={tr('Used for retraining datasets; for evidence tags it becomes the tag.')}><Input id="pd-label" value={label} onChange={(e) => setLabel(e.target.value)} autoFocus /></Field>
         )}
         <Field label={t.label} htmlFor="pd-comment" required={t.required} error={t.required && comment.length > 0 && comment.trim().length < 3 ? 'At least 3 characters' : null}>
           <Textarea id="pd-comment" rows={3} value={comment} onChange={(e) => setComment(e.target.value)} autoFocus={prompt.action !== 'CORRECT_LABEL'} />
@@ -234,7 +235,7 @@ function HistoryDrawer({ id, onClose }: { id: string | null; onClose: () => void
   const q = useHistory(id);
   if (!id) return null;
   return (
-    <Modal open size="lg" title="Review history" onClose={onClose}>
+    <Modal open size="lg" title={tr('Review history')} onClose={onClose}>
       {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : (
         <div className="space-y-4">
           <div className="flex gap-3">
@@ -247,7 +248,7 @@ function HistoryDrawer({ id, onClose }: { id: string | null; onClose: () => void
               <Attributes a={q.data!.detection.attributes} />
             </div>
           </div>
-          {q.data!.events.length === 0 ? <Alert tone="blue">No review actions yet.</Alert> : (
+          {q.data!.events.length === 0 ? <Alert tone="blue">{tr('No review actions yet.')}</Alert> : (
             <ol className="space-y-2 border-l border-ink-200 pl-4">
               {q.data!.events.map((e) => (
                 <li key={e.id} className="text-sm">

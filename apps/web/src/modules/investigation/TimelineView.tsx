@@ -7,6 +7,7 @@ import { Alert, Badge, Button, Card, EmptyState, ErrorState, Field, Input, Selec
 import { useTimeline, useWsMutation, type TimelineEntry, type VisibleItem } from './api';
 import { laneTimeAt, layoutTimeline } from './geometry';
 
+import { t as tr } from '@/lib/i18n';
 interface Props {
   workspaceId: string;
   items: VisibleItem[];
@@ -29,7 +30,7 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
   const delEvent = useWsMutation((id: string) => api.delete(`/workspaces/${workspaceId}/timeline/events/${id}`));
   const itemByEvidence = new Map(items.map((i) => [i.evidenceId, i]));
 
-  if (tl.isLoading) return <Spinner label="Building timeline…" />;
+  if (tl.isLoading) return <Spinner label={tr('Building timeline…')} />;
   if (tl.error) return <ErrorState error={tl.error} onRetry={() => void tl.refetch()} />;
   const t = tl.data!;
   const layout = layoutTimeline(t);
@@ -70,10 +71,10 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
   return (
     <div className="space-y-4">
       {!layout ? (
-        <EmptyState icon={<Clock className="h-6 w-6" />} title="Nothing to place on the timeline yet" description="Add evidence with a recording time, or add manual events." />
+        <EmptyState icon={<Clock className="h-6 w-6" />} title={tr('Nothing to place on the timeline yet')} description={tr('Add evidence with a recording time, or add manual events.')} />
       ) : (
-        <Card title="Reconstruction" actions={<span className="text-xs text-ink-500">{formatDateTime(t.range!.start)} → {formatDateTime(t.range!.end)}</span>}>
-          <div className="space-y-2" role="list" aria-label="Timeline lanes">
+        <Card title={tr('Reconstruction')} actions={<span className="text-xs text-ink-500">{formatDateTime(t.range!.start)} → {formatDateTime(t.range!.end)}</span>}>
+          <div className="space-y-2" role="list" aria-label={tr('Timeline lanes')}>
             {layout.lanes.map((lane) => (
               <div key={lane.itemId} className="grid grid-cols-[minmax(0,13rem)_1fr] items-center gap-2" role="listitem">
                 <span className="mono truncate text-xs" title={lane.label}>{lane.label}</span>
@@ -98,7 +99,7 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
               </div>
             ))}
             <div className="grid grid-cols-[minmax(0,13rem)_1fr] items-center gap-2">
-              <span className="text-xs font-medium text-ink-600">Events</span>
+              <span className="text-xs font-medium text-ink-600">{tr('Events')}</span>
               <div className="relative h-7 rounded bg-emerald-50">
                 {layout.events.map((ev) => (
                   <span key={ev.entry.id} className="absolute top-1 h-5 w-2 -translate-x-1/2 rounded-full bg-emerald-600" style={{ left: `${ev.left}%` }} title={`${ev.entry.title} — ${formatDateTime(ev.entry.at)}`} />
@@ -106,12 +107,12 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
               </div>
             </div>
           </div>
-          <p className="mt-2 text-xs text-ink-500">Blue bars: recordings (wall-clock). Amber: bookmarks. Dark: annotations. Green: manual events.</p>
+          <p className="mt-2 text-xs text-ink-500">{tr('Blue bars: recordings (wall-clock). Amber: bookmarks. Dark: annotations. Green: manual events.')}</p>
         </Card>
       )}
 
       {t.overlaps.length > 0 && (
-        <Card title={<span className="inline-flex items-center gap-1.5"><Layers className="h-4 w-4" aria-hidden />Same moment, different angle</span>}>
+        <Card title={<span className="inline-flex items-center gap-1.5"><Layers className="h-4 w-4" aria-hidden />{tr('Same moment, different angle')}</span>}>
           <ul className="divide-y divide-ink-100">
             {t.overlaps.map((o) => {
               const ia = itemByEvidence.get(o.a);
@@ -121,7 +122,7 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
                   <span className="mono text-xs">{labelOf(o.a)}</span> @ {formatTimecode(o.aTimeMs)}
                   <span aria-hidden>↔</span>
                   <span className="mono text-xs">{labelOf(o.b)}</span> @ {formatTimecode(o.bTimeMs)}
-                  <span className="text-ink-500">overlap {formatDuration(o.durationMs)} from {formatDateTime(o.start)}</span>
+                  <span className="text-ink-500">{tr('overlap')}{' '}{formatDuration(o.durationMs)}{' '}{tr('from')}{' '}{formatDateTime(o.start)}</span>
                   {ia && ib && (
                     <Button
                       size="sm"
@@ -132,7 +133,7 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
                         onCompare([ia.id, ib.id], { [ia.id]: la?.suggestedOffsetMs ?? 0, [ib.id]: lb?.suggestedOffsetMs ?? 0 });
                       }}
                     >
-                      Compare aligned
+                      {tr('Compare aligned')}
                     </Button>
                   )}
                 </li>
@@ -142,8 +143,8 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
         </Card>
       )}
 
-      <Card title="Chronology">
-        {!t.entries.length ? <EmptyState title="No entries" /> : (
+      <Card title={tr('Chronology')}>
+        {!t.entries.length ? <EmptyState title={tr('No entries')} /> : (
           <ol className="space-y-1">
             {t.entries.map((e) => {
               const target = entryTarget(e);
@@ -153,58 +154,58 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
                   <span className="mono w-48 shrink-0 text-xs text-ink-500">{formatDateTime(e.at)}</span>
                   <Badge tone={kindTone[e.kind]}>{e.kind.toLowerCase()}</Badge>
                   <div className="min-w-0 flex-1 text-sm">
-                    {e.kind === 'RECORDING' && <>Recording <span className="mono text-xs">{e.label}</span> until {formatDateTime(e.end)}</>}
+                    {e.kind === 'RECORDING' && <>{tr('Recording')}{' '}<span className="mono text-xs">{e.label}</span>{' '}{tr('until')}{' '}{formatDateTime(e.end)}</>}
                     {e.kind === 'EVENT' && (
                       <>
                         <span className="font-medium">{e.title}</span>
                         {e.description && <span className="block text-ink-600">{e.description}</span>}
-                        {e.restricted && <span className="block text-xs text-ink-500">Linked evidence is restricted for you.</span>}
-                        <span className="block text-xs text-ink-500">by {e.createdBy}</span>
+                        {e.restricted && <span className="block text-xs text-ink-500">{tr('Linked evidence is restricted for you.')}</span>}
+                        <span className="block text-xs text-ink-500">{tr('by')}{' '}{e.createdBy}</span>
                       </>
                     )}
                     {e.kind === 'BOOKMARK' && <>{e.label} <span className="text-xs text-ink-500">({labelOf(e.evidenceId)} @ {formatTimecode(e.timeMs)}, {e.user})</span></>}
                     {e.kind === 'ANNOTATION' && <>{e.annotationKind.toLowerCase()}: {e.body ?? '—'} <span className="text-xs text-ink-500">({labelOf(e.evidenceId)} @ {formatTimecode(e.startMs)}, {e.author})</span></>}
                   </div>
-                  {target && <Button size="sm" variant="ghost" onClick={() => onOpen(target.itemId, target.ms)}>Open</Button>}
+                  {target && <Button size="sm" variant="ghost" onClick={() => onOpen(target.itemId, target.ms)}>{tr('Open')}</Button>}
                   {e.kind === 'EVENT' && editable && <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={`Delete event ${e.title}`} onClick={() => delEvent.mutate(e.id)} />}
                 </li>
               );
             })}
           </ol>
         )}
-        {t.unplacedItems.length > 0 && <p className="mt-2 text-xs text-ink-500">{t.unplacedItems.length} item(s) have no recording time and cannot be placed.</p>}
+        {t.unplacedItems.length > 0 && <p className="mt-2 text-xs text-ink-500">{t.unplacedItems.length}{' '}{tr('item(s) have no recording time and cannot be placed.')}</p>}
         {delEvent.error && <Alert tone="red">{errorMessage(delEvent.error)}</Alert>}
       </Card>
 
       {editable && (
-        <Card title="Add timeline event">
+        <Card title={tr('Add timeline event')}>
           <form onSubmit={submit} className="grid gap-3 md:grid-cols-2">
-            <Field label="Title" htmlFor="te-title" required>
+            <Field label={tr('Title')} htmlFor="te-title" required>
               <Input id="te-title" value={form.title} maxLength={200} onChange={(e) => setForm({ ...form, title: e.target.value })} />
             </Field>
-            <Field label="Occurred at" htmlFor="te-at" required>
+            <Field label={tr('Occurred at')} htmlFor="te-at" required>
               <div className="flex gap-2">
                 <Input id="te-at" type="datetime-local" step={1} value={form.occurredAt} onChange={(e) => setForm({ ...form, occurredAt: e.target.value })} />
-                <Button variant="secondary" size="sm" onClick={() => setForm({ ...form, occurredAt: toLocalInput(new Date(t.range?.start ?? Date.now())) })}>Start</Button>
+                <Button variant="secondary" size="sm" onClick={() => setForm({ ...form, occurredAt: toLocalInput(new Date(t.range?.start ?? Date.now())) })}>{tr('Start')}</Button>
               </div>
             </Field>
-            <Field label="Linked evidence (optional)" htmlFor="te-ev">
+            <Field label={tr('Linked evidence (optional)')} htmlFor="te-ev">
               <Select id="te-ev" value={form.evidenceId} onChange={(e) => setForm({ ...form, evidenceId: e.target.value })}>
-                <option value="">None</option>
+                <option value="">{tr('None')}</option>
                 {items.map((i) => <option key={i.id} value={i.evidenceId}>{i.evidence.evidenceNumber ?? i.evidenceId}</option>)}
               </Select>
             </Field>
-            <Field label="Video time (s, optional)" htmlFor="te-time">
+            <Field label={tr('Video time (s, optional)')} htmlFor="te-time">
               <Input id="te-time" inputMode="decimal" value={form.timeS} disabled={!form.evidenceId} onChange={(e) => setForm({ ...form, timeS: e.target.value })} />
             </Field>
             <div className="md:col-span-2">
-              <Field label="Description" htmlFor="te-desc">
+              <Field label={tr('Description')} htmlFor="te-desc">
                 <Textarea id="te-desc" rows={2} value={form.description} maxLength={5000} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </Field>
             </div>
             {(formError || addEvent.error) && <div className="md:col-span-2"><Alert tone="red">{formError ?? errorMessage(addEvent.error)}</Alert></div>}
             <div className="flex justify-end md:col-span-2">
-              <Button type="submit" icon={<Plus className="h-4 w-4" />} loading={addEvent.isPending}>Add event</Button>
+              <Button type="submit" icon={<Plus className="h-4 w-4" />} loading={addEvent.isPending}>{tr('Add event')}</Button>
             </div>
           </form>
         </Card>

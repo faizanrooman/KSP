@@ -4,6 +4,7 @@ import { ImageOff } from 'lucide-react';
 import { AI_TASK_INFO, type AiDetectionDto, type AiTask, type ReviewStatus } from '@ksp/shared';
 import { Badge, clsx, type Tone } from '@/components/ui';
 
+import { t as tr } from '@/lib/i18n';
 export const taskLabel = (t: AiTask | string) => AI_TASK_INFO[t as AiTask]?.label ?? t;
 
 export const TASK_COLORS: Record<AiTask, string> = {
@@ -28,7 +29,7 @@ export function ConfidenceBar({ value, threshold, className }: { value: number; 
   const tone = value >= 0.8 ? 'bg-emerald-600' : value >= 0.6 ? 'bg-brand-600' : 'bg-amber-500';
   return (
     <div className={clsx('flex items-center gap-2', className)}>
-      <div className="relative h-2 w-24 overflow-hidden rounded bg-ink-100" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Confidence">
+      <div className="relative h-2 w-24 overflow-hidden rounded bg-ink-100" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={tr('Confidence')}>
         <div className={clsx('h-full', tone)} style={{ width: `${pct}%` }} />
         {threshold !== undefined && <div className="absolute inset-y-0 w-px bg-ink-900" style={{ left: `${Math.round(threshold * 100)}%` }} title={`Threshold ${Math.round(threshold * 100)}%`} />}
       </div>
@@ -41,7 +42,7 @@ export function CropThumb({ d, size = 'md' }: { d: Pick<AiDetectionDto, 'cropUrl
   const cls = size === 'sm' ? 'h-12 w-12' : size === 'lg' ? 'h-48 w-48' : 'h-24 w-24';
   if (!d.cropUrl) {
     return (
-      <div className={clsx(cls, 'flex shrink-0 items-center justify-center rounded bg-ink-100 text-ink-400')} role="img" aria-label="No crop available">
+      <div className={clsx(cls, 'flex shrink-0 items-center justify-center rounded bg-ink-100 text-ink-400')} role="img" aria-label={tr('No crop available')}>
         <ImageOff className="h-5 w-5" aria-hidden />
       </div>
     );
@@ -60,14 +61,14 @@ export function Attributes({ a }: { a: Record<string, unknown> }) {
       </span>,
     );
   }
-  if (typeof a.plateText === 'string') parts.push(<span key="p" className="mono">plate {a.plateText} ({Math.round(Number(a.plateConfidence ?? 0) * 100)}% OCR)</span>);
-  if (a.watchlistHit || a.watchlistEntryId) parts.push(<Badge key="w" tone="red">Watchlist{a.watchlistLabel ? `: ${String(a.watchlistLabel)}` : ''}</Badge>);
-  if (typeof a.similarity === 'number') parts.push(<span key="s">similarity {a.similarity.toFixed(3)}</span>);
+  if (typeof a.plateText === 'string') parts.push(<span key="p" className="mono">{tr('plate')}{' '}{a.plateText} ({Math.round(Number(a.plateConfidence ?? 0) * 100)}{tr('% OCR)')}</span>);
+  if (a.watchlistHit || a.watchlistEntryId) parts.push(<Badge key="w" tone="red">{tr('Watchlist')}{' '}{a.watchlistLabel ? `: ${String(a.watchlistLabel)}` : ''}</Badge>);
+  if (typeof a.similarity === 'number') parts.push(<span key="s">{tr('similarity')}{' '}{a.similarity.toFixed(3)}</span>);
   if (a.basis && typeof a.basis === 'object') {
     const b = a.basis as Record<string, unknown>;
     parts.push(<span key="b">{b.maxPersonsInFrame ? `${String(b.maxPersonsInFrame)} persons in one frame` : `from ${String(b.label)} (${String(b.observations)} obs.)`}</span>);
   }
-  if (typeof a.observations === 'number' && a.observations > 1) parts.push(<span key="o">{a.observations} frames</span>);
+  if (typeof a.observations === 'number' && a.observations > 1) parts.push(<span key="o">{a.observations}{' '}{tr('frames')}</span>);
   if (!parts.length) return null;
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-600">{parts}</div>;
 }

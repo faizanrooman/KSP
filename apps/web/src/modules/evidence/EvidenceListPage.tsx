@@ -10,6 +10,7 @@ import { OrgUnitSelect } from '@/components/pickers';
 import { Badge, Button, Card, DataTable, EmptyState, Field, Input, PageHeader, Pagination, Select, StatusBadge, type Column } from '@/components/ui';
 import type { EvidenceListItem, Paged } from './types';
 
+import { t as tr } from '@/lib/i18n';
 const DEFAULTS = {
   q: '', status: '', mediaStatus: '', orgUnitId: '', tag: '', legalHold: '', storageTier: '', recordedFrom: '', recordedTo: '', hasGps: '',
   sort: '-created_at', page: '1', pageSize: '25',
@@ -48,15 +49,15 @@ export function EvidenceListPage() {
   const filtered = Object.entries(s).some(([k, v]) => !['sort', 'page', 'pageSize'].includes(k) && v !== '');
 
   const columns: Column<EvidenceListItem>[] = [
-    { key: 'thumb', header: <span className="sr-only">Thumbnail</span>, render: (r) => <Thumb url={r.thumbnailUrl} label={r.evidenceNumber ?? r.id} />, className: 'w-24' },
+    { key: 'thumb', header: <span className="sr-only">{tr('Thumbnail')}</span>, render: (r) => <Thumb url={r.thumbnailUrl} label={r.evidenceNumber ?? r.id} />, className: 'w-24' },
     {
       key: 'number',
-      header: 'Evidence',
+      header: tr('Evidence'),
       sortKey: 'evidence_number',
       render: (r) => (
         <div className="min-w-[12rem] max-w-[20rem]">
           <p className="mono text-xs font-semibold text-brand-800">{r.evidenceNumber ?? '—'}</p>
-          <p className="text-sm text-ink-900 [overflow-wrap:anywhere]">{r.title ?? <span className="text-ink-500">Untitled</span>}</p>
+          <p className="text-sm text-ink-900 [overflow-wrap:anywhere]">{r.title ?? <span className="text-ink-500">{tr('Untitled')}</span>}</p>
           {r.tags.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {r.tags.slice(0, 4).map((t) => (
@@ -70,31 +71,31 @@ export function EvidenceListPage() {
     },
     {
       key: 'status',
-      header: 'Status',
+      header: tr('Status'),
       render: (r) => (
         <div className="flex flex-col items-start gap-1">
           <StatusBadge status={r.status} />
-          <span className="whitespace-nowrap text-xs text-ink-500">Media: {titleCase(r.mediaStatus)}</span>
-          <span className="whitespace-nowrap text-xs text-ink-500">Tier: {titleCase(r.storageTier)}</span>
+          <span className="whitespace-nowrap text-xs text-ink-500">{tr('Media:')}{' '}{titleCase(r.mediaStatus)}</span>
+          <span className="whitespace-nowrap text-xs text-ink-500">{tr('Tier:')}{' '}{titleCase(r.storageTier)}</span>
           {r.legalHold && (
             <Badge tone="red">
               <Lock className="mr-1 h-3 w-3" aria-hidden />
-              Legal hold
+              {tr('Legal hold')}
             </Badge>
           )}
         </div>
       ),
     },
-    { key: 'unit', header: 'Unit / officer', className: 'min-w-[9rem]', render: (r) => (<div><p>{r.orgUnit.name}</p><p className="text-xs text-ink-500">{r.officer ? `${r.officer.fullName}${r.officer.badgeNumber ? ` (${r.officer.badgeNumber})` : ''}` : `Uploaded by ${r.uploadedBy.fullName}`}</p></div>) },
-    { key: 'recorded', header: 'Recorded', sortKey: 'recorded_at', className: 'min-w-[7rem]', render: (r) => formatDateTime(r.recordedAt) },
-    { key: 'duration', header: 'Duration', sortKey: 'duration_ms', render: (r) => formatDuration(r.durationMs) },
-    { key: 'size', header: 'Size', sortKey: 'size_bytes', render: (r) => <span className="whitespace-nowrap">{formatBytes(r.sizeBytes)}</span> },
-    { key: 'created', header: 'Received', sortKey: 'created_at', className: 'min-w-[7rem]', render: (r) => formatDateTime(r.createdAt) },
+    { key: 'unit', header: tr('Unit / officer'), className: 'min-w-[9rem]', render: (r) => (<div><p>{r.orgUnit.name}</p><p className="text-xs text-ink-500">{r.officer ? `${r.officer.fullName}${r.officer.badgeNumber ? ` (${r.officer.badgeNumber})` : ''}` : `Uploaded by ${r.uploadedBy.fullName}`}</p></div>) },
+    { key: 'recorded', header: tr('Recorded'), sortKey: 'recorded_at', className: 'min-w-[7rem]', render: (r) => formatDateTime(r.recordedAt) },
+    { key: 'duration', header: tr('Duration'), sortKey: 'duration_ms', render: (r) => formatDuration(r.durationMs) },
+    { key: 'size', header: tr('Size'), sortKey: 'size_bytes', render: (r) => <span className="whitespace-nowrap">{formatBytes(r.sizeBytes)}</span> },
+    { key: 'created', header: tr('Received'), sortKey: 'created_at', className: 'min-w-[7rem]', render: (r) => formatDateTime(r.createdAt) },
   ];
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Evidence" subtitle="Video evidence within your jurisdiction. Every view is recorded in the chain of custody." />
+      <PageHeader title={tr('Evidence')} subtitle={tr('Video evidence within your jurisdiction. Every view is recorded in the chain of custody.')} />
       <Card>
         <form
           className="grid gap-3 md:grid-cols-3 xl:grid-cols-6"
@@ -105,65 +106,65 @@ export function EvidenceListPage() {
           }}
         >
           <div className="md:col-span-2">
-            <Field label="Search" htmlFor="ev-q">
-              <Input id="ev-q" name="q" defaultValue={s.q} key={s.q} placeholder="Evidence number, title, description, location…" />
+            <Field label={tr('Search')} htmlFor="ev-q">
+              <Input id="ev-q" name="q" defaultValue={s.q} key={s.q} placeholder={tr('Evidence number, title, description, location…')} />
             </Field>
           </div>
-          <Field label="Unit" htmlFor="ev-unit">
+          <Field label={tr('Unit')} htmlFor="ev-unit">
             <OrgUnitSelect id="ev-unit" value={s.orgUnitId} onChange={(v) => set({ orgUnitId: v })} />
           </Field>
-          <Field label="Status" htmlFor="ev-status">
+          <Field label={tr('Status')} htmlFor="ev-status">
             <Select id="ev-status" value={s.status} onChange={(e) => set({ status: e.target.value })}>
-              <option value="">All statuses</option>
+              <option value="">{tr('All statuses')}</option>
               {EVIDENCE_STATUSES.map((x) => (
                 <option key={x} value={x}>{titleCase(x)}</option>
               ))}
             </Select>
           </Field>
-          <Field label="Media" htmlFor="ev-media">
+          <Field label={tr('Media')} htmlFor="ev-media">
             <Select id="ev-media" value={s.mediaStatus} onChange={(e) => set({ mediaStatus: e.target.value })}>
-              <option value="">Any</option>
+              <option value="">{tr('Any')}</option>
               {MEDIA_STATUSES.map((x) => (
                 <option key={x} value={x}>{titleCase(x)}</option>
               ))}
             </Select>
           </Field>
-          <Field label="Storage tier" htmlFor="ev-tier">
+          <Field label={tr('Storage tier')} htmlFor="ev-tier">
             <Select id="ev-tier" value={s.storageTier} onChange={(e) => set({ storageTier: e.target.value })}>
-              <option value="">Any</option>
+              <option value="">{tr('Any')}</option>
               {STORAGE_TIERS.map((x) => (
                 <option key={x} value={x}>{titleCase(x)}</option>
               ))}
             </Select>
           </Field>
-          <Field label="Recorded from" htmlFor="ev-from">
+          <Field label={tr('Recorded from')} htmlFor="ev-from">
             <Input id="ev-from" type="date" value={s.recordedFrom} onChange={(e) => set({ recordedFrom: e.target.value })} />
           </Field>
-          <Field label="Recorded to" htmlFor="ev-to">
+          <Field label={tr('Recorded to')} htmlFor="ev-to">
             <Input id="ev-to" type="date" value={s.recordedTo} onChange={(e) => set({ recordedTo: e.target.value })} />
           </Field>
-          <Field label="Tag" htmlFor="ev-tag">
-            <Input id="ev-tag" value={s.tag} onChange={(e) => set({ tag: e.target.value.toLowerCase() })} placeholder="e.g. night patrol" />
+          <Field label={tr('Tag')} htmlFor="ev-tag">
+            <Input id="ev-tag" value={s.tag} onChange={(e) => set({ tag: e.target.value.toLowerCase() })} placeholder={tr('e.g. night patrol')} />
           </Field>
-          <Field label="Legal hold" htmlFor="ev-hold">
+          <Field label={tr('Legal hold')} htmlFor="ev-hold">
             <Select id="ev-hold" value={s.legalHold} onChange={(e) => set({ legalHold: e.target.value })}>
-              <option value="">Any</option>
-              <option value="true">On hold</option>
-              <option value="false">Not on hold</option>
+              <option value="">{tr('Any')}</option>
+              <option value="true">{tr('On hold')}</option>
+              <option value="false">{tr('Not on hold')}</option>
             </Select>
           </Field>
-          <Field label="Location" htmlFor="ev-gps">
+          <Field label={tr('Location')} htmlFor="ev-gps">
             <Select id="ev-gps" value={s.hasGps} onChange={(e) => set({ hasGps: e.target.value })}>
-              <option value="">Any</option>
-              <option value="true">Has GPS</option>
-              <option value="false">No GPS</option>
+              <option value="">{tr('Any')}</option>
+              <option value="true">{tr('Has GPS')}</option>
+              <option value="false">{tr('No GPS')}</option>
             </Select>
           </Field>
           <div className="flex items-end gap-2">
-            <Button type="submit">Search</Button>
+            <Button type="submit">{tr('Search')}</Button>
             {filtered && (
               <Button variant="ghost" onClick={reset}>
-                Clear
+                {tr('Clear')}
               </Button>
             )}
           </div>
@@ -171,7 +172,7 @@ export function EvidenceListPage() {
       </Card>
       <Card bodyClassName="p-0">
         <DataTable
-          caption="Evidence"
+          caption={tr('Evidence')}
           columns={columns}
           rows={list.data?.items}
           rowKey={(r) => r.id}
@@ -186,7 +187,7 @@ export function EvidenceListPage() {
               icon={<MapPin className="h-10 w-10" aria-hidden />}
               title={filtered ? 'No evidence matches these filters' : 'No evidence yet'}
               description={filtered ? 'Try widening the date range or clearing filters.' : 'Uploaded footage appears here once it is registered.'}
-              action={filtered ? <Button variant="secondary" onClick={reset}>Clear filters</Button> : undefined}
+              action={filtered ? <Button variant="secondary" onClick={reset}>{tr('Clear filters')}</Button> : undefined}
             />
           }
         />

@@ -9,11 +9,12 @@ import { Spinner } from '@/components/ui';
 import { ChangePasswordPage, LoginPage, MfaEnrollPanel } from '@/pages/AuthPages';
 import { ForbiddenPage, NotFoundPage } from '@/pages/StatusPages';
 
+import { t } from '@/lib/i18n';
 function Guard({ element: El, anyOf }: { element: ComponentType; anyOf?: Permission[] }) {
   const { canAny } = useAuth();
   if (anyOf && anyOf.length && !canAny(...anyOf)) return <ForbiddenPage />;
   return (
-    <LazyBoundary label="Loading page…">
+    <LazyBoundary label={t('Loading page…')}>
       <El />
     </LazyBoundary>
   );
@@ -33,14 +34,14 @@ export default function App() {
   return (
     <Routes>
       {publicRoutes.map((r) => (
-        <Route key={r.path} path={r.path} element={<LazyBoundary label="Loading…" className="min-h-screen"><r.element /></LazyBoundary>} />
+        <Route key={r.path} path={r.path} element={<LazyBoundary label={t('Loading…')} className="min-h-screen"><r.element /></LazyBoundary>} />
       ))}
       <Route path="/login" element={me ? <Navigate to={afterLogin} replace /> : <LoginPage />} />
       <Route
         path="*"
         element={
           loading ? (
-            <Spinner label="Loading session…" className="min-h-screen" />
+            <Spinner label={t('Loading session…')} className="min-h-screen" />
           ) : !me ? (
             <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
           ) : me.user.mustChangePassword ? (

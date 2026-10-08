@@ -6,6 +6,7 @@ import { formatDateTime } from '@/lib/format';
 import { Alert, Badge, Button, Card, Checkbox, ConfirmDialog, ErrorState, Field, Input, PageHeader, Spinner, useToast } from '@/components/ui';
 import { useRoles } from './shared';
 
+import { t } from '@/lib/i18n';
 interface SettingsResponse {
   settings: SystemSettings;
   defaults: SystemSettings;
@@ -122,8 +123,8 @@ function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: Sett
   const details = save.error instanceof ApiError && Array.isArray(save.error.details) ? (save.error.details as Array<{ path?: string; message: string }>) : [];
   return (
     <Card
-      title={<div><h2>{group.title} {meta?.overridden ? <Badge tone="blue">Customised</Badge> : <Badge>Default</Badge>}</h2><p className="text-xs font-normal text-ink-500">{group.description}{meta?.updatedAt ? ` Last changed ${formatDateTime(meta.updatedAt)}${meta.updatedBy ? ` by ${meta.updatedBy.fullName}` : ''}.` : ''}</p></div>}
-      actions={meta?.overridden ? <Button size="sm" variant="ghost" onClick={() => { reset.reset(); setConfirmReset(true); }}>Restore defaults</Button> : undefined}
+      title={<div><h2>{group.title} {meta?.overridden ? <Badge tone="blue">{t('Customised')}</Badge> : <Badge>{t('Default')}</Badge>}</h2><p className="text-xs font-normal text-ink-500">{group.description}{meta?.updatedAt ? ` Last changed ${formatDateTime(meta.updatedAt)}${meta.updatedBy ? ` by ${meta.updatedBy.fullName}` : ''}.` : ''}</p></div>}
+      actions={meta?.overridden ? <Button size="sm" variant="ghost" onClick={() => { reset.reset(); setConfirmReset(true); }}>{t('Restore defaults')}</Button> : undefined}
     >
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -167,17 +168,17 @@ function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: Sett
           )}
         </div>
         {save.error ? (
-          <Alert tone="red" title="Not saved">
+          <Alert tone="red" title={t('Not saved')}>
             {errorMessage(save.error)}
             {details.length > 0 && <ul className="mt-1 list-disc pl-5">{details.map((d, i) => <li key={i}>{d.path ? `${d.path}: ` : ''}{d.message}</li>)}</ul>}
           </Alert>
         ) : null}
         <div className="flex justify-end gap-2">
-          {dirty && <Button variant="secondary" onClick={() => { setV(initial); save.reset(); }}>Discard</Button>}
-          <Button type="submit" disabled={!dirty} loading={save.isPending}>Save</Button>
+          {dirty && <Button variant="secondary" onClick={() => { setV(initial); save.reset(); }}>{t('Discard')}</Button>}
+          <Button type="submit" disabled={!dirty} loading={save.isPending}>{t('Save')}</Button>
         </div>
       </form>
-      <ConfirmDialog open={confirmReset} title={`Restore ${group.title}`} message="Replace the customised values with the built-in defaults? The change is audited." confirmLabel="Restore defaults" loading={reset.isPending} error={reset.error} onConfirm={() => reset.mutate()} onCancel={() => setConfirmReset(false)} />
+      <ConfirmDialog open={confirmReset} title={`Restore ${group.title}`} message={t('Replace the customised values with the built-in defaults? The change is audited.')} confirmLabel={t('Restore defaults')} loading={reset.isPending} error={reset.error} onConfirm={() => reset.mutate()} onCancel={() => setConfirmReset(false)} />
     </Card>
   );
 }
@@ -186,7 +187,7 @@ export function SettingsPage() {
   const q = useQuery({ queryKey: ['admin', 'settings'], queryFn: () => api.get<SettingsResponse>('/settings') });
   return (
     <div className="space-y-4">
-      <PageHeader title="System settings" subtitle="Security and operational policies. Every change is recorded in the audit trail with old and new values." />
+      <PageHeader title={t('System settings')} subtitle={t('Security and operational policies. Every change is recorded in the audit trail with old and new values.')} />
       {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : GROUPS.map((g) => <GroupForm key={g.key} group={g} data={q.data!} />)}
     </div>
   );

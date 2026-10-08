@@ -12,6 +12,7 @@ import { formatDuration } from '@/lib/format';
 import { Alert, Button, Card, Checkbox, EmptyState, Field, Input, KeyValue, PageHeader, Spinner, StatusBadge, Textarea, useToast } from '@/components/ui';
 import type { ExportDetail, Paged } from './types';
 
+import { t as tr } from '@/lib/i18n';
 export interface PickedItem {
   id: string;
   evidenceNumber: string | null;
@@ -74,8 +75,8 @@ export function CreateExportPage() {
   const canNext = step === 0 ? items.length > 0 : step === 1 ? opts.includeOriginal || opts.includeWatermarked : meta.purpose.trim().length >= 5;
   return (
     <div className="space-y-4">
-      <PageHeader title="New court export" subtitle="The request is reviewed by an approving officer (not you) before the package is built." breadcrumb={<Link to="/exports" className="text-brand-700 hover:underline">Court exports</Link>} />
-      <ol className="flex flex-wrap gap-2 text-sm" aria-label="Steps">
+      <PageHeader title={tr('New court export')} subtitle={tr('The request is reviewed by an approving officer (not you) before the package is built.')} breadcrumb={<Link to="/exports" className="text-brand-700 hover:underline">{tr('Court exports')}</Link>} />
+      <ol className="flex flex-wrap gap-2 text-sm" aria-label={tr('Steps')}>
         {STEPS.map((s, i) => (
           <li key={s} aria-current={i === step ? 'step' : undefined} className={`rounded-full px-3 py-1 ${i === step ? 'bg-brand-700 text-white' : i < step ? 'bg-brand-50 text-brand-800' : 'bg-ink-100 text-ink-600'}`}>{i + 1}. {s}</li>
         ))}
@@ -84,19 +85,19 @@ export function CreateExportPage() {
       {step === 0 && (
         <Card title={`Items (${items.length})`}>
           <div className="space-y-4">
-            {items.length === 0 ? <EmptyState title="No items selected" description="Add evidence from the case list or search below." /> : (
+            {items.length === 0 ? <EmptyState title={tr('No items selected')} description={tr('Add evidence from the case list or search below.')} /> : (
               <ul className="divide-y divide-ink-100 rounded-md border border-ink-200">
                 {items.map((i) => (
                   <li key={i.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                     <span><span className="mono">{i.evidenceNumber ?? i.id}</span> {i.title && <span className="text-ink-600">— {i.title}</span>}</span>
-                    <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={`Remove ${i.evidenceNumber ?? i.id}`} onClick={() => remove(i.id)}>Remove</Button>
+                    <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={`Remove ${i.evidenceNumber ?? i.id}`} onClick={() => remove(i.id)}>{tr('Remove')}</Button>
                   </li>
                 ))}
               </ul>
             )}
             {caseId && (
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-ink-800">Evidence linked to the case</h3>
+                <h3 className="mb-2 text-sm font-semibold text-ink-800">{tr('Evidence linked to the case')}</h3>
                 {caseItems.isLoading ? <Spinner /> : caseItems.error ? <Alert tone="red">{errorMessage(caseItems.error)}</Alert> : (
                   <div className="space-y-1">
                     {caseItems.data?.items.filter((c) => !c.unlinkedAt).map((c) => (
@@ -108,19 +109,19 @@ export function CreateExportPage() {
                 )}
               </div>
             )}
-            <Field label="Add evidence by number or title" htmlFor="ce-search">
+            <Field label={tr('Add evidence by number or title')} htmlFor="ce-search">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-ink-400" aria-hidden />
-                <Input id="ce-search" className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="e.g. KSP-CUBBONPARK-2026" />
+                <Input id="ce-search" className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tr('e.g. KSP-CUBBONPARK-2026')} />
               </div>
             </Field>
             {found.data && (
               <ul className="divide-y divide-ink-100 rounded-md border border-ink-200 text-sm">
-                {found.data.items.length === 0 && <li className="px-3 py-2 text-ink-500">No registered evidence found</li>}
+                {found.data.items.length === 0 && <li className="px-3 py-2 text-ink-500">{tr('No registered evidence found')}</li>}
                 {found.data.items.map((e) => (
                   <li key={e.id} className="flex items-center justify-between px-3 py-2">
                     <span><span className="mono">{e.evidenceNumber}</span> <span className="text-ink-600">{e.title}</span> <StatusBadge status={e.status} /></span>
-                    <Button size="sm" variant="secondary" disabled={items.some((x) => x.id === e.id)} onClick={() => add({ id: e.id, evidenceNumber: e.evidenceNumber, title: e.title, durationMs: e.durationMs })}>Add</Button>
+                    <Button size="sm" variant="secondary" disabled={items.some((x) => x.id === e.id)} onClick={() => add({ id: e.id, evidenceNumber: e.evidenceNumber, title: e.title, durationMs: e.durationMs })}>{tr('Add')}</Button>
                   </li>
                 ))}
               </ul>
@@ -130,31 +131,31 @@ export function CreateExportPage() {
       )}
 
       {step === 1 && (
-        <Card title="Package contents">
+        <Card title={tr('Package contents')}>
           <div className="space-y-3">
-            <Checkbox label="Original files (byte-identical)" description={can('evidence:download_original') ? 'Re-verified against the registered SHA-256/512 before packaging.' : 'Requires permission to download originals — ask a supervisor or request watermarked copies only.'} checked={opts.includeOriginal} disabled={!can('evidence:download_original')} onChange={(v) => setOpts({ ...opts, includeOriginal: v })} />
-            <Checkbox label="Watermarked viewing copies" description='MP4 with burned-in export number, recipient, date, "COPY - NOT ORIGINAL" and timecode.' checked={opts.includeWatermarked} onChange={(v) => setOpts({ ...opts, includeWatermarked: v })} />
-            {opts.includeWatermarked && <Field label="Extra watermark text (optional)" htmlFor="ce-wm"><Input id="ce-wm" maxLength={120} value={opts.watermarkText} onChange={(e) => setOpts({ ...opts, watermarkText: e.target.value })} /></Field>}
-            <Checkbox label="Signed chain-of-custody report per item" checked={opts.includeCustodyReport} onChange={(v) => setOpts({ ...opts, includeCustodyReport: v })} />
-            <Checkbox label="Fact Sheet (with Section 63 BSA certificate template)" checked={opts.includeFactSheet} onChange={(v) => setOpts({ ...opts, includeFactSheet: v })} />
-            {!opts.includeOriginal && !opts.includeWatermarked && <Alert tone="amber">Include the originals and/or the watermarked copies.</Alert>}
-            <p className="text-xs text-ink-600">Every package also contains metadata files, manifest.json with the SHA-256 of every file, a detached signature, the signing certificate and VERIFY.txt with offline verification commands.</p>
+            <Checkbox label={tr('Original files (byte-identical)')} description={can('evidence:download_original') ? 'Re-verified against the registered SHA-256/512 before packaging.' : 'Requires permission to download originals — ask a supervisor or request watermarked copies only.'} checked={opts.includeOriginal} disabled={!can('evidence:download_original')} onChange={(v) => setOpts({ ...opts, includeOriginal: v })} />
+            <Checkbox label={tr('Watermarked viewing copies')} description={tr('MP4 with burned-in export number, recipient, date, "COPY - NOT ORIGINAL" and timecode.')} checked={opts.includeWatermarked} onChange={(v) => setOpts({ ...opts, includeWatermarked: v })} />
+            {opts.includeWatermarked && <Field label={tr('Extra watermark text (optional)')} htmlFor="ce-wm"><Input id="ce-wm" maxLength={120} value={opts.watermarkText} onChange={(e) => setOpts({ ...opts, watermarkText: e.target.value })} /></Field>}
+            <Checkbox label={tr('Signed chain-of-custody report per item')} checked={opts.includeCustodyReport} onChange={(v) => setOpts({ ...opts, includeCustodyReport: v })} />
+            <Checkbox label={tr('Fact Sheet (with Section 63 BSA certificate template)')} checked={opts.includeFactSheet} onChange={(v) => setOpts({ ...opts, includeFactSheet: v })} />
+            {!opts.includeOriginal && !opts.includeWatermarked && <Alert tone="amber">{tr('Include the originals and/or the watermarked copies.')}</Alert>}
+            <p className="text-xs text-ink-600">{tr('Every package also contains metadata files, manifest.json with the SHA-256 of every file, a detached signature, the signing certificate and VERIFY.txt with offline verification commands.')}</p>
           </div>
         </Card>
       )}
 
       {step === 2 && (
-        <Card title="Purpose and destination">
+        <Card title={tr('Purpose and destination')}>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="md:col-span-2"><Field label="Purpose" required htmlFor="ce-purpose" hint="At least 5 characters; recorded in the chain of custody."><Textarea id="ce-purpose" rows={3} value={meta.purpose} onChange={(e) => setMeta({ ...meta, purpose: e.target.value })} /></Field></div>
-            <Field label="Court" htmlFor="ce-court"><Input id="ce-court" value={meta.courtName} onChange={(e) => setMeta({ ...meta, courtName: e.target.value })} /></Field>
-            <Field label="Court case number" htmlFor="ce-ccn"><Input id="ce-ccn" value={meta.courtCaseNumber} onChange={(e) => setMeta({ ...meta, courtCaseNumber: e.target.value })} /></Field>
-            <div className="md:col-span-2"><Field label="Recipient" htmlFor="ce-rec" hint="e.g. Public Prosecutor, the court's evidence clerk"><Input id="ce-rec" value={meta.recipient} onChange={(e) => setMeta({ ...meta, recipient: e.target.value })} /></Field></div>
+            <div className="md:col-span-2"><Field label={tr('Purpose')} required htmlFor="ce-purpose" hint={tr('At least 5 characters; recorded in the chain of custody.')}><Textarea id="ce-purpose" rows={3} value={meta.purpose} onChange={(e) => setMeta({ ...meta, purpose: e.target.value })} /></Field></div>
+            <Field label={tr('Court')} htmlFor="ce-court"><Input id="ce-court" value={meta.courtName} onChange={(e) => setMeta({ ...meta, courtName: e.target.value })} /></Field>
+            <Field label={tr('Court case number')} htmlFor="ce-ccn"><Input id="ce-ccn" value={meta.courtCaseNumber} onChange={(e) => setMeta({ ...meta, courtCaseNumber: e.target.value })} /></Field>
+            <div className="md:col-span-2"><Field label={tr('Recipient')} htmlFor="ce-rec" hint={tr('e.g. Public Prosecutor, the court\'s evidence clerk')}><Input id="ce-rec" value={meta.recipient} onChange={(e) => setMeta({ ...meta, recipient: e.target.value })} /></Field></div>
           </div>
           <div className="mt-4 rounded-md bg-ink-50 p-3">
             <KeyValue items={[
-              { label: 'Items', value: items.map((i) => i.evidenceNumber ?? i.id).join(', ') },
-              { label: 'Contents', value: [opts.includeOriginal && 'originals', opts.includeWatermarked && 'watermarked copies', opts.includeCustodyReport && 'custody reports', opts.includeFactSheet && 'fact sheet'].filter(Boolean).join(', ') },
+              { label: tr('Items'), value: items.map((i) => i.evidenceNumber ?? i.id).join(', ') },
+              { label: tr('Contents'), value: [opts.includeOriginal && 'originals', opts.includeWatermarked && 'watermarked copies', opts.includeCustodyReport && 'custody reports', opts.includeFactSheet && 'fact sheet'].filter(Boolean).join(', ') },
             ]} />
           </div>
           {submit.error ? <div className="mt-3"><Alert tone="red">{errorMessage(submit.error)}</Alert></div> : null}
@@ -162,11 +163,11 @@ export function CreateExportPage() {
       )}
 
       <div className="flex justify-between">
-        <Button variant="secondary" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</Button>
+        <Button variant="secondary" disabled={step === 0} onClick={() => setStep(step - 1)}>{tr('Back')}</Button>
         {step < STEPS.length - 1 ? (
-          <Button disabled={!canNext} onClick={() => setStep(step + 1)}>Next</Button>
+          <Button disabled={!canNext} onClick={() => setStep(step + 1)}>{tr('Next')}</Button>
         ) : (
-          <Button disabled={!canNext} loading={submit.isPending} onClick={() => submit.mutate()}>Submit for approval</Button>
+          <Button disabled={!canNext} loading={submit.isPending} onClick={() => submit.mutate()}>{tr('Submit for approval')}</Button>
         )}
       </div>
     </div>

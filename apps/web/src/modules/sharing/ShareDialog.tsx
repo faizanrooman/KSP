@@ -8,6 +8,7 @@ import { Alert, Button, Checkbox, CopyButton, Field, Input, Modal, Select, Texta
 import type { CreatedShare } from './types';
 import { deliveryText, useShareOptions } from './ShareManageActions';
 
+import { t } from '@/lib/i18n';
 export interface ShareTarget {
   id: string;
   evidenceNumber: string | null;
@@ -53,15 +54,15 @@ export function ShareDialog({ items, caseId, onClose }: { items: ShareTarget[]; 
   const valid = purpose.trim().length >= 5 && (type === 'INTERNAL_USER' ? !!user : rec.name.trim().length > 1 && /.+@.+\..+/.test(rec.email)) && new Date(expires).getTime() > Date.now();
   if (created) {
     return (
-      <Modal open onClose={onClose} title="Share created" footer={<Button onClick={onClose}>Done</Button>}>
+      <Modal open onClose={onClose} title={t('Share created')} footer={<Button onClick={onClose}>{t('Done')}</Button>}>
         <div className="space-y-3 text-sm">
-          {deliveryText(created.delivery) && <Alert tone={created.delivery?.link === 'FAILED' || created.delivery?.accessCode === 'FAILED' ? 'red' : 'green'}>{deliveryText(created.delivery)} to {created.share.recipient.email}.</Alert>}
-          <Alert tone="amber" title="Shown only once">
-            {created.delivery?.link === 'SENT' && created.delivery.accessCode !== 'SENT' ? 'Give the access code to the recipient by phone/SMS or in person — it was not e-mailed. ' : ''}Send the link and the access code to {created.share.recipient.name} through <strong>different channels</strong> (for example the link by e-mail and the code by phone/SMS). Neither can be displayed again.
+          {deliveryText(created.delivery) && <Alert tone={created.delivery?.link === 'FAILED' || created.delivery?.accessCode === 'FAILED' ? 'red' : 'green'}>{deliveryText(created.delivery)}{' '}{t('to')}{' '}{created.share.recipient.email}.</Alert>}
+          <Alert tone="amber" title={t('Shown only once')}>
+            {created.delivery?.link === 'SENT' && created.delivery.accessCode !== 'SENT' ? 'Give the access code to the recipient by phone/SMS or in person — it was not e-mailed. ' : ''}{' '}{t('Send the link and the access code to')}{' '}{created.share.recipient.name}{' '}{t('through')}{' '}<strong>{t('different channels')}</strong>{t('(for example the link by e-mail and the code by phone/SMS). Neither can be displayed again.')}
           </Alert>
-          <Field label="Link" htmlFor="sd-link"><div className="flex gap-2"><Input id="sd-link" readOnly value={created.link} className="mono text-xs" /><CopyButton value={created.link!} /></div></Field>
-          <Field label="Access code" htmlFor="sd-code"><div className="flex gap-2"><Input id="sd-code" readOnly value={created.accessCode} className="mono text-lg tracking-widest" /><CopyButton value={created.accessCode!} /></div></Field>
-          <p className="text-xs text-ink-600">Expires {formatDateTime(created.share.expiresAt)}{created.share.maxViews ? ` or after ${created.share.maxViews} views` : ''}. Five wrong codes lock the share.</p>
+          <Field label={t('Link')} htmlFor="sd-link"><div className="flex gap-2"><Input id="sd-link" readOnly value={created.link} className="mono text-xs" /><CopyButton value={created.link!} /></div></Field>
+          <Field label={t('Access code')} htmlFor="sd-code"><div className="flex gap-2"><Input id="sd-code" readOnly value={created.accessCode} className="mono text-lg tracking-widest" /><CopyButton value={created.accessCode!} /></div></Field>
+          <p className="text-xs text-ink-600">{t('Expires')}{' '}{formatDateTime(created.share.expiresAt)}{created.share.maxViews ? ` or after ${created.share.maxViews} views` : ''}{t('. Five wrong codes lock the share.')}</p>
         </div>
       </Modal>
     );
@@ -72,41 +73,41 @@ export function ShareDialog({ items, caseId, onClose }: { items: ShareTarget[]; 
       onClose={onClose}
       size="lg"
       title={`Share ${items.length === 1 ? (items[0]!.evidenceNumber ?? 'evidence') : `${items.length} items`}`}
-      footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button disabled={!valid} loading={m.isPending} onClick={() => m.mutate()}>Create share</Button></>}
+      footer={<><Button variant="secondary" onClick={onClose}>{t('Cancel')}</Button><Button disabled={!valid} loading={m.isPending} onClick={() => m.mutate()}>{t('Create share')}</Button></>}
     >
       <div className="space-y-3 text-sm">
-        <Field label="Recipient type" htmlFor="sd-type">
+        <Field label={t('Recipient type')} htmlFor="sd-type">
           <Select id="sd-type" value={type} onChange={(e) => setType(e.target.value as 'INTERNAL_USER' | 'EXTERNAL')}>
-            <option value="INTERNAL_USER">KSP user (internal)</option>
-            <option value="EXTERNAL">External recipient (prosecutor, court, FSL…)</option>
+            <option value="INTERNAL_USER">{t('KSP user (internal)')}</option>
+            <option value="EXTERNAL">{t('External recipient (prosecutor, court, FSL…)')}</option>
           </Select>
         </Field>
         {type === 'INTERNAL_USER' ? (
-          <Field label="User" htmlFor="sd-user"><UserPicker id="sd-user" value={user} onChange={setUser} /></Field>
+          <Field label={t('User')} htmlFor="sd-user"><UserPicker id="sd-user" value={user} onChange={setUser} /></Field>
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Field label="Name" required htmlFor="sd-name"><Input id="sd-name" value={rec.name} onChange={(e) => setRec({ ...rec, name: e.target.value })} /></Field>
-            <Field label="E-mail" required htmlFor="sd-email"><Input id="sd-email" type="email" value={rec.email} onChange={(e) => setRec({ ...rec, email: e.target.value })} /></Field>
-            <Field label="Organisation" htmlFor="sd-org"><Input id="sd-org" value={rec.org} onChange={(e) => setRec({ ...rec, org: e.target.value })} /></Field>
+            <Field label={t('Name')} required htmlFor="sd-name"><Input id="sd-name" value={rec.name} onChange={(e) => setRec({ ...rec, name: e.target.value })} /></Field>
+            <Field label={t('E-mail')} required htmlFor="sd-email"><Input id="sd-email" type="email" value={rec.email} onChange={(e) => setRec({ ...rec, email: e.target.value })} /></Field>
+            <Field label={t('Organisation')} htmlFor="sd-org"><Input id="sd-org" value={rec.org} onChange={(e) => setRec({ ...rec, org: e.target.value })} /></Field>
           </div>
         )}
-        <Field label="Purpose" required htmlFor="sd-purpose" hint="At least 5 characters; recorded in the chain of custody."><Textarea id="sd-purpose" rows={2} value={purpose} onChange={(e) => setPurpose(e.target.value)} /></Field>
+        <Field label={t('Purpose')} required htmlFor="sd-purpose" hint={t('At least 5 characters; recorded in the chain of custody.')}><Textarea id="sd-purpose" rows={2} value={purpose} onChange={(e) => setPurpose(e.target.value)} /></Field>
         <fieldset className="space-y-2">
-          <legend className="text-xs font-semibold uppercase text-ink-600">Permissions</legend>
-          <Checkbox label="Allow download" description={canOriginal ? (type === 'EXTERNAL' ? 'External recipients receive the watermarked copy.' : 'The recipient may download the original.') : 'Requires that you may download the original.'} checked={perm.allowDownload} disabled={!canOriginal} onChange={(v) => setPerm({ ...perm, allowDownload: v, allowOriginal: v && perm.allowOriginal })} />
-          {type === 'EXTERNAL' && perm.allowDownload && <Checkbox label="Also allow the ORIGINAL file" description="Only when the recipient must hold the unmodified original." checked={perm.allowOriginal} onChange={(v) => setPerm({ ...perm, allowOriginal: v })} />}
-          {type === 'EXTERNAL' && <Checkbox label="Allow printing watermarked stills" checked={perm.allowPrint} onChange={(v) => setPerm({ ...perm, allowPrint: v })} />}
-          {type === 'EXTERNAL' && <Checkbox label="Watermark playback with the recipient's identity" description={canOriginal ? 'Strongly recommended.' : 'Mandatory unless you may download the original.'} checked={perm.watermark} disabled={!canOriginal} onChange={(v) => setPerm({ ...perm, watermark: v })} />}
+          <legend className="text-xs font-semibold uppercase text-ink-600">{t('Permissions')}</legend>
+          <Checkbox label={t('Allow download')} description={canOriginal ? (type === 'EXTERNAL' ? 'External recipients receive the watermarked copy.' : 'The recipient may download the original.') : 'Requires that you may download the original.'} checked={perm.allowDownload} disabled={!canOriginal} onChange={(v) => setPerm({ ...perm, allowDownload: v, allowOriginal: v && perm.allowOriginal })} />
+          {type === 'EXTERNAL' && perm.allowDownload && <Checkbox label={t('Also allow the ORIGINAL file')} description={t('Only when the recipient must hold the unmodified original.')} checked={perm.allowOriginal} onChange={(v) => setPerm({ ...perm, allowOriginal: v })} />}
+          {type === 'EXTERNAL' && <Checkbox label={t('Allow printing watermarked stills')} checked={perm.allowPrint} onChange={(v) => setPerm({ ...perm, allowPrint: v })} />}
+          {type === 'EXTERNAL' && <Checkbox label={t('Watermark playback with the recipient\'s identity')} description={canOriginal ? 'Strongly recommended.' : 'Mandatory unless you may download the original.'} checked={perm.watermark} disabled={!canOriginal} onChange={(v) => setPerm({ ...perm, watermark: v })} />}
         </fieldset>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label="Expires" required htmlFor="sd-exp" hint="Limited by the system share policy (default 30 days)."><Input id="sd-exp" type="datetime-local" value={expires} onChange={(e) => setExpires(e.target.value)} /></Field>
-          <Field label="Maximum views (optional)" htmlFor="sd-views" hint={type === 'INTERNAL_USER' ? 'Counts openings of each item (one per 30-minute viewing session).' : undefined}><Input id="sd-views" inputMode="numeric" value={maxViews} onChange={(e) => setMaxViews(e.target.value.replace(/\D/g, ''))} /></Field>
+          <Field label={t('Expires')} required htmlFor="sd-exp" hint={t('Limited by the system share policy (default 30 days).')}><Input id="sd-exp" type="datetime-local" value={expires} onChange={(e) => setExpires(e.target.value)} /></Field>
+          <Field label={t('Maximum views (optional)')} htmlFor="sd-views" hint={type === 'INTERNAL_USER' ? 'Counts openings of each item (one per 30-minute viewing session).' : undefined}><Input id="sd-views" inputMode="numeric" value={maxViews} onChange={(e) => setMaxViews(e.target.value.replace(/\D/g, ''))} /></Field>
         </div>
         {emailOk && (
           <fieldset className="space-y-2">
-            <legend className="text-xs font-semibold uppercase text-ink-600">Delivery</legend>
-            <Checkbox label="E-mail the link to the recipient" description="The access code is not included — give it by phone/SMS or in person." checked={mail.emailLink} onChange={(v) => setMail({ emailLink: v, emailAccessCode: v && mail.emailAccessCode })} />
-            {mail.emailLink && <Checkbox label="Also e-mail the access code (separate message)" description="Not recommended: anyone with access to that mailbox could then open the share." checked={mail.emailAccessCode} onChange={(v) => setMail({ ...mail, emailAccessCode: v })} />}
+            <legend className="text-xs font-semibold uppercase text-ink-600">{t('Delivery')}</legend>
+            <Checkbox label={t('E-mail the link to the recipient')} description={t('The access code is not included — give it by phone/SMS or in person.')} checked={mail.emailLink} onChange={(v) => setMail({ emailLink: v, emailAccessCode: v && mail.emailAccessCode })} />
+            {mail.emailLink && <Checkbox label={t('Also e-mail the access code (separate message)')} description={t('Not recommended: anyone with access to that mailbox could then open the share.')} checked={mail.emailAccessCode} onChange={(v) => setMail({ ...mail, emailAccessCode: v })} />}
           </fieldset>
         )}
         {m.error ? <Alert tone="red">{errorMessage(m.error)}</Alert> : null}

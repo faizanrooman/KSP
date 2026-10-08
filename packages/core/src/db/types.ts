@@ -594,6 +594,22 @@ export interface Exports {
   status: Generated<string>;
 }
 
+export interface FaceSearches {
+  created_at: Generated<Timestamp>;
+  error: string | null;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  model_id: string | null;
+  org_unit_id: string;
+  params: Generated<Json>;
+  probe_key: string;
+  requested_by: string;
+  result: Json | null;
+  started_at: Timestamp | null;
+  stats: Json | null;
+  status: Generated<string>;
+}
+
 export interface Firs {
   acts_sections: Generated<string[]>;
   brief_facts: string | null;
@@ -1109,6 +1125,7 @@ export interface DB {
   evidence_tags: EvidenceTags;
   export_items: ExportItems;
   exports: Exports;
+  face_searches: FaceSearches;
   firs: Firs;
   integration_sync_log: IntegrationSyncLog;
   integration_systems: IntegrationSystems;

@@ -13,6 +13,7 @@ import { formatTimecode } from '@/lib/format';
 import { EvidencePlayer, RATES, type EvidencePlayerHandle } from './EvidencePlayer';
 import type { PlaybackInfo } from './api';
 
+import { t } from '@/lib/i18n';
 export interface SyncItem {
   evidenceId: string;
   /** Position of this item's t=0 on the shared (master) timeline, in ms. */
@@ -191,22 +192,22 @@ export function SyncPlayer({ items: input, onOffsetsChange, className }: SyncPla
                   <span className="mono whitespace-nowrap text-ink-500">{local < 0 ? `starts in ${formatTimecode(-local)}` : formatTimecode(local)}</span>
                 </span>
                 <span className="ml-auto inline-flex items-center gap-1 whitespace-nowrap">
-                <span className="text-ink-600">Offset</span>
-                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, -100)} aria-label={`${it.label}: offset −100 ms`}>−100ms</button>
+                <span className="text-ink-600">{t('Offset')}</span>
+                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, -100)} aria-label={`${it.label}: offset −100 ms`}>{t('−100ms')}</button>
                 <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, -f)} aria-label={`${it.label}: offset −1 frame`}>−1f</button>
                 <span className="mono w-20 text-center" aria-live="polite">{(offsets[i] ?? 0) >= 0 ? '+' : '−'}{formatTimecode(Math.abs(offsets[i] ?? 0))}</span>
                 <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, f)} aria-label={`${it.label}: offset +1 frame`}>+1f</button>
-                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, 100)} aria-label={`${it.label}: offset +100 ms`}>+100ms</button>
+                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, 100)} aria-label={`${it.label}: offset +100 ms`}>{t('+100ms')}</button>
                 </span>
               </div>
             </div>
           );
         })}
       </div>
-      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-ink-950 px-3 py-2 text-ink-100" role="group" aria-label="Synchronised transport">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-ink-950 px-3 py-2 text-ink-100" role="group" aria-label={t('Synchronised transport')}>
         <button type="button" className={btn} onClick={togglePlay} aria-label={playing ? 'Pause all' : 'Play all'}>{playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
-        <button type="button" className={btn} onClick={() => stepMaster(-1)} aria-label="All: previous frame"><StepBack className="h-4 w-4" /></button>
-        <button type="button" className={btn} onClick={() => stepMaster(1)} aria-label="All: next frame"><StepForward className="h-4 w-4" /></button>
+        <button type="button" className={btn} onClick={() => stepMaster(-1)} aria-label={t('All: previous frame')}><StepBack className="h-4 w-4" /></button>
+        <button type="button" className={btn} onClick={() => stepMaster(1)} aria-label={t('All: next frame')}><StepForward className="h-4 w-4" /></button>
         <input
           type="range"
           className="min-w-[160px] flex-1 accent-brand-500"
@@ -215,11 +216,11 @@ export function SyncPlayer({ items: input, onOffsetsChange, className }: SyncPla
           step={1}
           value={Math.min(range.end, Math.max(range.start, master))}
           onChange={(e) => seekMaster(Number(e.target.value))}
-          aria-label="Shared timeline"
+          aria-label={t('Shared timeline')}
           aria-valuetext={formatTimecode(master)}
         />
         <span className="mono text-xs tabular-nums">{master < 0 ? '−' : ''}{formatTimecode(Math.abs(master))} / {formatTimecode(range.end)}</span>
-        <label className="sr-only" htmlFor="sync-rate">Playback rate</label>
+        <label className="sr-only" htmlFor="sync-rate">{t('Playback rate')}</label>
         <select id="sync-rate" value={rate} onChange={(e) => changeRate(Number(e.target.value))} className="h-8 rounded bg-white/10 px-1 text-xs">
           {RATES.map((r) => <option key={r} value={r} className="text-ink-900">{r}×</option>)}
         </select>

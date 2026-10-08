@@ -11,6 +11,7 @@ import { formatDateTime, titleCase } from '@/lib/format';
 import { Alert, Badge, CopyButton, EmptyState, ErrorState, PageHeader, Spinner, StatusBadge, Tabs } from '@/components/ui';
 import { PERMISSION_FLAGS, evidenceKey, type EvidenceDetail } from './types';
 
+import { t as tr } from '@/lib/i18n';
 const TAB_DEFAULTS = { tab: '' };
 
 export function useEvidenceDetail(id: string) {
@@ -50,10 +51,10 @@ export function EvidenceDetailPage() {
   const [url, setUrl] = useUrlState(TAB_DEFAULTS);
   const q = useEvidenceDetail(id);
 
-  if (q.isLoading) return <Spinner label="Loading evidence…" />;
+  if (q.isLoading) return <Spinner label={tr('Loading evidence…')} />;
   if (q.error) {
     if (q.error instanceof ApiError && q.error.status === 404) {
-      return <EmptyState heading="h1" title="Evidence not found" description="It does not exist or is outside your jurisdiction." action={<Link className="text-brand-700 hover:underline" to="/evidence">Back to evidence</Link>} />;
+      return <EmptyState heading="h1" title={tr('Evidence not found')} description={tr('It does not exist or is outside your jurisdiction.')} action={<Link className="text-brand-700 hover:underline" to="/evidence">{tr('Back to evidence')}</Link>} />;
     }
     return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
   }
@@ -66,7 +67,7 @@ export function EvidenceDetailPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        breadcrumb={<Link to="/evidence" className="hover:underline">Evidence</Link>}
+        breadcrumb={<Link to="/evidence" className="hover:underline">{tr('Evidence')}</Link>}
         title={
           <span className="flex flex-wrap items-center gap-2">
             <span className="break-all font-mono">{ev.evidenceNumber ?? 'Unnumbered'}</span>
@@ -74,10 +75,10 @@ export function EvidenceDetailPage() {
             {ev.legalHold && (
               <Badge tone="red">
                 <Lock className="mr-1 h-3 w-3" aria-hidden />
-                Legal hold
+                {tr('Legal hold')}
               </Badge>
             )}
-            <Badge tone="gray">{titleCase(ev.storageTier)} tier</Badge>
+            <Badge tone="gray">{titleCase(ev.storageTier)}{' '}{tr('tier')}</Badge>
           </span>
         }
         subtitle={
@@ -96,24 +97,24 @@ export function EvidenceDetailPage() {
         }
       />
       {ev.legalHold && (
-        <Alert tone="red" title="Under legal hold">
-          {ev.legalHoldReason} — placed by {ev.legalHoldBy?.fullName ?? 'unknown'} on {formatDateTime(ev.legalHoldAt)}. Disposal is blocked until the hold is released.
+        <Alert tone="red" title={tr('Under legal hold')}>
+          {ev.legalHoldReason}{' '}{tr('— placed by')}{' '}{ev.legalHoldBy?.fullName ?? 'unknown'}{' '}{tr('on')}{' '}{formatDateTime(ev.legalHoldAt)}{tr('. Disposal is blocked until the hold is released.')}
         </Alert>
       )}
       {ev.status === 'DISPOSED' && (
-        <Alert tone="amber" title="Disposed">
-          The original and derived media were destroyed on {formatDateTime(ev.disposedAt)} under an authorised disposal. This record and its chain of custody are retained permanently.
+        <Alert tone="amber" title={tr('Disposed')}>
+          {tr('The original and derived media were destroyed on')}{' '}{formatDateTime(ev.disposedAt)}{' '}{tr('under an authorised disposal. This record and its chain of custody are retained permanently.')}
         </Alert>
       )}
-      {ev.status === 'DISPOSAL_PENDING' && <Alert tone="amber" title="Disposal pending">A disposal request is awaiting a decision by an authorised approver.</Alert>}
+      {ev.status === 'DISPOSAL_PENDING' && <Alert tone="amber" title={tr('Disposal pending')}>{tr('A disposal request is awaiting a decision by an authorised approver.')}</Alert>}
       <div className="card space-y-1 px-4 py-3">
         <div className="mb-1 flex items-center gap-2 text-sm font-medium text-ink-700">
           <ShieldCheck className="h-4 w-4 text-emerald-700" aria-hidden />
-          Registered hashes
+          {tr('Registered hashes')}
           <span className="text-xs font-normal text-ink-500">{ev.lastVerifiedAt ? `last verified ${formatDateTime(ev.lastVerifiedAt)}` : 'not yet re-verified'}</span>
         </div>
-        <HashRow label="SHA-256" value={ev.sha256} />
-        <HashRow label="SHA-512" value={ev.sha512} />
+        <HashRow label={tr('SHA-256')} value={ev.sha256} />
+        <HashRow label={tr('SHA-512')} value={ev.sha512} />
       </div>
       {tabs.length > 0 && active && (
         <div>

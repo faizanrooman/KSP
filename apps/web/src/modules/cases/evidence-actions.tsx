@@ -8,6 +8,7 @@ import { titleCase } from '@/lib/format';
 import { Alert, Button, Field, Input, Modal, Spinner, StatusBadge, useToast } from '@/components/ui';
 import { ACTIVE_CASE_STATUSES, type CaseListItem, type Paged } from './types';
 
+import { t as tr } from '@/lib/i18n';
 function LinkToCaseButton({ evidence }: { evidence: EvidenceSummary }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -38,18 +39,18 @@ function LinkToCaseButton({ evidence }: { evidence: EvidenceSummary }) {
   });
   return (
     <>
-      <Button variant="secondary" size="sm" icon={<FolderInput className="h-4 w-4" />} onClick={() => { setPicked(null); setNote(''); m.reset(); setOpen(true); }}>Link to case</Button>
+      <Button variant="secondary" size="sm" icon={<FolderInput className="h-4 w-4" />} onClick={() => { setPicked(null); setNote(''); m.reset(); setOpen(true); }}>{tr('Link to case')}</Button>
       <Modal
         open={open}
         onClose={() => setOpen(false)}
         title={`Link ${evidence.evidenceNumber ?? 'evidence'} to a case`}
-        footer={<><Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button><Button disabled={!picked} loading={m.isPending} onClick={() => m.mutate()}>Link</Button></>}
+        footer={<><Button variant="secondary" onClick={() => setOpen(false)}>{tr('Cancel')}</Button><Button disabled={!picked} loading={m.isPending} onClick={() => m.mutate()}>{tr('Link')}</Button></>}
       >
         <div className="space-y-3">
-          <Field label="Find case" htmlFor="ltc-q"><Input id="ltc-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Case number, title or FIR number" autoFocus /></Field>
+          <Field label={tr('Find case')} htmlFor="ltc-q"><Input id="ltc-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr('Case number, title or FIR number')} autoFocus /></Field>
           {cases.isLoading ? <Spinner /> : cases.error ? <Alert tone="red">{errorMessage(cases.error)}</Alert> : (
-            <ul className="max-h-60 divide-y divide-ink-100 overflow-y-auto rounded-md border border-ink-200 text-sm" aria-label="Cases">
-              {cases.data?.items.length === 0 && <li className="px-3 py-2 text-ink-500">No open cases found</li>}
+            <ul className="max-h-60 divide-y divide-ink-100 overflow-y-auto rounded-md border border-ink-200 text-sm" aria-label={tr('Cases')}>
+              {cases.data?.items.length === 0 && <li className="px-3 py-2 text-ink-500">{tr('No open cases found')}</li>}
               {cases.data?.items.map((c) => (
                 <li key={c.id}>
                   <button type="button" aria-pressed={picked?.id === c.id} className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-brand-50 ${picked?.id === c.id ? 'bg-brand-50 ring-1 ring-brand-300' : ''}`} onClick={() => setPicked(c)}>
@@ -59,8 +60,8 @@ function LinkToCaseButton({ evidence }: { evidence: EvidenceSummary }) {
               ))}
             </ul>
           )}
-          <Field label="Note (optional)" htmlFor="ltc-note"><Input id="ltc-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} /></Field>
-          <p className="text-xs text-ink-600">The link is recorded in the evidence chain of custody.</p>
+          <Field label={tr('Note (optional)')} htmlFor="ltc-note"><Input id="ltc-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} /></Field>
+          <p className="text-xs text-ink-600">{tr('The link is recorded in the evidence chain of custody.')}</p>
           {m.error ? <Alert tone="red">{errorMessage(m.error)}</Alert> : null}
         </div>
       </Modal>

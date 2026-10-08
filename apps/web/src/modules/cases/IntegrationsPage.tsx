@@ -8,27 +8,28 @@ import { Alert, Badge, Button, Card, DataTable, EmptyState, ErrorState, Field, I
 import { VerificationBadge } from './FirPages';
 import type { IntegrationSystem, Paged, SyncLogItem } from './types';
 
+import { t as tr } from '@/lib/i18n';
 export function IntegrationsPage() {
   const q = useQuery({ queryKey: ['integrations', 'systems'], queryFn: () => api.get<{ items: IntegrationSystem[] }>('/integrations/systems') });
   const [editing, setEditing] = useState<IntegrationSystem | 'new' | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const cols: Column<IntegrationSystem>[] = [
-    { key: 'name', header: 'System', render: (r) => <div><p className="font-medium">{r.name}</p><p className="mono text-xs text-ink-500">{r.code}</p></div> },
-    { key: 'type', header: 'Type', render: (r) => titleCase(r.systemType) },
-    { key: 'adapter', header: 'Adapter', render: (r) => <span className="mono text-sm">{r.adapter}</span> },
-    { key: 'verified', header: 'Contract', render: (r) => <VerificationBadge status={r.verificationStatus} /> },
-    { key: 'enabled', header: 'State', render: (r) => <Badge tone={r.enabled ? 'green' : 'gray'}>{r.enabled ? 'Enabled' : 'Disabled'}</Badge> },
-    { key: 'last', header: 'Last activity', render: (r) => <div className="text-xs">{formatDateTime(r.lastSyncAt)}<p className="text-ink-500">{r.lastStatus ?? ''}</p></div> },
+    { key: 'name', header: tr('System'), render: (r) => <div><p className="font-medium">{r.name}</p><p className="mono text-xs text-ink-500">{r.code}</p></div> },
+    { key: 'type', header: tr('Type'), render: (r) => titleCase(r.systemType) },
+    { key: 'adapter', header: tr('Adapter'), render: (r) => <span className="mono text-sm">{r.adapter}</span> },
+    { key: 'verified', header: tr('Contract'), render: (r) => <VerificationBadge status={r.verificationStatus} /> },
+    { key: 'enabled', header: tr('State'), render: (r) => <Badge tone={r.enabled ? 'green' : 'gray'}>{r.enabled ? 'Enabled' : 'Disabled'}</Badge> },
+    { key: 'last', header: tr('Last activity'), render: (r) => <div className="text-xs">{formatDateTime(r.lastSyncAt)}<p className="text-ink-500">{r.lastStatus ?? ''}</p></div> },
   ];
   const sel = q.data?.items.find((s) => s.id === selected) ?? null;
   return (
     <div className="space-y-4">
-      <PageHeader title="External integrations" subtitle="CCTNS, FIR systems, case diaries and digital evidence repositories." actions={<Button icon={<Plus className="h-4 w-4" />} onClick={() => setEditing('new')}>Add system</Button>} />
-      <Alert tone="amber" title="External API contracts are not defined in the specification">
-        The <span className="mono">http-json</span> adapter implements an assumed contract and is <strong>UNVERIFIED</strong> until a live contract test (Test with probe) passes against the real system. <span className="mono">fixture</span> systems return synthetic data only.
+      <PageHeader title={tr('External integrations')} subtitle={tr('CCTNS, FIR systems, case diaries and digital evidence repositories.')} actions={<Button icon={<Plus className="h-4 w-4" />} onClick={() => setEditing('new')}>{tr('Add system')}</Button>} />
+      <Alert tone="amber" title={tr('External API contracts are not defined in the specification')}>
+        {tr('The')}<span className="mono">{tr('http-json')}</span>{' '}{tr('adapter implements an assumed contract and is')}{' '}<strong>{tr('UNVERIFIED')}</strong>{' '}{tr('until a live contract test (Test with probe) passes against the real system.')}{' '}<span className="mono">{tr('fixture')}</span>{tr('systems return synthetic data only.')}
       </Alert>
       <Card bodyClassName="p-0">
-        <DataTable caption="Integration systems" columns={cols} rows={q.data?.items} rowKey={(r) => r.id} loading={q.isFetching} error={q.error} onRetry={() => void q.refetch()} onRowClick={(r) => setSelected(r.id)} empty={<EmptyState title="No integrations configured" icon={<Plug className="h-8 w-8" />} />} />
+        <DataTable caption={tr('Integration systems')} columns={cols} rows={q.data?.items} rowKey={(r) => r.id} loading={q.isFetching} error={q.error} onRetry={() => void q.refetch()} onRowClick={(r) => setSelected(r.id)} empty={<EmptyState title={tr('No integrations configured')} icon={<Plug className="h-8 w-8" />} />} />
       </Card>
       {sel && <SystemPanel sys={sel} onEdit={() => setEditing(sel)} />}
       {editing && <SystemFormModal sys={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
@@ -60,38 +61,38 @@ function SystemPanel({ sys, onEdit }: { sys: IntegrationSystem; onEdit: () => vo
   });
   const isFir = sys.systemType === 'CCTNS' || sys.systemType === 'FIR';
   const logCols: Column<SyncLogItem>[] = [
-    { key: 'at', header: 'Time', render: (r) => <span className="whitespace-nowrap text-xs">{formatDateTime(r.createdAt)}</span> },
-    { key: 'op', header: 'Operation', render: (r) => <span className="text-xs">{r.direction} · {r.operation}{r.requestRef ? ` · ${r.requestRef}` : ''}</span> },
-    { key: 'st', header: 'Result', render: (r) => <Badge tone={r.status === 'SUCCESS' ? 'green' : 'red'}>{titleCase(r.status)}</Badge> },
-    { key: 'err', header: 'Detail', render: (r) => <span className="text-xs text-ink-700">{r.error ?? ''}</span> },
-    { key: 'by', header: 'By', render: (r) => <span className="text-xs">{r.createdByName ?? '—'}</span> },
+    { key: 'at', header: tr('Time'), render: (r) => <span className="whitespace-nowrap text-xs">{formatDateTime(r.createdAt)}</span> },
+    { key: 'op', header: tr('Operation'), render: (r) => <span className="text-xs">{r.direction} · {r.operation}{r.requestRef ? ` · ${r.requestRef}` : ''}</span> },
+    { key: 'st', header: tr('Result'), render: (r) => <Badge tone={r.status === 'SUCCESS' ? 'green' : 'red'}>{titleCase(r.status)}</Badge> },
+    { key: 'err', header: tr('Detail'), render: (r) => <span className="text-xs text-ink-700">{r.error ?? ''}</span> },
+    { key: 'by', header: tr('By'), render: (r) => <span className="text-xs">{r.createdByName ?? '—'}</span> },
   ];
   return (
     <div className="grid gap-4 lg:grid-cols-3">
-      <Card title={sys.name} actions={<div className="flex gap-2"><Button size="sm" variant="secondary" onClick={onEdit}>Edit</Button><Button size="sm" variant={sys.enabled ? 'danger' : 'success'} loading={toggle.isPending} onClick={() => toggle.mutate()}>{sys.enabled ? 'Disable' : 'Enable'}</Button></div>}>
+      <Card title={sys.name} actions={<div className="flex gap-2"><Button size="sm" variant="secondary" onClick={onEdit}>{tr('Edit')}</Button><Button size="sm" variant={sys.enabled ? 'danger' : 'success'} loading={toggle.isPending} onClick={() => toggle.mutate()}>{sys.enabled ? 'Disable' : 'Enable'}</Button></div>}>
         <dl className="space-y-1 text-sm">
-          <div><dt className="inline text-ink-500">Base URL: </dt><dd className="mono inline break-all">{sys.baseUrl ?? '—'}</dd></div>
-          <div><dt className="inline text-ink-500">Auth: </dt><dd className="inline">{sys.config?.authType ?? '—'}{sys.credentialsRef ? ` via secret ${sys.credentialsRef}` : ''} {sys.config?.authType !== 'none' && <Badge tone={sys.credentialsPresent ? 'green' : 'red'}>{sys.credentialsPresent ? 'secret present' : 'secret missing'}</Badge>}</dd></div>
-          <div><dt className="inline text-ink-500">Timeout / retries: </dt><dd className="inline">{sys.config?.timeoutMs} ms / {sys.config?.retries}</dd></div>
-          <div><dt className="inline text-ink-500">Contract: </dt><dd className="inline"><VerificationBadge status={sys.verificationStatus} />{sys.verifiedAt ? ` since ${formatDateTime(sys.verifiedAt)}` : ''}</dd></div>
+          <div><dt className="inline text-ink-500">{tr('Base URL:')}{' '}</dt><dd className="mono inline break-all">{sys.baseUrl ?? '—'}</dd></div>
+          <div><dt className="inline text-ink-500">{tr('Auth:')}{' '}</dt><dd className="inline">{sys.config?.authType ?? '—'}{sys.credentialsRef ? ` via secret ${sys.credentialsRef}` : ''} {sys.config?.authType !== 'none' && <Badge tone={sys.credentialsPresent ? 'green' : 'red'}>{sys.credentialsPresent ? 'secret present' : 'secret missing'}</Badge>}</dd></div>
+          <div><dt className="inline text-ink-500">{tr('Timeout / retries:')}{' '}</dt><dd className="inline">{sys.config?.timeoutMs}{' '}{tr('ms /')}{' '}{sys.config?.retries}</dd></div>
+          <div><dt className="inline text-ink-500">{tr('Contract:')}{' '}</dt><dd className="inline"><VerificationBadge status={sys.verificationStatus} />{sys.verifiedAt ? ` since ${formatDateTime(sys.verifiedAt)}` : ''}</dd></div>
         </dl>
       </Card>
-      <Card title="Test connection" className="lg:col-span-2">
+      <Card title={tr('Test connection')} className="lg:col-span-2">
         <div className="space-y-3">
           <div className="flex flex-wrap items-end gap-3">
-            <Button variant="secondary" icon={<Activity className="h-4 w-4" />} loading={test.isPending && test.variables === false} onClick={() => test.mutate(false)}>Health check</Button>
+            <Button variant="secondary" icon={<Activity className="h-4 w-4" />} loading={test.isPending && test.variables === false} onClick={() => test.mutate(false)}>{tr('Health check')}</Button>
             {isFir ? (
               <>
-                <Field label="Probe station code" htmlFor="pr-st"><Input id="pr-st" value={probe.stationCode} onChange={(e) => setProbe((p) => ({ ...p, stationCode: e.target.value }))} /></Field>
-                <Field label="Year" htmlFor="pr-y"><Input id="pr-y" type="number" value={probe.year} onChange={(e) => setProbe((p) => ({ ...p, year: e.target.value }))} className="w-24" /></Field>
-                <Field label="FIR number" htmlFor="pr-no"><Input id="pr-no" value={probe.firNumber} onChange={(e) => setProbe((p) => ({ ...p, firNumber: e.target.value }))} /></Field>
+                <Field label={tr('Probe station code')} htmlFor="pr-st"><Input id="pr-st" value={probe.stationCode} onChange={(e) => setProbe((p) => ({ ...p, stationCode: e.target.value }))} /></Field>
+                <Field label={tr('Year')} htmlFor="pr-y"><Input id="pr-y" type="number" value={probe.year} onChange={(e) => setProbe((p) => ({ ...p, year: e.target.value }))} className="w-24" /></Field>
+                <Field label={tr('FIR number')} htmlFor="pr-no"><Input id="pr-no" value={probe.firNumber} onChange={(e) => setProbe((p) => ({ ...p, firNumber: e.target.value }))} /></Field>
               </>
             ) : sys.systemType === 'CASE_DIARY' ? (
-              <Field label="Probe case reference" htmlFor="pr-case"><Input id="pr-case" value={probe.caseRef} onChange={(e) => setProbe((p) => ({ ...p, caseRef: e.target.value }))} /></Field>
+              <Field label={tr('Probe case reference')} htmlFor="pr-case"><Input id="pr-case" value={probe.caseRef} onChange={(e) => setProbe((p) => ({ ...p, caseRef: e.target.value }))} /></Field>
             ) : (
-              <Field label="Probe evidence reference" htmlFor="pr-ev"><Input id="pr-ev" value={probe.evidenceRef} onChange={(e) => setProbe((p) => ({ ...p, evidenceRef: e.target.value }))} /></Field>
+              <Field label={tr('Probe evidence reference')} htmlFor="pr-ev"><Input id="pr-ev" value={probe.evidenceRef} onChange={(e) => setProbe((p) => ({ ...p, evidenceRef: e.target.value }))} /></Field>
             )}
-            <Button loading={test.isPending && test.variables === true} disabled={isFir ? !probe.stationCode || !probe.firNumber : sys.systemType === 'CASE_DIARY' ? !probe.caseRef : !probe.evidenceRef} onClick={() => test.mutate(true)}>Run contract test</Button>
+            <Button loading={test.isPending && test.variables === true} disabled={isFir ? !probe.stationCode || !probe.firNumber : sys.systemType === 'CASE_DIARY' ? !probe.caseRef : !probe.evidenceRef} onClick={() => test.mutate(true)}>{tr('Run contract test')}</Button>
           </div>
           {test.data && (
             <Alert tone={test.data.ok ? 'green' : 'red'} title={test.data.ok ? `Passed (${test.data.latencyMs} ms)` : `Failed: ${test.data.errorCode}`}>
@@ -102,10 +103,10 @@ function SystemPanel({ sys, onEdit }: { sys: IntegrationSystem; onEdit: () => vo
           {test.error ? <Alert tone="red">{errorMessage(test.error)}</Alert> : null}
         </div>
       </Card>
-      <Card title="Sync log" className="lg:col-span-3" bodyClassName="p-0">
+      <Card title={tr('Sync log')} className="lg:col-span-3" bodyClassName="p-0">
         {log.isLoading ? <Spinner /> : log.error ? <ErrorState error={log.error} onRetry={() => void log.refetch()} /> : (
           <>
-            <DataTable caption="Sync log" columns={logCols} rows={log.data?.items} rowKey={(r) => String(r.id)} empty={<EmptyState title="No activity yet" />} />
+            <DataTable caption={tr('Sync log')} columns={logCols} rows={log.data?.items} rowKey={(r) => String(r.id)} empty={<EmptyState title={tr('No activity yet')} />} />
             {log.data && <Pagination page={log.data.page} pageSize={log.data.pageSize} total={log.data.total} onPage={setPage} />}
           </>
         )}
@@ -137,20 +138,20 @@ function SystemFormModal({ sys, onClose }: { sys: IntegrationSystem | null; onCl
     },
   });
   return (
-    <Modal open onClose={onClose} title={sys ? `Edit ${sys.name}` : 'Add integration system'} size="lg" footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={!f.name.trim() || (!sys && !f.code.trim())}>Save</Button></>}>
+    <Modal open onClose={onClose} title={sys ? `Edit ${sys.name}` : 'Add integration system'} size="lg" footer={<><Button variant="secondary" onClick={onClose}>{tr('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={!f.name.trim() || (!sys && !f.code.trim())}>{tr('Save')}</Button></>}>
       <div className="grid gap-3 md:grid-cols-2">
-        {!sys && <Field label="Code" required htmlFor="is-code" hint="lowercase letters, digits, - and _"><Input id="is-code" value={f.code} onChange={upd('code')} /></Field>}
-        <Field label="Name" required htmlFor="is-name"><Input id="is-name" value={f.name} onChange={upd('name')} /></Field>
-        {!sys && <Field label="System type" htmlFor="is-type"><Select id="is-type" value={f.systemType} onChange={upd('systemType')}>{INTEGRATION_SYSTEM_TYPES.map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}</Select></Field>}
-        <Field label="Adapter" htmlFor="is-adapter"><Select id="is-adapter" value={f.adapter} onChange={upd('adapter')}>{INTEGRATION_ADAPTERS.map((t) => <option key={t} value={t}>{t}</option>)}</Select></Field>
-        <div className="md:col-span-2"><Field label="Base URL" htmlFor="is-url" hint="https required in production. Private/link-local/metadata addresses are refused unless allow-listed by deployment config."><Input id="is-url" value={f.baseUrl} onChange={upd('baseUrl')} placeholder="https://cctns.example.gov.in/api/v1" /></Field></div>
-        <Field label="Authentication" htmlFor="is-auth"><Select id="is-auth" value={f.authType} onChange={upd('authType')}>{INTEGRATION_AUTH_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</Select></Field>
-        <Field label="Secret reference" htmlFor="is-cred" hint="Name only (e.g. CCTNS_PROD). The secret is read from env KSP_SECRET_<NAME>; it is never stored here."><Input id="is-cred" value={f.credentialsRef} onChange={upd('credentialsRef')} /></Field>
-        <Field label="Timeout (ms)" htmlFor="is-to"><Input id="is-to" type="number" min={200} max={60000} value={f.timeoutMs} onChange={upd('timeoutMs')} /></Field>
-        <Field label="Retries" htmlFor="is-re"><Input id="is-re" type="number" min={0} max={5} value={f.retries} onChange={upd('retries')} /></Field>
-        <div className="md:col-span-2"><Field label="Station code map" htmlFor="is-map" hint="One per line: SOURCE_CODE=our_org_unit_code (default: identical codes)"><textarea id="is-map" className="w-full rounded-md border border-ink-300 p-2 font-mono text-sm" rows={3} value={f.stationMap} onChange={upd('stationMap')} /></Field></div>
+        {!sys && <Field label={tr('Code')} required htmlFor="is-code" hint={tr('lowercase letters, digits, - and _')}><Input id="is-code" value={f.code} onChange={upd('code')} /></Field>}
+        <Field label={tr('Name')} required htmlFor="is-name"><Input id="is-name" value={f.name} onChange={upd('name')} /></Field>
+        {!sys && <Field label={tr('System type')} htmlFor="is-type"><Select id="is-type" value={f.systemType} onChange={upd('systemType')}>{INTEGRATION_SYSTEM_TYPES.map((t) => <option key={t} value={t}>{titleCase(t)}</option>)}</Select></Field>}
+        <Field label={tr('Adapter')} htmlFor="is-adapter"><Select id="is-adapter" value={f.adapter} onChange={upd('adapter')}>{INTEGRATION_ADAPTERS.map((t) => <option key={t} value={t}>{t}</option>)}</Select></Field>
+        <div className="md:col-span-2"><Field label={tr('Base URL')} htmlFor="is-url" hint={tr('https required in production. Private/link-local/metadata addresses are refused unless allow-listed by deployment config.')}><Input id="is-url" value={f.baseUrl} onChange={upd('baseUrl')} placeholder={tr('https://cctns.example.gov.in/api/v1')} /></Field></div>
+        <Field label={tr('Authentication')} htmlFor="is-auth"><Select id="is-auth" value={f.authType} onChange={upd('authType')}>{INTEGRATION_AUTH_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</Select></Field>
+        <Field label={tr('Secret reference')} htmlFor="is-cred" hint={tr('Name only (e.g. CCTNS_PROD). The secret is read from env KSP_SECRET_<NAME>; it is never stored here.')}><Input id="is-cred" value={f.credentialsRef} onChange={upd('credentialsRef')} /></Field>
+        <Field label={tr('Timeout (ms)')} htmlFor="is-to"><Input id="is-to" type="number" min={200} max={60000} value={f.timeoutMs} onChange={upd('timeoutMs')} /></Field>
+        <Field label={tr('Retries')} htmlFor="is-re"><Input id="is-re" type="number" min={0} max={5} value={f.retries} onChange={upd('retries')} /></Field>
+        <div className="md:col-span-2"><Field label={tr('Station code map')} htmlFor="is-map" hint={tr('One per line: SOURCE_CODE=our_org_unit_code (default: identical codes)')}><textarea id="is-map" className="w-full rounded-md border border-ink-300 p-2 font-mono text-sm" rows={3} value={f.stationMap} onChange={upd('stationMap')} /></Field></div>
       </div>
-      {sys && <p className="mt-2 text-xs text-ink-600">Changing adapter, URL, credentials or configuration resets verification.</p>}
+      {sys && <p className="mt-2 text-xs text-ink-600">{tr('Changing adapter, URL, credentials or configuration resets verification.')}</p>}
       {m.error ? <div className="mt-3"><Alert tone="red">{errorMessage(m.error)}</Alert></div> : null}
     </Modal>
   );

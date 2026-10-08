@@ -19,6 +19,7 @@ import { formatTimecode } from '@/lib/format';
 import { Alert, Button, clsx, ErrorState, ProgressBar, Spinner, useToast } from '@/components/ui';
 import { cueAt, frameOf, parseSpriteVtt, tokenFrom, useCreateSnapshot, usePlayback, withToken, type PlaybackInfo, type SpriteCue } from './api';
 
+import { t as tr } from '@/lib/i18n';
 export interface EvidencePlayerHandle {
   seek(ms: number): void;
   play(): void;
@@ -77,16 +78,16 @@ export const EvidencePlayer = forwardRef<EvidencePlayerHandle, EvidencePlayerPro
   const box = (children: ReactNode) => (
     <div className={clsx('flex min-h-[240px] items-center justify-center rounded-lg bg-ink-950 p-6 text-sm text-ink-100', props.className)}>{children}</div>
   );
-  if (q.isLoading) return box(<Spinner label="Loading player…" className="text-ink-100" />);
-  if (q.isError || !q.data) return <ErrorState error={q.error} onRetry={() => void q.refetch()} title="Could not load playback" />;
+  if (q.isLoading) return box(<Spinner label={tr('Loading player…')} className="text-ink-100" />);
+  if (q.isError || !q.data) return <ErrorState error={q.error} onRetry={() => void q.refetch()} title={tr('Could not load playback')} />;
   const d = q.data;
   if (d.mediaStatus === 'PENDING' || d.mediaStatus === 'PROCESSING') {
     return box(
       <div className="w-full max-w-sm space-y-3 text-center" role="status" aria-live="polite">
         <Loader2 className="mx-auto h-6 w-6 animate-spin" aria-hidden />
         <p className="font-medium">{d.mediaStatus === 'PENDING' ? 'Queued for processing' : 'Preparing playback'}</p>
-        <ProgressBar value={d.progress} label="Media processing progress" />
-        <p className="text-xs text-ink-300">{Math.round(d.progress * 100)}% — proxy, adaptive stream and thumbnails are being generated. This page updates automatically.</p>
+        <ProgressBar value={d.progress} label={tr('Media processing progress')} />
+        <p className="text-xs text-ink-300">{Math.round(d.progress * 100)}{tr('% — proxy, adaptive stream and thumbnails are being generated. This page updates automatically.')}</p>
       </div>,
     );
   }
@@ -504,13 +505,13 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
               playsInline
               muted={props.muted}
               preload="auto"
-              aria-label="Evidence video"
+              aria-label={tr('Evidence video')}
             />
             {overlays && <div className="pointer-events-none absolute inset-0">{overlays}</div>}
           </div>
           {buffering && !paused && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-white/80" aria-label="Buffering" />
+              <Loader2 className="h-8 w-8 animate-spin text-white/80" aria-label={tr('Buffering')} />
             </div>
           )}
           {zoom.z > 1 && <div className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-xs">{zoom.z.toFixed(1)}×</div>}
@@ -518,8 +519,8 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 p-4 text-center text-sm" role="alert">
               <p>{error}</p>
               <div className="flex gap-2">
-                <Button size="sm" variant="secondary" onClick={() => setReloadKey((k) => k + 1)}>Retry</Button>
-                {sourceMode === 'hls' && <Button size="sm" variant="secondary" onClick={() => setSourceMode('mp4')}>Use MP4 proxy</Button>}
+                <Button size="sm" variant="secondary" onClick={() => setReloadKey((k) => k + 1)}>{tr('Retry')}</Button>
+                {sourceMode === 'hls' && <Button size="sm" variant="secondary" onClick={() => setSourceMode('mp4')}>{tr('Use MP4 proxy')}</Button>}
               </div>
             </div>
           )}
@@ -564,7 +565,7 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
               value={Math.min(time, durMs || time)}
               onChange={(e) => seek(Number(e.target.value))}
               className="h-2 w-full cursor-pointer accent-brand-500"
-              aria-label="Seek"
+              aria-label={tr('Seek')}
               aria-valuetext={`${formatTimecode(time)}${frame !== null ? `, frame ${frame}` : ''}`}
             />
           </div>
@@ -572,42 +573,42 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
             <button type="button" className={btn} onClick={togglePlay} aria-label={paused ? 'Play' : 'Pause'} title={paused ? 'Play (Space)' : 'Pause (Space)'}>
               {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
             </button>
-            <button type="button" className={btn} onClick={() => seek(time - 5000)} aria-label="Back 5 seconds" title="Back 5 s (Shift+←)"><Rewind className="h-4 w-4" /></button>
-            <button type="button" className={btn} onClick={() => stepFrame(-1)} disabled={!fps} aria-label="Previous frame" title="Previous frame (←)"><StepBack className="h-4 w-4" /></button>
-            <button type="button" className={btn} onClick={() => stepFrame(1)} disabled={!fps} aria-label="Next frame" title="Next frame (→)"><StepForward className="h-4 w-4" /></button>
-            <button type="button" className={btn} onClick={() => seek(time + 5000)} aria-label="Forward 5 seconds" title="Forward 5 s (Shift+→)"><FastForward className="h-4 w-4" /></button>
+            <button type="button" className={btn} onClick={() => seek(time - 5000)} aria-label={tr('Back 5 seconds')} title={tr('Back 5 s (Shift+←)')}><Rewind className="h-4 w-4" /></button>
+            <button type="button" className={btn} onClick={() => stepFrame(-1)} disabled={!fps} aria-label={tr('Previous frame')} title={tr('Previous frame (←)')}><StepBack className="h-4 w-4" /></button>
+            <button type="button" className={btn} onClick={() => stepFrame(1)} disabled={!fps} aria-label={tr('Next frame')} title={tr('Next frame (→)')}><StepForward className="h-4 w-4" /></button>
+            <button type="button" className={btn} onClick={() => seek(time + 5000)} aria-label={tr('Forward 5 seconds')} title={tr('Forward 5 s (Shift+→)')}><FastForward className="h-4 w-4" /></button>
             <span className="mono ml-1 whitespace-nowrap text-xs tabular-nums" aria-live="off">
               {formatTimecode(time)} / {formatTimecode(durMs)}
               {frame !== null && <span className="ml-2 text-ink-300">F {frame}</span>}
             </span>
             <span className="flex-1" />
-            <label className="sr-only" htmlFor={`rate-${evidenceId}`}>Playback rate</label>
-            <select id={`rate-${evidenceId}`} value={rate} onChange={(e) => setRate(Number(e.target.value))} className="h-8 rounded bg-white/10 px-1 text-xs text-ink-100" title="Playback rate ([ / ])">
+            <label className="sr-only" htmlFor={`rate-${evidenceId}`}>{tr('Playback rate')}</label>
+            <select id={`rate-${evidenceId}`} value={rate} onChange={(e) => setRate(Number(e.target.value))} className="h-8 rounded bg-white/10 px-1 text-xs text-ink-100" title={tr('Playback rate ([ / ])')}>
               {RATES.map((r) => <option key={r} value={r} className="text-ink-900">{r}×</option>)}
             </select>
-            <button type="button" className={btn} onClick={() => zoomBy(1 / 1.25)} disabled={zoom.z <= MIN_ZOOM} aria-label="Zoom out" title="Zoom out (−)"><ZoomOut className="h-4 w-4" /></button>
+            <button type="button" className={btn} onClick={() => zoomBy(1 / 1.25)} disabled={zoom.z <= MIN_ZOOM} aria-label={tr('Zoom out')} title={tr('Zoom out (−)')}><ZoomOut className="h-4 w-4" /></button>
             <span className="w-10 text-center text-xs tabular-nums">{Math.round(zoom.z * 100)}%</span>
-            <button type="button" className={btn} onClick={() => zoomBy(1.25)} disabled={zoom.z >= MAX_ZOOM} aria-label="Zoom in" title="Zoom in (+)"><ZoomIn className="h-4 w-4" /></button>
-            <button type="button" className={btn} onClick={resetZoom} disabled={zoom.z === 1} aria-label="Reset zoom" title="Reset zoom (0)"><RotateCcw className="h-4 w-4" /></button>
+            <button type="button" className={btn} onClick={() => zoomBy(1.25)} disabled={zoom.z >= MAX_ZOOM} aria-label={tr('Zoom in')} title={tr('Zoom in (+)')}><ZoomIn className="h-4 w-4" /></button>
+            <button type="button" className={btn} onClick={resetZoom} disabled={zoom.z === 1} aria-label={tr('Reset zoom')} title={tr('Reset zoom (0)')}><RotateCcw className="h-4 w-4" /></button>
             {info.hlsUrl && (
               <>
-                <label className="sr-only" htmlFor={`src-${evidenceId}`}>Playback source</label>
-                <select id={`src-${evidenceId}`} value={sourceMode} onChange={(e) => setSourceMode(e.target.value as 'hls' | 'mp4')} className="h-8 rounded bg-white/10 px-1 text-xs text-ink-100" title="Playback source">
-                  <option value="hls" className="text-ink-900">Adaptive</option>
-                  <option value="mp4" className="text-ink-900">Proxy MP4</option>
+                <label className="sr-only" htmlFor={`src-${evidenceId}`}>{tr('Playback source')}</label>
+                <select id={`src-${evidenceId}`} value={sourceMode} onChange={(e) => setSourceMode(e.target.value as 'hls' | 'mp4')} className="h-8 rounded bg-white/10 px-1 text-xs text-ink-100" title={tr('Playback source')}>
+                  <option value="hls" className="text-ink-900">{tr('Adaptive')}</option>
+                  <option value="mp4" className="text-ink-900">{tr('Proxy MP4')}</option>
                 </select>
               </>
             )}
             {canSnapshot && (
-              <button type="button" className={btn} onClick={takeSnapshot} disabled={snapshot.isPending} aria-label="Take snapshot of current frame" title="Snapshot (S)">
+              <button type="button" className={btn} onClick={takeSnapshot} disabled={snapshot.isPending} aria-label={tr('Take snapshot of current frame')} title={tr('Snapshot (S)')}>
                 {snapshot.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
               </button>
             )}
             <div className="relative">
-              <button type="button" className={btn} onClick={() => setHelp((h) => !h)} aria-label="Keyboard shortcuts" aria-expanded={help} title="Keyboard shortcuts (?)"><Keyboard className="h-4 w-4" /></button>
+              <button type="button" className={btn} onClick={() => setHelp((h) => !h)} aria-label={tr('Keyboard shortcuts')} aria-expanded={help} title={tr('Keyboard shortcuts (?)')}><Keyboard className="h-4 w-4" /></button>
               {help && <ShortcutHelp onClose={() => setHelp(false)} />}
             </div>
-            <button type="button" className={btn} onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} title="Fullscreen (F)">
+            <button type="button" className={btn} onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} title={tr('Fullscreen (F)')}>
               {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
             </button>
           </div>
@@ -632,10 +633,10 @@ const SHORTCUTS: Array<[string, string]> = [
 
 function ShortcutHelp({ onClose }: { onClose: () => void }) {
   return (
-    <div role="dialog" aria-label="Keyboard shortcuts" className="absolute bottom-full right-0 z-20 mb-2 w-72 rounded-md border border-white/10 bg-ink-900 p-3 text-xs shadow-xl">
+    <div role="dialog" aria-label={tr('Keyboard shortcuts')} className="absolute bottom-full right-0 z-20 mb-2 w-72 rounded-md border border-white/10 bg-ink-900 p-3 text-xs shadow-xl">
       <div className="mb-2 flex items-center justify-between">
-        <span className="font-semibold">Keyboard shortcuts</span>
-        <button type="button" onClick={onClose} className="rounded px-1 hover:bg-white/10" aria-label="Close shortcuts help">×</button>
+        <span className="font-semibold">{tr('Keyboard shortcuts')}</span>
+        <button type="button" onClick={onClose} className="rounded px-1 hover:bg-white/10" aria-label={tr('Close shortcuts help')}>×</button>
       </div>
       <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
         {SHORTCUTS.map(([k, v]) => (
@@ -645,7 +646,7 @@ function ShortcutHelp({ onClose }: { onClose: () => void }) {
           </div>
         ))}
       </dl>
-      <p className="mt-2 text-ink-400">Click the player first so it has keyboard focus.</p>
+      <p className="mt-2 text-ink-400">{tr('Click the player first so it has keyboard focus.')}</p>
     </div>
   );
 }

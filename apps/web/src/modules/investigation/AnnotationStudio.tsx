@@ -15,6 +15,7 @@ import { Alert, Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, Fiel
 import { useAnnotations, useBookmarks, useWsMutation, type AnnotationRow, type Region } from './api';
 import { activeAt, clampRegion, DEFAULT_REGION, describeRegion, nudgeRegion, regionFromDrag } from './geometry';
 
+import { t as tr } from '@/lib/i18n';
 const COLORS = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7'];
 
 /** Black or white text, whichever contrasts more with the (user-chosen) label background. */
@@ -196,7 +197,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
         {editable && (
           <div className="flex flex-wrap items-end gap-2">
             <Field label={`Bookmark at ${formatTimecode(now)}`} htmlFor="bm-label">
-              <Input id="bm-label" value={bmLabel} onChange={(e) => setBmLabel(e.target.value)} placeholder="e.g. Suspect enters frame" maxLength={200} />
+              <Input id="bm-label" value={bmLabel} onChange={(e) => setBmLabel(e.target.value)} placeholder={tr('e.g. Suspect enters frame')} maxLength={200} />
             </Field>
             <Button
               icon={<BookmarkPlus className="h-4 w-4" />}
@@ -204,25 +205,25 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
               loading={addBookmark.isPending}
               onClick={() => addBookmark.mutate({ label: bmLabel.trim(), timeMs: Math.round(player.current?.getTime() ?? now) }, { onSuccess: () => { setBmLabel(''); toast.success('Bookmark added'); } })}
             >
-              Add bookmark
+              {tr('Add bookmark')}
             </Button>
             <span className="mx-1 h-8 w-px bg-ink-200" aria-hidden />
-            <Button variant="secondary" icon={<StickyNote className="h-4 w-4" />} onClick={() => startDraft('NOTE')}>Note</Button>
-            <Button variant="secondary" icon={<Pencil className="h-4 w-4" />} onClick={() => startDraft('HIGHLIGHT')}>Highlight</Button>
-            <Button variant="secondary" icon={<Square className="h-4 w-4" />} onClick={() => startDraft('REGION')}>Region</Button>
+            <Button variant="secondary" icon={<StickyNote className="h-4 w-4" />} onClick={() => startDraft('NOTE')}>{tr('Note')}</Button>
+            <Button variant="secondary" icon={<Pencil className="h-4 w-4" />} onClick={() => startDraft('HIGHLIGHT')}>{tr('Highlight')}</Button>
+            <Button variant="secondary" icon={<Square className="h-4 w-4" />} onClick={() => startDraft('REGION')}>{tr('Region')}</Button>
           </div>
         )}
         {addBookmark.error && <Alert tone="red">{errorMessage(addBookmark.error)}</Alert>}
         {draft && (
-          <Card title={`${draft.editingId ? 'Edit' : 'New'} ${draft.kind.toLowerCase()} at ${formatTimecode(draft.startMs)}`} actions={<Button variant="ghost" size="sm" icon={<X className="h-4 w-4" />} aria-label="Cancel annotation" onClick={() => { setDraft(null); setDrawing(false); }} />}>
+          <Card title={`${draft.editingId ? 'Edit' : 'New'} ${draft.kind.toLowerCase()} at ${formatTimecode(draft.startMs)}`} actions={<Button variant="ghost" size="sm" icon={<X className="h-4 w-4" />} aria-label={tr('Cancel annotation')} onClick={() => { setDraft(null); setDrawing(false); }} />}>
             <div className="grid gap-3 md:grid-cols-3">
-              <Field label="Start (s)" htmlFor="an-start">
+              <Field label={tr('Start (s)')} htmlFor="an-start">
                 <Input id="an-start" inputMode="decimal" value={(draft.startMs / 1000).toFixed(3)} onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v >= 0) setDraft({ ...draft, startMs: Math.round(v * 1000) }); }} />
               </Field>
-              <Field label="End (s, optional)" htmlFor="an-end">
+              <Field label={tr('End (s, optional)')} htmlFor="an-end">
                 <Input id="an-end" inputMode="decimal" value={draft.endMs} onChange={(e) => setDraft({ ...draft, endMs: e.target.value })} />
               </Field>
-              <Field label="Colour" htmlFor="an-color">
+              <Field label={tr('Colour')} htmlFor="an-color">
                 <Select id="an-color" value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })}>
                   {COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
                 </Select>
@@ -236,14 +237,14 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
             {draft.kind === 'REGION' && (
               <>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                  {draft.region ? <Badge tone="green">Region set ({Math.round(draft.region.w * 100)}% × {Math.round(draft.region.h * 100)}%)</Badge> : <Badge tone="amber">No region yet</Badge>}
+                  {draft.region ? <Badge tone="green">{tr('Region set (')}{Math.round(draft.region.w * 100)}% × {Math.round(draft.region.h * 100)}%)</Badge> : <Badge tone="amber">{tr('No region yet')}</Badge>}
                   <Button size="sm" variant="secondary" onClick={() => { player.current?.pause(); setDrawing(true); }} aria-pressed={drawing}>
                     {drawing ? 'Drag on the frame…' : draft.region ? 'Redraw region' : 'Draw region'}
                   </Button>
-                  <span className="text-xs text-ink-500">Keyboard: focus the frame, arrows move, Shift+arrows resize, Enter sets — or type the values below.</span>
+                  <span className="text-xs text-ink-500">{tr('Keyboard: focus the frame, arrows move, Shift+arrows resize, Enter sets — or type the values below.')}</span>
                 </div>
                 <fieldset className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
-                  <legend className="sr-only">Region position and size (percent of the frame)</legend>
+                  <legend className="sr-only">{tr('Region position and size (percent of the frame)')}</legend>
                   {(['x', 'y', 'w', 'h'] as const).map((k) => (
                     <Field key={k} label={{ x: 'Region left (%)', y: 'Region top (%)', w: 'Region width (%)', h: 'Region height (%)' }[k]} htmlFor={`an-region-${k}`}>
                       <Input
@@ -269,9 +270,9 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
         )}
       </div>
       <div className="space-y-3">
-        <Card title="Bookmarks" bodyClassName="p-2">
+        <Card title={tr('Bookmarks')} bodyClassName="p-2">
           {bookmarks.isLoading ? <Spinner /> : bookmarks.error ? <ErrorState error={bookmarks.error} onRetry={() => void bookmarks.refetch()} /> : !bookmarks.data?.items.length ? (
-            <EmptyState title="No bookmarks" />
+            <EmptyState title={tr('No bookmarks')} />
           ) : (
             <ul className="divide-y divide-ink-100">
               {bookmarks.data.items.map((b) => (
@@ -284,9 +285,9 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
             </ul>
           )}
         </Card>
-        <Card title="Annotations" bodyClassName="p-2">
+        <Card title={tr('Annotations')} bodyClassName="p-2">
           {annotations.isLoading ? <Spinner /> : annotations.error ? <ErrorState error={annotations.error} onRetry={() => void annotations.refetch()} /> : !annotations.data?.items.length ? (
-            <EmptyState title="No annotations" />
+            <EmptyState title={tr('No annotations')} />
           ) : (
             <ul className="divide-y divide-ink-100">
               {annotations.data.items.map((a) => (
@@ -300,8 +301,8 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
                     <span className="flex-1" />
                     {a.canEdit && editable && (
                       <>
-                        <Button size="sm" variant="ghost" icon={<Pencil className="h-4 w-4" />} aria-label="Edit annotation" onClick={() => editDraft(a)} />
-                        <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label="Delete annotation" onClick={() => setConfirmDelete(a)} />
+                        <Button size="sm" variant="ghost" icon={<Pencil className="h-4 w-4" />} aria-label={tr('Edit annotation')} onClick={() => editDraft(a)} />
+                        <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={tr('Delete annotation')} onClick={() => setConfirmDelete(a)} />
                       </>
                     )}
                   </div>
@@ -316,9 +317,9 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announce}</div>
       <ConfirmDialog
         open={!!confirmDelete}
-        title="Delete annotation"
-        message="The annotation is hidden from views but kept (with your name and the time) in the evidence audit trail."
-        confirmLabel="Delete"
+        title={tr('Delete annotation')}
+        message={tr('The annotation is hidden from views but kept (with your name and the time) in the evidence audit trail.')}
+        confirmLabel={tr('Delete')}
         variant="danger"
         loading={delAnn.isPending}
         error={delAnn.error}

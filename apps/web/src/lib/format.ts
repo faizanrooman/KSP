@@ -1,3 +1,4 @@
+import { getLocale } from '@/lib/i18n';
 export function formatBytes(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return '—';
   const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
@@ -28,17 +29,26 @@ export function formatTimecode(ms: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(milli).padStart(3, '0')}`;
 }
 
-const dtf = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' });
-const df = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'Asia/Kolkata' });
+// Locale follows the UI language (en-IN / kn-IN); formatters are cached per locale.
+const fmtCache = new Map<string, { dtf: Intl.DateTimeFormat; df: Intl.DateTimeFormat }>();
+function fmts() {
+  const loc = getLocale();
+  let f = fmtCache.get(loc);
+  if (!f) {
+    f = { dtf: new Intl.DateTimeFormat(loc, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' }), df: new Intl.DateTimeFormat(loc, { dateStyle: 'medium', timeZone: 'Asia/Kolkata' }) };
+    fmtCache.set(loc, f);
+  }
+  return f;
+}
 export function formatDateTime(v: string | Date | null | undefined): string {
   if (!v) return '—';
   const d = typeof v === 'string' ? new Date(v) : v;
-  return Number.isNaN(d.getTime()) ? '—' : `${dtf.format(d)} IST`;
+  return Number.isNaN(d.getTime()) ? '—' : `${fmts().dtf.format(d)} IST`;
 }
 export function formatDate(v: string | Date | null | undefined): string {
   if (!v) return '—';
   const d = typeof v === 'string' ? new Date(v) : v;
-  return Number.isNaN(d.getTime()) ? '—' : df.format(d);
+  return Number.isNaN(d.getTime()) ? '—' : fmts().df.format(d);
 }
 
 export function shortHash(h: string | null | undefined, n = 12): string {

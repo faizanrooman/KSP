@@ -9,6 +9,7 @@ import { Alert, Button, Card, Field, Input, PageHeader, Select } from '@/compone
 import { localToIso, OneTimePasswordDialog, useRoles } from './shared';
 import type { UserDetail } from './types';
 
+import { t } from '@/lib/i18n';
 interface Grant {
   roleId: string;
   orgUnitId: string;
@@ -29,25 +30,25 @@ export function ProfileFields({ f, setF, idPrefix }: { f: ProfileForm; setF: (f:
   const fld = (k: keyof ProfileForm) => ({ id: `${idPrefix}-${k}`, value: f[k], onChange: (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value }) });
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field label="Full name" htmlFor={`${idPrefix}-fullName`} required>
+      <Field label={t('Full name')} htmlFor={`${idPrefix}-fullName`} required>
         <Input {...fld('fullName')} maxLength={200} required />
       </Field>
-      <Field label="Home unit" htmlFor={`${idPrefix}-homeOrgUnitId`} required hint="Determines which administrators manage this account.">
-        <OrgUnitSelect scope="users:manage" id={`${idPrefix}-homeOrgUnitId`} value={f.homeOrgUnitId} onChange={(v) => setF({ ...f, homeOrgUnitId: v })} allowEmpty emptyLabel="Select a unit…" required />
+      <Field label={t('Home unit')} htmlFor={`${idPrefix}-homeOrgUnitId`} required hint={t('Determines which administrators manage this account.')}>
+        <OrgUnitSelect scope="users:manage" id={`${idPrefix}-homeOrgUnitId`} value={f.homeOrgUnitId} onChange={(v) => setF({ ...f, homeOrgUnitId: v })} allowEmpty emptyLabel={t('Select a unit…')} required />
       </Field>
-      <Field label="Email" htmlFor={`${idPrefix}-email`}>
+      <Field label={t('Email')} htmlFor={`${idPrefix}-email`}>
         <Input type="email" {...fld('email')} maxLength={254} />
       </Field>
-      <Field label="Badge / employee number" htmlFor={`${idPrefix}-badgeNumber`}>
+      <Field label={t('Badge / employee number')} htmlFor={`${idPrefix}-badgeNumber`}>
         <Input {...fld('badgeNumber')} maxLength={64} />
       </Field>
-      <Field label="Rank" htmlFor={`${idPrefix}-rank`}>
+      <Field label={t('Rank')} htmlFor={`${idPrefix}-rank`}>
         <Input {...fld('rank')} maxLength={100} />
       </Field>
-      <Field label="Designation" htmlFor={`${idPrefix}-designation`}>
+      <Field label={t('Designation')} htmlFor={`${idPrefix}-designation`}>
         <Input {...fld('designation')} maxLength={200} />
       </Field>
-      <Field label="Phone" htmlFor={`${idPrefix}-phone`}>
+      <Field label={t('Phone')} htmlFor={`${idPrefix}-phone`}>
         <Input type="tel" {...fld('phone')} maxLength={20} />
       </Field>
     </div>
@@ -85,34 +86,34 @@ export function UserCreatePage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="New user" breadcrumb={<Link to="/admin/users" className="hover:underline">Users</Link>} subtitle="A strong one-time password is generated; the user must change it at first sign-in." />
+      <PageHeader title={t('New user')} breadcrumb={<Link to="/admin/users" className="hover:underline">{t('Users')}</Link>} subtitle={t('A strong one-time password is generated; the user must change it at first sign-in.')} />
       <form onSubmit={(e) => { e.preventDefault(); if (valid) m.mutate(); }} className="space-y-4">
-        <Card title="Account">
+        <Card title={t('Account')}>
           <div className="space-y-3">
-            <Field label="Username" htmlFor="nu-username" required hint="3-64 characters: lowercase letters, digits, dot, dash, underscore.">
+            <Field label={t('Username')} htmlFor="nu-username" required hint={t('3-64 characters: lowercase letters, digits, dot, dash, underscore.')}>
               <Input id="nu-username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" maxLength={64} required />
             </Field>
             <ProfileFields f={f} setF={setF} idPrefix="nu" />
           </div>
         </Card>
         {can('roles:manage') && (
-          <Card title="Initial roles" actions={<Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setGrants([...grants, { roleId: '', orgUnitId: f.homeOrgUnitId, expiresAt: '' }])}>Add role</Button>}>
+          <Card title={t('Initial roles')} actions={<Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setGrants([...grants, { roleId: '', orgUnitId: f.homeOrgUnitId, expiresAt: '' }])}>{t('Add role')}</Button>}>
             {grants.length === 0 ? (
-              <p className="text-sm text-ink-500">No roles yet — the account will have no permissions until a role is granted.</p>
+              <p className="text-sm text-ink-500">{t('No roles yet — the account will have no permissions until a role is granted.')}</p>
             ) : (
               <ul className="space-y-3">
                 {grants.map((g, i) => (
                   <li key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_12rem_auto]">
-                    <Field label="Role" htmlFor={`g-role-${i}`}>
+                    <Field label={t('Role')} htmlFor={`g-role-${i}`}>
                       <Select id={`g-role-${i}`} value={g.roleId} onChange={(e) => setGrants(grants.map((x, j) => (j === i ? { ...x, roleId: e.target.value } : x)))}>
-                        <option value="">Select a role…</option>
+                        <option value="">{t('Select a role…')}</option>
                         {roles.data?.items.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                       </Select>
                     </Field>
-                    <Field label="At unit (and sub-units)" htmlFor={`g-org-${i}`}>
-                      <OrgUnitSelect scope="roles:manage" id={`g-org-${i}`} value={g.orgUnitId} onChange={(v) => setGrants(grants.map((x, j) => (j === i ? { ...x, orgUnitId: v } : x)))} emptyLabel="Select a unit…" />
+                    <Field label={t('At unit (and sub-units)')} htmlFor={`g-org-${i}`}>
+                      <OrgUnitSelect scope="roles:manage" id={`g-org-${i}`} value={g.orgUnitId} onChange={(v) => setGrants(grants.map((x, j) => (j === i ? { ...x, orgUnitId: v } : x)))} emptyLabel={t('Select a unit…')} />
                     </Field>
-                    <Field label="Expires (optional)" htmlFor={`g-exp-${i}`}>
+                    <Field label={t('Expires (optional)')} htmlFor={`g-exp-${i}`}>
                       <Input id={`g-exp-${i}`} type="datetime-local" value={g.expiresAt} onChange={(e) => setGrants(grants.map((x, j) => (j === i ? { ...x, expiresAt: e.target.value } : x)))} />
                     </Field>
                     <Button variant="ghost" aria-label={`Remove role row ${i + 1}`} icon={<Trash2 className="h-4 w-4" />} onClick={() => setGrants(grants.filter((_, j) => j !== i))} />
@@ -123,15 +124,15 @@ export function UserCreatePage() {
           </Card>
         )}
         {m.error ? (
-          <Alert tone="red" title="Could not create the user">
+          <Alert tone="red" title={t('Could not create the user')}>
             {errorMessage(m.error)}
             {Array.isArray(fieldErrors) && <ul className="mt-1 list-disc pl-5">{(fieldErrors as Array<{ message?: string; instancePath?: string }>).map((d, i) => <li key={i}>{d.instancePath ? `${d.instancePath}: ` : ''}{d.message}</li>)}</ul>}
           </Alert>
         ) : null}
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {incompleteGrants && <span className="mr-auto text-sm text-amber-800">Choose a role and a unit for every role row, or remove the row.</span>}
-          <Button variant="secondary" onClick={() => navigate('/admin/users')}>Cancel</Button>
-          <Button type="submit" disabled={!valid} loading={m.isPending}>Create user</Button>
+          {incompleteGrants && <span className="mr-auto text-sm text-amber-800">{t('Choose a role and a unit for every role row, or remove the row.')}</span>}
+          <Button variant="secondary" onClick={() => navigate('/admin/users')}>{t('Cancel')}</Button>
+          <Button type="submit" disabled={!valid} loading={m.isPending}>{t('Create user')}</Button>
         </div>
       </form>
       <OneTimePasswordDialog password={created?.temporaryPassword ?? null} username={created?.user.username ?? ''} onClose={() => { const id = created?.user.id; setCreated(null); if (id) navigate(`/admin/users/${id}`); }} />

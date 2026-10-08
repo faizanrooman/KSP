@@ -15,6 +15,7 @@ import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import type { NotificationPage } from './api';
 
+import { t } from '@/lib/i18n';
 export function NotificationBell() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -43,13 +44,13 @@ export function NotificationBell() {
         {unread > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[1.1rem] rounded-full bg-red-700 px-1 text-center text-[10px] font-semibold leading-4 text-white" aria-hidden>{unread > 99 ? '99+' : unread}</span>}
       </button>
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-md border border-ink-200 bg-white shadow-lg" role="dialog" aria-label="Unread notifications">
+        <div className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-md border border-ink-200 bg-white shadow-lg" role="dialog" aria-label={t('Unread notifications')}>
           <div className="flex items-center justify-between border-b border-ink-100 px-3 py-2">
-            <span className="text-sm font-semibold text-ink-900">{unread} unread</span>
-            <button type="button" className="text-xs text-brand-700 hover:underline disabled:opacity-50" disabled={!unread || readAll.isPending} onClick={() => readAll.mutate()}>Mark all read</button>
+            <span className="text-sm font-semibold text-ink-900">{unread}{' '}{t('unread')}</span>
+            <button type="button" className="text-xs text-brand-700 hover:underline disabled:opacity-50" disabled={!unread || readAll.isPending} onClick={() => readAll.mutate()}>{t('Mark all read')}</button>
           </div>
           <ul className="max-h-80 divide-y divide-ink-100 overflow-auto">
-            {query.error && <li className="px-3 py-2 text-sm text-red-800">Could not load notifications.</li>}
+            {query.error && <li className="px-3 py-2 text-sm text-red-800">{t('Could not load notifications.')}</li>}
             {query.data?.items.map((n) => (
               <li key={n.id} className="px-3 py-2">
                 {n.link ? (
@@ -58,9 +59,9 @@ export function NotificationBell() {
                 <p className="text-xs text-ink-500">{n.kind.replace('ALERT_', '').toLowerCase()} · {formatDateTime(n.createdAt)}</p>
               </li>
             ))}
-            {query.data && !query.data.items.length && <li className="px-3 py-3 text-sm text-ink-600">You are all caught up.</li>}
+            {query.data && !query.data.items.length && <li className="px-3 py-3 text-sm text-ink-600">{t('You are all caught up.')}</li>}
           </ul>
-          <Link to="/notifications" className="block border-t border-ink-100 px-3 py-2 text-center text-sm text-brand-700 hover:underline" onClick={() => setOpen(false)}>All notifications</Link>
+          <Link to="/notifications" className="block border-t border-ink-100 px-3 py-2 text-center text-sm text-brand-700 hover:underline" onClick={() => setOpen(false)}>{t('All notifications')}</Link>
         </div>
       )}
     </div>

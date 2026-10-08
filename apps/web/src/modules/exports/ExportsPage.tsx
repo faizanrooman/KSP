@@ -10,6 +10,7 @@ import { formatDateTime, titleCase } from '@/lib/format';
 import { Button, Card, DataTable, EmptyState, Field, Input, PageHeader, Pagination, Select, StatusBadge, Tabs, type Column } from '@/components/ui';
 import type { ExportSummary, Paged } from './types';
 
+import { t } from '@/lib/i18n';
 const DEFAULTS = { view: 'mine', status: '', q: '', page: '1' };
 
 export function ExportsPage() {
@@ -17,8 +18,8 @@ export function ExportsPage() {
   const navigate = useNavigate();
   const [s, set] = useUrlState(DEFAULTS);
   const views = [
-    ...(can('export:create') ? [{ id: 'mine', label: 'My requests' }] : []),
-    ...(can('export:approve') ? [{ id: 'pending', label: 'Awaiting my approval' }, { id: 'all', label: 'All in my jurisdiction' }] : []),
+    ...(can('export:create') ? [{ id: 'mine', label: t('My requests') }] : []),
+    ...(can('export:approve') ? [{ id: 'pending', label: t('Awaiting my approval') }, { id: 'all', label: t('All in my jurisdiction') }] : []),
   ] as Array<{ id: string; label: string }>;
   const view = views.some((v) => v.id === s.view) ? s.view : (views[0]?.id ?? 'mine');
   const search = useDebounced(s.q.trim());
@@ -29,28 +30,28 @@ export function ExportsPage() {
     refetchInterval: (query) => (query.state.data?.items.some((x) => ['APPROVED', 'PROCESSING'].includes(x.status)) ? 4000 : false),
   });
   const cols: Column<ExportSummary>[] = [
-    { key: 'num', header: 'Export', render: (r) => <Link className="mono text-brand-700 hover:underline" to={`/exports/${r.id}`}>{r.exportNumber}</Link> },
-    { key: 'status', header: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-    { key: 'purpose', header: 'Purpose / court', render: (r) => <div><div className="line-clamp-1">{r.purpose}</div><div className="text-xs text-ink-500">{[r.courtName, r.courtCaseNumber].filter(Boolean).join(' · ') || '—'}</div></div> },
-    { key: 'items', header: 'Items', render: (r) => r.itemCount },
-    { key: 'by', header: 'Requested by', render: (r) => r.createdBy.name },
-    { key: 'at', header: 'Requested', render: (r) => <span className="whitespace-nowrap">{formatDateTime(r.createdAt)}</span> },
-    { key: 'appr', header: 'Decided by', render: (r) => r.approvedBy?.name ?? '—' },
+    { key: 'num', header: t('Export'), render: (r) => <Link className="mono text-brand-700 hover:underline" to={`/exports/${r.id}`}>{r.exportNumber}</Link> },
+    { key: 'status', header: t('Status'), render: (r) => <StatusBadge status={r.status} /> },
+    { key: 'purpose', header: t('Purpose / court'), render: (r) => <div><div className="line-clamp-1">{r.purpose}</div><div className="text-xs text-ink-500">{[r.courtName, r.courtCaseNumber].filter(Boolean).join(' · ') || '—'}</div></div> },
+    { key: 'items', header: t('Items'), render: (r) => r.itemCount },
+    { key: 'by', header: t('Requested by'), render: (r) => r.createdBy.name },
+    { key: 'at', header: t('Requested'), render: (r) => <span className="whitespace-nowrap">{formatDateTime(r.createdAt)}</span> },
+    { key: 'appr', header: t('Decided by'), render: (r) => r.approvedBy?.name ?? '—' },
   ];
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Court exports"
-        subtitle="Controlled export of evidence for court: two-person approval, integrity re-verification, signed manifest and fact sheet."
-        actions={can('export:create') ? <Button icon={<Plus className="h-4 w-4" />} onClick={() => navigate('/exports/new')}>New export</Button> : undefined}
+        title={t('Court exports')}
+        subtitle={t('Controlled export of evidence for court: two-person approval, integrity re-verification, signed manifest and fact sheet.')}
+        actions={can('export:create') ? <Button icon={<Plus className="h-4 w-4" />} onClick={() => navigate('/exports/new')}>{t('New export')}</Button> : undefined}
       />
       {views.length > 1 && <Tabs tabs={views} value={view} onChange={(v) => set({ view: v, page: '1' })} />}
       <Card>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <Field label="Search" htmlFor="ex-q"><Input id="ex-q" value={s.q} placeholder="Export number, purpose, court case" onChange={(e) => set({ q: e.target.value })} /></Field>
-          <Field label="Status" htmlFor="ex-status">
+          <Field label={t('Search')} htmlFor="ex-q"><Input id="ex-q" value={s.q} placeholder={t('Export number, purpose, court case')} onChange={(e) => set({ q: e.target.value })} /></Field>
+          <Field label={t('Status')} htmlFor="ex-status">
             <Select id="ex-status" value={s.status} onChange={(e) => set({ status: e.target.value })}>
-              <option value="">All</option>
+              <option value="">{t('All')}</option>
               {EXPORT_STATUSES.map((x) => <option key={x} value={x}>{titleCase(x)}</option>)}
             </Select>
           </Field>
@@ -58,7 +59,7 @@ export function ExportsPage() {
       </Card>
       <Card bodyClassName="p-0">
         <DataTable
-          caption="Exports"
+          caption={t('Exports')}
           columns={cols}
           rows={q.data?.items}
           rowKey={(r) => r.id}

@@ -4,6 +4,7 @@ import { Gavel } from 'lucide-react';
 import type { EvidenceAction, EvidenceSummary } from '@/lib/extensions';
 import { Button } from '@/components/ui';
 
+import { t } from '@/lib/i18n';
 type WithFlags = EvidenceSummary & { permissions?: { canExport?: boolean } };
 
 function ExportForCourt({ evidence }: { evidence: EvidenceSummary }) {
@@ -16,7 +17,7 @@ function ExportForCourt({ evidence }: { evidence: EvidenceSummary }) {
       icon={<Gavel className="h-4 w-4" />}
       onClick={() => navigate(`/exports/new?evidence=${evidence.id}`, { state: { items: [{ id: evidence.id, evidenceNumber: evidence.evidenceNumber, title: evidence.title, durationMs: evidence.durationMs }] } })}
     >
-      Export for court
+      {t('Export for court')}
     </Button>
   );
 }

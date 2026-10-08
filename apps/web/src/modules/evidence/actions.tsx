@@ -7,6 +7,7 @@ import { titleCase } from '@/lib/format';
 import { Alert, Button, ConfirmDialog, Field, Input, Modal, Select, Textarea, useToast } from '@/components/ui';
 import { evidenceKey, type EvidenceDetail, type RetentionPolicy } from './types';
 
+import { t as tr } from '@/lib/i18n';
 function useRefreshEvidence(id: string) {
   const qc = useQueryClient();
   return () => {
@@ -31,7 +32,7 @@ export function VerifyButton({ evidence }: { evidence: EvidenceSummary }) {
   });
   return (
     <Button variant="secondary" size="sm" icon={<ShieldCheck className="h-4 w-4" />} loading={m.isPending} onClick={() => m.mutate()}>
-      Verify integrity
+      {tr('Verify integrity')}
     </Button>
   );
 }
@@ -92,26 +93,26 @@ export function RequestDisposalButton({ evidence }: { evidence: EvidenceSummary 
   return (
     <>
       <Button variant="danger" size="sm" icon={<Trash2 className="h-4 w-4" />} onClick={() => { m.reset(); setReason(''); setAuthorityRef(''); setOpen(true); }}>
-        Request disposal
+        {tr('Request disposal')}
       </Button>
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Request authorised disposal"
+        title={tr('Request authorised disposal')}
         size="sm"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setOpen(false)} disabled={m.isPending}>Cancel</Button>
-            <Button variant="danger" disabled={!valid} loading={m.isPending} onClick={() => m.mutate()}>Submit request</Button>
+            <Button variant="secondary" onClick={() => setOpen(false)} disabled={m.isPending}>{tr('Cancel')}</Button>
+            <Button variant="danger" disabled={!valid} loading={m.isPending} onClick={() => m.mutate()}>{tr('Submit request')}</Button>
           </>
         }
       >
         <div className="space-y-3 text-sm">
-          <Alert tone="amber">Disposal permanently destroys the original and all derived media once approved by a second authorised officer. The record and its audit trail are kept.</Alert>
-          <Field label="Authority reference" htmlFor="dr-auth" required hint="Court order, government order or policy reference authorising disposal.">
+          <Alert tone="amber">{tr('Disposal permanently destroys the original and all derived media once approved by a second authorised officer. The record and its audit trail are kept.')}</Alert>
+          <Field label={tr('Authority reference')} htmlFor="dr-auth" required hint={tr('Court order, government order or policy reference authorising disposal.')}>
             <Input id="dr-auth" value={authorityRef} onChange={(e) => setAuthorityRef(e.target.value)} maxLength={300} />
           </Field>
-          <Field label="Reason" htmlFor="dr-reason" required hint="At least 10 characters; recorded in the chain of custody.">
+          <Field label={tr('Reason')} htmlFor="dr-reason" required hint={tr('At least 10 characters; recorded in the chain of custody.')}>
             <Textarea id="dr-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={4000} />
           </Field>
           {m.error ? <Alert tone="red">{errorMessage(m.error)}</Alert> : null}
@@ -136,16 +137,16 @@ export function TierChangeControl({ ev }: { ev: EvidenceDetail }) {
   });
   return (
     <div className="flex items-end gap-2">
-      <Field label="Move original to tier" htmlFor="tier-target">
+      <Field label={tr('Move original to tier')} htmlFor="tier-target">
         <Select id="tier-target" value={target} onChange={(e) => setTarget(e.target.value)}>
-          <option value="">Select tier…</option>
+          <option value="">{tr('Select tier…')}</option>
           {['ACTIVE', 'ARCHIVE', 'LONG_TERM'].filter((t) => t !== ev.storageTier).map((t) => (
             <option key={t} value={t}>{titleCase(t)}</option>
           ))}
         </Select>
       </Field>
       <Button variant="secondary" disabled={!target} loading={m.isPending} onClick={() => m.mutate()}>
-        Move
+        {tr('Move')}
       </Button>
     </div>
   );
@@ -167,7 +168,7 @@ export function RetentionAssignControl({ ev, currentId }: { ev: EvidenceDetail; 
   });
   return (
     <div className="flex items-end gap-2">
-      <Field label="Assign retention policy" htmlFor="ret-policy">
+      <Field label={tr('Assign retention policy')} htmlFor="ret-policy">
         <Select id="ret-policy" value={policyId} onChange={(e) => setPolicyId(e.target.value)} disabled={policies.isLoading}>
           <option value="">{policies.isLoading ? 'Loading…' : 'Select policy…'}</option>
           {policies.data?.items.filter((p) => p.id !== currentId).map((p) => (
@@ -178,7 +179,7 @@ export function RetentionAssignControl({ ev, currentId }: { ev: EvidenceDetail; 
         </Select>
       </Field>
       <Button variant="secondary" disabled={!policyId} loading={m.isPending} onClick={() => m.mutate()}>
-        Assign
+        {tr('Assign')}
       </Button>
     </div>
   );

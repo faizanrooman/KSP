@@ -9,6 +9,7 @@ import { Alert, Badge, Button, Card, EmptyState, ErrorState, Field, Input, Selec
 import { useRelated } from '@/modules/search/api';
 import { useAnnotations, useBookmarks, useRelations, useWsMutation } from './api';
 
+import { t } from '@/lib/i18n';
 const at = (id: string, ms: number) => `/evidence/${id}?tab=playback&t=${Math.max(1, Math.round(ms))}`;
 
 function NotesTab({ evidence }: { evidence: EvidenceSummary }) {
@@ -35,46 +36,46 @@ function NotesTab({ evidence }: { evidence: EvidenceSummary }) {
   const error = err ?? (addBm.error || addNote.error || delBm.error ? errorMessage(addBm.error ?? addNote.error ?? delBm.error) : null);
   return (
     <div className="space-y-4">
-      <Card title="Add">
+      <Card title={t('Add')}>
         <div className="grid gap-3 md:grid-cols-[10rem_10rem_1fr_auto] md:items-end">
-          <Field label="Type" htmlFor="na-kind">
+          <Field label={t('Type')} htmlFor="na-kind">
             <Select id="na-kind" value={kind} onChange={(e) => setKind(e.target.value as 'BOOKMARK' | 'NOTE')}>
-              <option value="BOOKMARK">Personal bookmark</option>
-              <option value="NOTE">Shared note</option>
+              <option value="BOOKMARK">{t('Personal bookmark')}</option>
+              <option value="NOTE">{t('Shared note')}</option>
             </Select>
           </Field>
-          <Field label="Time" htmlFor="na-time"><Input id="na-time" value={time} onChange={(e) => setTime(e.target.value)} className="font-mono" /></Field>
+          <Field label={t('Time')} htmlFor="na-time"><Input id="na-time" value={time} onChange={(e) => setTime(e.target.value)} className="font-mono" /></Field>
           <Field label={kind === 'NOTE' ? 'Note (visible to everyone who can see this evidence)' : 'Label'} htmlFor="na-label">
             {kind === 'NOTE' ? <Textarea id="na-label" rows={1} value={label} maxLength={5000} onChange={(e) => setLabel(e.target.value)} /> : <Input id="na-label" value={label} maxLength={200} onChange={(e) => setLabel(e.target.value)} />}
           </Field>
-          <Button loading={addBm.isPending || addNote.isPending} onClick={submit}>Add</Button>
+          <Button loading={addBm.isPending || addNote.isPending} onClick={submit}>{t('Add')}</Button>
         </div>
         {error && <div className="mt-2"><Alert tone="red">{error}</Alert></div>}
-        <p className="mt-2 text-xs text-ink-500">Workspace bookmarks, regions and highlights are created from the workspace review view. Every change is recorded in the chain of custody.</p>
+        <p className="mt-2 text-xs text-ink-500">{t('Workspace bookmarks, regions and highlights are created from the workspace review view. Every change is recorded in the chain of custody.')}</p>
       </Card>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="Bookmarks">
-          {bookmarks.isLoading ? <Spinner /> : bookmarks.error ? <ErrorState error={bookmarks.error} onRetry={() => void bookmarks.refetch()} /> : !bookmarks.data?.items.length ? <EmptyState title="No bookmarks" /> : (
+        <Card title={t('Bookmarks')}>
+          {bookmarks.isLoading ? <Spinner /> : bookmarks.error ? <ErrorState error={bookmarks.error} onRetry={() => void bookmarks.refetch()} /> : !bookmarks.data?.items.length ? <EmptyState title={t('No bookmarks')} /> : (
             <ul className="divide-y divide-ink-100">
               {bookmarks.data.items.map((b) => (
                 <li key={b.id} className="flex items-center gap-2 py-1.5 text-sm">
                   <Link to={at(evidence.id, b.timeMs)} className="mono text-xs text-brand-700 hover:underline">{formatTimecode(b.timeMs)}</Link>
                   <span className="flex-1">{b.label}<span className="block text-xs text-ink-500">{b.user.fullName} · {b.workspaceTitle ?? 'personal'}</span></span>
-                  {b.canDelete && <Button size="sm" variant="ghost" onClick={() => delBm.mutate(b.id)} aria-label={`Delete bookmark ${b.label}`}>Delete</Button>}
+                  {b.canDelete && <Button size="sm" variant="ghost" onClick={() => delBm.mutate(b.id)} aria-label={`Delete bookmark ${b.label}`}>{t('Delete')}</Button>}
                 </li>
               ))}
             </ul>
           )}
         </Card>
-        <Card title="Annotations" actions={<label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />Show deleted</label>}>
-          {annotations.isLoading ? <Spinner /> : annotations.error ? <ErrorState error={annotations.error} onRetry={() => void annotations.refetch()} /> : !annotations.data?.items.length ? <EmptyState title="No annotations" /> : (
+        <Card title={t('Annotations')} actions={<label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />{t('Show deleted')}</label>}>
+          {annotations.isLoading ? <Spinner /> : annotations.error ? <ErrorState error={annotations.error} onRetry={() => void annotations.refetch()} /> : !annotations.data?.items.length ? <EmptyState title={t('No annotations')} /> : (
             <ul className="divide-y divide-ink-100">
               {annotations.data.items.map((a) => (
                 <li key={a.id} className={`py-1.5 text-sm ${a.deleted ? 'opacity-60' : ''}`}>
                   <div className="flex items-center gap-2">
                     <Link to={at(evidence.id, a.startMs)} className="mono text-xs text-brand-700 hover:underline">{formatTimecode(a.startMs)}{a.endMs !== null ? `–${formatTimecode(a.endMs)}` : ''}</Link>
                     <Badge>{a.kind.toLowerCase()}</Badge>
-                    {a.deleted && <Badge tone="red">deleted{a.deletedBy ? ` by ${a.deletedBy}` : ''}</Badge>}
+                    {a.deleted && <Badge tone="red">{t('deleted')}{' '}{a.deletedBy ? ` by ${a.deletedBy}` : ''}</Badge>}
                   </div>
                   {a.body && <p className={a.deleted ? 'line-through' : ''}>{a.body}</p>}
                   <p className="text-xs text-ink-500">{a.author.fullName} · {a.workspaceTitle ?? 'shared on evidence'}</p>
@@ -95,9 +96,9 @@ function RelatedTab({ evidence }: { evidence: EvidenceSummary }) {
   return (
     <div className="space-y-4">
       {can('workspace:use') && (
-        <Card title="Recorded relations">
+        <Card title={t('Recorded relations')}>
           {relations.isLoading ? <Spinner /> : relations.error ? <ErrorState error={relations.error} onRetry={() => void relations.refetch()} /> : !relations.data?.items.length ? (
-            <p className="text-sm text-ink-500">No relations recorded. Relate items from an investigation workspace.</p>
+            <p className="text-sm text-ink-500">{t('No relations recorded. Relate items from an investigation workspace.')}</p>
           ) : (
             <ul className="divide-y divide-ink-100">
               {relations.data.items.map((r) => {
@@ -115,9 +116,9 @@ function RelatedTab({ evidence }: { evidence: EvidenceSummary }) {
           )}
         </Card>
       )}
-      <Card title="Suggestions">
-        {related.isLoading ? <Spinner label="Finding related evidence…" /> : related.error ? <ErrorState error={related.error} onRetry={() => void related.refetch()} /> : !related.data?.items.length ? (
-          <EmptyState title="No related evidence found" description="Suggestions consider the same case, officer or device (±1 h), place and time (200 m), and approved plate / watchlist hits — among evidence you can see." />
+      <Card title={t('Suggestions')}>
+        {related.isLoading ? <Spinner label={t('Finding related evidence…')} /> : related.error ? <ErrorState error={related.error} onRetry={() => void related.refetch()} /> : !related.data?.items.length ? (
+          <EmptyState title={t('No related evidence found')} description={t('Suggestions consider the same case, officer or device (±1 h), place and time (200 m), and approved plate / watchlist hits — among evidence you can see.')} />
         ) : (
           <ul className="divide-y divide-ink-100">
             {related.data.items.map((r) => (

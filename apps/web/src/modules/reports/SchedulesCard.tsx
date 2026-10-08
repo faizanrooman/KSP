@@ -5,6 +5,7 @@ import { formatDateTime } from '@/lib/format';
 import { Alert, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, EmptyState, Field, Input, Select, useToast, type Column } from '@/components/ui';
 import { OrgUnitSelect, UserPicker, type UserOption } from '@/components/pickers';
 
+import { t as tr } from '@/lib/i18n';
 export interface ReportTypeOption { code: string; title: string; available: boolean; extraParams: string[] }
 interface Schedule {
   id: string; name: string; reportType: string; title: string; format: string; frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CRON'; cron: string; timezone: string;
@@ -50,66 +51,66 @@ export function SchedulesCard({ types, formats }: { types: ReportTypeOption[]; f
   const remove = useMutation({ mutationFn: (s: Schedule) => api.delete(`/reports/schedules/${s.id}`), onSuccess: () => { setDel(null); toast.success('Schedule deleted'); invalidate(); } });
 
   const cols: Column<Schedule>[] = [
-    { key: 'name', header: 'Schedule', render: (s) => <div><div className="font-medium text-ink-900">{s.name}</div><div className="text-xs text-ink-600">{s.title} · {s.format}{s.orgUnit?.name ? ` · ${s.orgUnit.name}` : ''}</div></div> },
-    { key: 'when', header: 'When', render: (s) => <div><div>{describe(s)}</div><div className="text-xs text-ink-600">{s.timezone} · last {s.lookbackDays} day(s)</div></div> },
-    { key: 'next', header: 'Next run', render: (s) => (s.enabled ? (s.nextRunAt ? formatDateTime(s.nextRunAt) : '—') : <Badge>Paused</Badge>), className: 'whitespace-nowrap' },
-    { key: 'last', header: 'Last run', render: (s) => <div>{s.lastRunAt ? formatDateTime(s.lastRunAt) : 'never'}{s.lastError && <div className="text-xs text-red-700">{s.lastError}</div>}</div> },
-    { key: 'to', header: 'Recipients', render: (s) => (s.recipients.length ? s.recipients.map((r) => r.fullName ?? r.id.slice(0, 8)).join(', ') : 'only me') + (s.emailRecipients ? ' (+ e-mail)' : '') },
+    { key: 'name', header: tr('Schedule'), render: (s) => <div><div className="font-medium text-ink-900">{s.name}</div><div className="text-xs text-ink-600">{s.title} · {s.format}{s.orgUnit?.name ? ` · ${s.orgUnit.name}` : ''}</div></div> },
+    { key: 'when', header: tr('When'), render: (s) => <div><div>{describe(s)}</div><div className="text-xs text-ink-600">{s.timezone}{' '}{tr('· last')}{' '}{s.lookbackDays}{' '}{tr('day(s)')}</div></div> },
+    { key: 'next', header: tr('Next run'), render: (s) => (s.enabled ? (s.nextRunAt ? formatDateTime(s.nextRunAt) : '—') : <Badge>{tr('Paused')}</Badge>), className: 'whitespace-nowrap' },
+    { key: 'last', header: tr('Last run'), render: (s) => <div>{s.lastRunAt ? formatDateTime(s.lastRunAt) : 'never'}{s.lastError && <div className="text-xs text-red-700">{s.lastError}</div>}</div> },
+    { key: 'to', header: tr('Recipients'), render: (s) => (s.recipients.length ? s.recipients.map((r) => r.fullName ?? r.id.slice(0, 8)).join(', ') : 'only me') + (s.emailRecipients ? ' (+ e-mail)' : '') },
     {
-      key: 'act', header: <span className="sr-only">Actions</span>,
+      key: 'act', header: <span className="sr-only">{tr('Actions')}</span>,
       render: (s) => (
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" onClick={() => toggle.mutate(s)} loading={toggle.isPending && toggle.variables?.id === s.id}>{s.enabled ? 'Pause' : 'Resume'}</Button>
-          <Button size="sm" variant="ghost" onClick={() => { remove.reset(); setDel(s); }}>Delete</Button>
+          <Button size="sm" variant="ghost" onClick={() => { remove.reset(); setDel(s); }}>{tr('Delete')}</Button>
         </div>
       ),
     },
   ];
   const selected = types.find((t) => t.code === f.reportType);
   return (
-    <Card title="Scheduled reports" actions={<Button size="sm" variant={open ? 'ghost' : 'secondary'} onClick={() => setOpen(!open)}>{open ? 'Cancel' : 'New schedule'}</Button>}>
-      <p className="mb-3 text-sm text-ink-600">Runs are created automatically under <strong>your</strong> jurisdiction as it is at run time. You and the recipients are notified when a run is ready; recipients must be allowed to run the same report over the same area themselves.</p>
+    <Card title={tr('Scheduled reports')} actions={<Button size="sm" variant={open ? 'ghost' : 'secondary'} onClick={() => setOpen(!open)}>{open ? 'Cancel' : 'New schedule'}</Button>}>
+      <p className="mb-3 text-sm text-ink-600">{tr('Runs are created automatically under')}{' '}<strong>{tr('your')}</strong>{' '}{tr('jurisdiction as it is at run time. You and the recipients are notified when a run is ready; recipients must be allowed to run the same report over the same area themselves.')}</p>
       {open && (
         <form className="mb-4 space-y-3 rounded-lg border border-ink-100 p-3" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
           <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Name" htmlFor="sch-name" required><Input id="sch-name" value={f.name} required maxLength={200} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-            <Field label="Report type" htmlFor="sch-type" required>
+            <Field label={tr('Name')} htmlFor="sch-name" required><Input id="sch-name" value={f.name} required maxLength={200} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+            <Field label={tr('Report type')} htmlFor="sch-type" required>
               <Select id="sch-type" value={f.reportType} required onChange={(e) => setF({ ...f, reportType: e.target.value })}>
-                <option value="">Choose…</option>
+                <option value="">{tr('Choose…')}</option>
                 {types.map((t) => <option key={t.code} value={t.code} disabled={!t.available}>{t.title}{t.available ? '' : ' (not permitted)'}</option>)}
               </Select>
             </Field>
-            <Field label="Format" htmlFor="sch-format"><Select id="sch-format" value={f.format} onChange={(e) => setF({ ...f, format: e.target.value })}>{formats.map((x) => <option key={x}>{x}</option>)}</Select></Field>
-            <Field label="Frequency" htmlFor="sch-freq">
+            <Field label={tr('Format')} htmlFor="sch-format"><Select id="sch-format" value={f.format} onChange={(e) => setF({ ...f, format: e.target.value })}>{formats.map((x) => <option key={x}>{x}</option>)}</Select></Field>
+            <Field label={tr('Frequency')} htmlFor="sch-freq">
               <Select id="sch-freq" value={f.frequency} onChange={(e) => setF({ ...f, frequency: e.target.value as Schedule['frequency'] })}>
-                <option value="DAILY">Daily</option><option value="WEEKLY">Weekly</option><option value="MONTHLY">Monthly</option><option value="CRON">Custom (cron)</option>
+                <option value="DAILY">{tr('Daily')}</option><option value="WEEKLY">{tr('Weekly')}</option><option value="MONTHLY">{tr('Monthly')}</option><option value="CRON">{tr('Custom (cron)')}</option>
               </Select>
             </Field>
             {f.frequency === 'CRON'
-              ? <Field label="Cron expression" htmlFor="sch-cron" hint="minute hour day month weekday — at most hourly"><Input id="sch-cron" value={f.cron} onChange={(e) => setF({ ...f, cron: e.target.value })} /></Field>
-              : <Field label="Time (IST)" htmlFor="sch-time"><Input id="sch-time" type="time" value={f.time} required onChange={(e) => setF({ ...f, time: e.target.value })} /></Field>}
-            {f.frequency === 'WEEKLY' && <Field label="Day of week" htmlFor="sch-dow"><Select id="sch-dow" value={f.dayOfWeek} onChange={(e) => setF({ ...f, dayOfWeek: e.target.value })}>{DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}</Select></Field>}
-            {f.frequency === 'MONTHLY' && <Field label="Day of month" htmlFor="sch-dom" hint="1–28"><Input id="sch-dom" type="number" min={1} max={28} value={f.dayOfMonth} onChange={(e) => setF({ ...f, dayOfMonth: e.target.value })} /></Field>}
-            <Field label="Period covered (days)" htmlFor="sch-lookback" hint="Default: 1 / 7 / 31 by frequency"><Input id="sch-lookback" type="number" min={1} max={1098} value={f.lookbackDays} onChange={(e) => setF({ ...f, lookbackDays: e.target.value })} /></Field>
-            <Field label="Station / unit" htmlFor="sch-org"><OrgUnitSelect id="sch-org" scope="reports:generate" value={f.orgUnitId} onChange={(v) => setF({ ...f, orgUnitId: v })} emptyLabel="All in my jurisdiction" /></Field>
-            <Field label="Add recipient" htmlFor="sch-rcpt">
+              ? <Field label={tr('Cron expression')} htmlFor="sch-cron" hint={tr('minute hour day month weekday — at most hourly')}><Input id="sch-cron" value={f.cron} onChange={(e) => setF({ ...f, cron: e.target.value })} /></Field>
+              : <Field label={tr('Time (IST)')} htmlFor="sch-time"><Input id="sch-time" type="time" value={f.time} required onChange={(e) => setF({ ...f, time: e.target.value })} /></Field>}
+            {f.frequency === 'WEEKLY' && <Field label={tr('Day of week')} htmlFor="sch-dow"><Select id="sch-dow" value={f.dayOfWeek} onChange={(e) => setF({ ...f, dayOfWeek: e.target.value })}>{DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}</Select></Field>}
+            {f.frequency === 'MONTHLY' && <Field label={tr('Day of month')} htmlFor="sch-dom" hint="1–28"><Input id="sch-dom" type="number" min={1} max={28} value={f.dayOfMonth} onChange={(e) => setF({ ...f, dayOfMonth: e.target.value })} /></Field>}
+            <Field label={tr('Period covered (days)')} htmlFor="sch-lookback" hint={tr('Default: 1 / 7 / 31 by frequency')}><Input id="sch-lookback" type="number" min={1} max={1098} value={f.lookbackDays} onChange={(e) => setF({ ...f, lookbackDays: e.target.value })} /></Field>
+            <Field label={tr('Station / unit')} htmlFor="sch-org"><OrgUnitSelect id="sch-org" scope="reports:generate" value={f.orgUnitId} onChange={(v) => setF({ ...f, orgUnitId: v })} emptyLabel={tr('All in my jurisdiction')} /></Field>
+            <Field label={tr('Add recipient')} htmlFor="sch-rcpt">
               <UserPicker id="sch-rcpt" value={pick} onChange={(u) => { if (u && !recipients.some((r) => r.id === u.id)) setRecipients([...recipients, u]); setPick(null); }} />
             </Field>
           </div>
           {recipients.length > 0 && (
-            <ul className="flex flex-wrap gap-2" aria-label="Recipients">
+            <ul className="flex flex-wrap gap-2" aria-label={tr('Recipients')}>
               {recipients.map((r) => <li key={r.id}><Badge tone="blue">{r.fullName} <button type="button" className="ml-1 underline" aria-label={`Remove ${r.fullName}`} onClick={() => setRecipients(recipients.filter((x) => x.id !== r.id))}>×</button></Badge></li>)}
             </ul>
           )}
-          <Checkbox label="Also e-mail me and the recipients a sign-in link when a run is ready" checked={f.emailRecipients} onChange={(v) => setF({ ...f, emailRecipients: v })} />
-          {selected?.extraParams.length ? <p className="text-xs text-ink-600">This report&apos;s optional parameters use their defaults in schedules.</p> : null}
+          <Checkbox label={tr('Also e-mail me and the recipients a sign-in link when a run is ready')} checked={f.emailRecipients} onChange={(v) => setF({ ...f, emailRecipients: v })} />
+          {selected?.extraParams.length ? <p className="text-xs text-ink-600">{tr('This report&apos;s optional parameters use their defaults in schedules.')}</p> : null}
           {create.error && <Alert tone="red">{errorMessage(create.error)}</Alert>}
-          <Button type="submit" disabled={!f.name || !f.reportType} loading={create.isPending}>Create schedule</Button>
+          <Button type="submit" disabled={!f.name || !f.reportType} loading={create.isPending}>{tr('Create schedule')}</Button>
         </form>
       )}
-      <DataTable columns={cols} rows={list.data?.items} rowKey={(s) => s.id} loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()} caption="My scheduled reports"
-        empty={<EmptyState title="No scheduled reports" description="Create a schedule to receive a report daily, weekly or monthly." />} />
-      <ConfirmDialog open={!!del} title="Delete schedule" message={`Delete “${del?.name ?? ''}”? Past runs are kept.`} confirmLabel="Delete" variant="danger"
+      <DataTable columns={cols} rows={list.data?.items} rowKey={(s) => s.id} loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()} caption={tr('My scheduled reports')}
+        empty={<EmptyState title={tr('No scheduled reports')} description={tr('Create a schedule to receive a report daily, weekly or monthly.')} />} />
+      <ConfirmDialog open={!!del} title={tr('Delete schedule')} message={`Delete “${del?.name ?? ''}”? Past runs are kept.`} confirmLabel={tr('Delete')} variant="danger"
         loading={remove.isPending} error={remove.error} onConfirm={() => del && remove.mutate(del)} onCancel={() => setDel(null)} />
     </Card>
   );

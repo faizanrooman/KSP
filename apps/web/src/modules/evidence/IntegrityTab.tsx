@@ -6,6 +6,7 @@ import { Alert, Badge, Card, DataTable, EmptyState, KeyValue, type Column } from
 import type { EvidenceDetail } from './types';
 import { VerifyButton } from './actions';
 
+import { t } from '@/lib/i18n';
 interface IntegrityItem {
   id: number;
   trigger: string;
@@ -34,43 +35,43 @@ export function IntegrityTab({ evidence }: { evidence: EvidenceSummary }) {
     refetchInterval: (query) => (query.state.data?.pendingJob ? 3000 : false),
   });
   const cols: Column<IntegrityItem>[] = [
-    { key: 'at', header: 'Checked', render: (r) => <span className="whitespace-nowrap">{formatDateTime(r.checkedAt)}</span> },
-    { key: 'trigger', header: 'Trigger', render: (r) => titleCase(r.trigger) },
-    { key: 'result', header: 'Result', render: (r) => (r.ok ? <Badge tone="green">Match</Badge> : <Badge tone="red">Failed</Badge>) },
-    { key: 'actual', header: 'Computed SHA-256', render: (r) => <code className="mono text-xs" title={r.actualSha256 ?? ''}>{shortHash(r.actualSha256, 16)}</code> },
-    { key: 'error', header: 'Detail', render: (r) => r.error ?? '—' },
-    { key: 'by', header: 'Requested by', render: (r) => r.requestedBy?.fullName ?? 'System' },
+    { key: 'at', header: t('Checked'), render: (r) => <span className="whitespace-nowrap">{formatDateTime(r.checkedAt)}</span> },
+    { key: 'trigger', header: t('Trigger'), render: (r) => titleCase(r.trigger) },
+    { key: 'result', header: t('Result'), render: (r) => (r.ok ? <Badge tone="green">{t('Match')}</Badge> : <Badge tone="red">{t('Failed')}</Badge>) },
+    { key: 'actual', header: t('Computed SHA-256'), render: (r) => <code className="mono text-xs" title={r.actualSha256 ?? ''}>{shortHash(r.actualSha256, 16)}</code> },
+    { key: 'error', header: t('Detail'), render: (r) => r.error ?? '—' },
+    { key: 'by', header: t('Requested by'), render: (r) => r.requestedBy?.fullName ?? 'System' },
   ];
   const d = q.data;
   return (
     <div className="space-y-4">
       {d?.lastResult === 'FAILED' && (
-        <Alert tone="red" title="Integrity failure">
-          The most recent check did not match the registered hash. A critical alert has been raised; treat this item as potentially compromised until investigated.
+        <Alert tone="red" title={t('Integrity failure')}>
+          {t('The most recent check did not match the registered hash. A critical alert has been raised; treat this item as potentially compromised until investigated.')}
         </Alert>
       )}
-      <Card title="Fixity" actions={ev.permissions.canVerify ? <VerifyButton evidence={ev} /> : undefined}>
+      <Card title={t('Fixity')} actions={ev.permissions.canVerify ? <VerifyButton evidence={ev} /> : undefined}>
         <KeyValue
           items={[
-            { label: 'Registered SHA-256', value: ev.sha256, mono: true },
-            { label: 'Registered SHA-512', value: ev.sha512, mono: true },
-            { label: 'Size', value: formatBytes(ev.sizeBytes) },
-            { label: 'Last verified', value: d?.lastVerifiedAt ? formatDateTime(d.lastVerifiedAt) : 'Never re-verified' },
-            { label: 'Last result', value: d?.lastResult ? (d.lastResult === 'OK' ? <Badge tone="green">Match</Badge> : <Badge tone="red">Failed</Badge>) : '—' },
-            { label: 'Pending check', value: d?.pendingJob ? titleCase(d.pendingJob.status) : 'None' },
+            { label: t('Registered SHA-256'), value: ev.sha256, mono: true },
+            { label: t('Registered SHA-512'), value: ev.sha512, mono: true },
+            { label: t('Size'), value: formatBytes(ev.sizeBytes) },
+            { label: t('Last verified'), value: d?.lastVerifiedAt ? formatDateTime(d.lastVerifiedAt) : 'Never re-verified' },
+            { label: t('Last result'), value: d?.lastResult ? (d.lastResult === 'OK' ? <Badge tone="green">{t('Match')}</Badge> : <Badge tone="red">{t('Failed')}</Badge>) : '—' },
+            { label: t('Pending check'), value: d?.pendingJob ? titleCase(d.pendingJob.status) : 'None' },
           ]}
         />
       </Card>
-      <Card title="Verification history" bodyClassName="p-0">
+      <Card title={t('Verification history')} bodyClassName="p-0">
         <DataTable
-          caption="Integrity checks"
+          caption={t('Integrity checks')}
           columns={cols}
           rows={d?.items}
           rowKey={(r) => String(r.id)}
           loading={q.isFetching}
           error={q.error}
           onRetry={() => void q.refetch()}
-          empty={<EmptyState title="No integrity checks yet" description="Checks run nightly, on demand, on export and whenever the original changes storage tier." />}
+          empty={<EmptyState title={t('No integrity checks yet')} description={t('Checks run nightly, on demand, on export and whenever the original changes storage tier.')} />}
         />
       </Card>
     </div>

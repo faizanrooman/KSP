@@ -10,6 +10,7 @@ import { AI_JOBS_CHANNEL } from '@ksp/shared';
 import type { AiContext } from './context.js';
 import { claimJob, runJob } from './pipeline.js';
 import { embedPendingWatchlistEntries, reapStaleJobs } from './watchlist.js';
+import { processFaceSearches } from './face-search.js';
 import { aiStats, jobStarted, recordJob, startAiHeartbeat, startMetricsServer } from './metrics.js';
 
 process.env.KSP_SERVICE ??= 'ksp-ai-worker';
@@ -70,6 +71,7 @@ export async function startAiWorker(opts: StartAiWorkerOptions = {}): Promise<((
     while (!stopping) {
       try {
         if (slot === 0) await embedPendingWatchlistEntries(ctx);
+        if (slot === 0) await processFaceSearches(ctx);
         await drainJobs(ctx);
       } catch (err) {
         ctx.log.error({ err }, 'ai worker loop error');

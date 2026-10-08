@@ -8,6 +8,7 @@ import { Alert, Badge, Button, Card, ConfirmDialog, DataTable, EmptyState, Error
 import type { ShareDetail } from './types';
 import { ShareManageActions } from './ShareManageActions';
 
+import { t } from '@/lib/i18n';
 export function ShareDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
@@ -27,33 +28,33 @@ export function ShareDetailPage() {
   const s = q.data;
   const itemNo = (eid: string | null) => s.items.find((i) => i.evidenceId === eid)?.evidenceNumber ?? '—';
   const logCols: Column<ShareDetail['accessLog'][number]>[] = [
-    { key: 'at', header: 'Time', render: (l) => <span className="whitespace-nowrap">{formatDateTime(l.at)}</span> },
-    { key: 'a', header: 'Action', render: (l) => (['DENIED', 'CODE_FAILED'].includes(l.action) ? <Badge tone="red">{titleCase(l.action)}</Badge> : <Badge tone="blue">{titleCase(l.action)}</Badge>) },
-    { key: 'e', header: 'Item', render: (l) => <span className="mono whitespace-nowrap text-xs">{itemNo(l.evidenceId)}</span> },
-    { key: 'd', header: 'Detail', render: (l) => l.detail ?? '—' },
-    { key: 'ip', header: 'IP', render: (l) => l.ip ?? '—' },
-    { key: 'ua', header: 'Browser', render: (l) => <span className="block max-w-[14rem] truncate text-xs" title={l.userAgent ?? ''}>{l.userAgent ?? '—'}</span> },
+    { key: 'at', header: t('Time'), render: (l) => <span className="whitespace-nowrap">{formatDateTime(l.at)}</span> },
+    { key: 'a', header: t('Action'), render: (l) => (['DENIED', 'CODE_FAILED'].includes(l.action) ? <Badge tone="red">{titleCase(l.action)}</Badge> : <Badge tone="blue">{titleCase(l.action)}</Badge>) },
+    { key: 'e', header: t('Item'), render: (l) => <span className="mono whitespace-nowrap text-xs">{itemNo(l.evidenceId)}</span> },
+    { key: 'd', header: t('Detail'), render: (l) => l.detail ?? '—' },
+    { key: 'ip', header: t('IP'), render: (l) => l.ip ?? '—' },
+    { key: 'ua', header: t('Browser'), render: (l) => <span className="block max-w-[14rem] truncate text-xs" title={l.userAgent ?? ''}>{l.userAgent ?? '—'}</span> },
   ];
   return (
     <div className="space-y-4">
       <PageHeader
         title={`Share with ${s.recipient.name ?? 'recipient'}`}
         subtitle={s.purpose}
-        breadcrumb={<Link to="/shares" className="text-brand-700 hover:underline">Shares</Link>}
-        actions={<div className="flex flex-wrap gap-2"><ShareManageActions share={s} />{s.canRevoke && <Button variant="danger" onClick={() => { revoke.reset(); setRevoking(true); }}>Revoke</Button>}</div>}
+        breadcrumb={<Link to="/shares" className="text-brand-700 hover:underline">{t('Shares')}</Link>}
+        actions={<div className="flex flex-wrap gap-2"><ShareManageActions share={s} />{s.canRevoke && <Button variant="danger" onClick={() => { revoke.reset(); setRevoking(true); }}>{t('Revoke')}</Button>}</div>}
       />
-      {s.status === 'LOCKED' && <Alert tone="red" title="Locked">Too many wrong access codes were entered ({s.failedCodeAttempts}). {s.canUnlock ? 'Confirm with the recipient, then unlock it — or revoke it.' : 'Ask the sender to unlock or revoke it.'}</Alert>}
-      <Card title="Share">
+      {s.status === 'LOCKED' && <Alert tone="red" title={t('Locked')}>{t('Too many wrong access codes were entered (')}{s.failedCodeAttempts}). {s.canUnlock ? 'Confirm with the recipient, then unlock it — or revoke it.' : 'Ask the sender to unlock or revoke it.'}</Alert>}
+      <Card title={t('Share')}>
         <KeyValue items={[
-          { label: 'Status', value: <StatusBadge status={s.status} /> },
-          { label: 'Recipient', value: s.recipientType === 'EXTERNAL' ? `${s.recipient.name} <${s.recipient.email}>${s.recipient.organisation ? ` · ${s.recipient.organisation}` : ''}` : `${s.recipient.name} (KSP user)` },
-          { label: 'Permissions', value: [s.permissions.watermark && s.recipientType === 'EXTERNAL' ? 'watermarked playback' : 'playback', s.permissions.allowDownload && (s.permissions.allowOriginal ? 'download incl. original' : s.recipientType === 'EXTERNAL' ? 'download (watermarked)' : 'download original'), s.permissions.allowPrint && 'print'].filter(Boolean).join(', ') },
-          { label: 'Expires', value: formatDateTime(s.expiresAt) },
-          { label: 'Views', value: s.recipientType === 'EXTERNAL' || s.maxViews ? `${s.viewCount}${s.maxViews ? ` of ${s.maxViews}` : ''}` : '—' },
-          { label: 'Downloads', value: s.downloadCount },
-          { label: 'Shared by', value: `${s.createdBy.name} · ${formatDateTime(s.createdAt)}` },
-          { label: 'Last accessed', value: formatDateTime(s.lastAccessedAt) },
-          !!s.revokedAt && { label: 'Revoked', value: `${s.revokedBy?.name ?? '—'} · ${formatDateTime(s.revokedAt)} — ${s.revokeReason ?? ''}` },
+          { label: t('Status'), value: <StatusBadge status={s.status} /> },
+          { label: t('Recipient'), value: s.recipientType === 'EXTERNAL' ? `${s.recipient.name} <${s.recipient.email}>${s.recipient.organisation ? ` · ${s.recipient.organisation}` : ''}` : `${s.recipient.name} (KSP user)` },
+          { label: t('Permissions'), value: [s.permissions.watermark && s.recipientType === 'EXTERNAL' ? 'watermarked playback' : 'playback', s.permissions.allowDownload && (s.permissions.allowOriginal ? 'download incl. original' : s.recipientType === 'EXTERNAL' ? 'download (watermarked)' : 'download original'), s.permissions.allowPrint && 'print'].filter(Boolean).join(', ') },
+          { label: t('Expires'), value: formatDateTime(s.expiresAt) },
+          { label: t('Views'), value: s.recipientType === 'EXTERNAL' || s.maxViews ? `${s.viewCount}${s.maxViews ? ` of ${s.maxViews}` : ''}` : '—' },
+          { label: t('Downloads'), value: s.downloadCount },
+          { label: t('Shared by'), value: `${s.createdBy.name} · ${formatDateTime(s.createdAt)}` },
+          { label: t('Last accessed'), value: formatDateTime(s.lastAccessedAt) },
+          !!s.revokedAt && { label: t('Revoked'), value: `${s.revokedBy?.name ?? '—'} · ${formatDateTime(s.revokedAt)} — ${s.revokeReason ?? ''}` },
         ]} />
       </Card>
       <Card title={`Items (${s.items.length})`}>
@@ -61,14 +62,14 @@ export function ShareDetailPage() {
           {s.items.map((i) => <li key={i.evidenceId} className="py-1.5"><Link className="mono text-brand-700 hover:underline" to={`/evidence/${i.evidenceId}`}>{i.evidenceNumber}</Link> {i.title && <span className="text-ink-600">— {i.title}</span>}</li>)}
         </ul>
       </Card>
-      <Card title="Access log" bodyClassName="p-0">
-        <DataTable caption="Share access log" columns={logCols} rows={s.accessLog} rowKey={(l) => String(l.id)} empty={<EmptyState title={s.recipientType === 'EXTERNAL' ? 'Not opened yet' : 'Internal shares are logged in the chain of custody of each item'} />} />
+      <Card title={t('Access log')} bodyClassName="p-0">
+        <DataTable caption={t('Share access log')} columns={logCols} rows={s.accessLog} rowKey={(l) => String(l.id)} empty={<EmptyState title={s.recipientType === 'EXTERNAL' ? 'Not opened yet' : 'Internal shares are logged in the chain of custody of each item'} />} />
       </Card>
       <ConfirmDialog
         open={revoking}
-        title="Revoke share"
-        message="The recipient loses access immediately, including any open viewing session."
-        confirmLabel="Revoke"
+        title={t('Revoke share')}
+        message={t('The recipient loses access immediately, including any open viewing session.')}
+        confirmLabel={t('Revoke')}
         variant="danger"
         requireReason
         loading={revoke.isPending}
