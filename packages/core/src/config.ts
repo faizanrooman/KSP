@@ -29,6 +29,14 @@ const schema = z.object({
   TRUST_PROXY: bool.default('false'),
   /** Rate-limit counter store: `postgres` shares counts across API replicas (default in production), `memory` is per process (default elsewhere). */
   RATE_LIMIT_STORE: z.enum(['memory', 'postgres']).optional(),
+  /**
+   * Tender §50: access from authorised internal networks only. Comma-separated CIDRs (IPv4/IPv6) allowed to reach the
+   * staff application and API. Empty = no network restriction (perimeter firewall only). Requests from other networks get
+   * 403 NETWORK_NOT_ALLOWED and an audit event. Paths in ALLOWED_NETWORKS_EXEMPT_PREFIXES stay reachable from anywhere
+   * (default: the external share portal and health probes).
+   */
+  ALLOWED_NETWORKS: z.string().default(''),
+  ALLOWED_NETWORKS_EXEMPT_PREFIXES: z.string().default('/api/v1/share-portal,/api/v1/media/stream,/api/v1/media/download,/health'),
 
   DATABASE_URL: z.string().min(1), // ksp_app
   DATABASE_MIGRATION_URL: z.string().optional(), // schema owner, used by migrate only

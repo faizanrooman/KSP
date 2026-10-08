@@ -65,7 +65,24 @@ export default fp(async (app) => {
     }
   });
 
+  // Tender §50 — staff application reachable from authorised internal networks only.
+  const allowedNetworks = app.cfg.ALLOWED_NETWORKS.split(',').map((s) => s.trim()).filter(Boolean);
+  const exemptPrefixes = app.cfg.ALLOWED_NETWORKS_EXEMPT_PREFIXES.split(',').map((s) => s.trim()).filter(Boolean);
+  const networkDenials = new Map<string, number>(); // ip -> last audited (ms); one audit row per ip per minute
   app.addHook('onRequest', async (req) => {
+    if (allowedNetworks.length && (req.url.startsWith('/api/') || req.url === '/')) {
+      const path = req.url.split('?')[0]!;
+      if (!exemptPrefixes.some((p) => path.startsWith(p)) && !allowedNetworks.some((c) => ipInCidr(req.ip, c))) {
+        const last = networkDenials.get(req.ip) ?? 0;
+        if (Date.now() - last > 60_000) {
+          networkDenials.set(req.ip, Date.now());
+          await appendAudit(app.db, { type: 'USER', id: null, ip: req.ip, userAgent: req.headers['user-agent'] ?? null }, {
+            action: 'ACCESS_DENIED', outcome: 'DENIED', resourceType: 'network', resourceId: req.ip, details: { reason: 'NETWORK_NOT_ALLOWED', path },
+          });
+        }
+        throw new AppError(403, 'NETWORK_NOT_ALLOWED', 'This service is only available from authorised police networks');
+      }
+    }
     if (!req.url.startsWith('/api/')) return;
     // OpenAPI docs are open outside production; in production they require an authenticated session.
     if (req.url.startsWith('/api/docs') && app.cfg.NODE_ENV !== 'production') return;
