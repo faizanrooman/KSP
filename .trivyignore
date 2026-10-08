@@ -1,0 +1,6 @@
+# Reviewed Trivy suppressions (CI filesystem + image scans). Keep each entry justified; remove when no longer needed.
+#
+# KSV-0109 "ConfigMap with sensitive content" on deploy/k8s/base/config.yaml: the matched keys are *_TTL_SECONDS
+# settings and `file:/run/secrets/...` mount paths (JWT_*_KEY, SIGNING_*). No secret material is stored in the
+# ConfigMap; secrets come from Kubernetes Secrets materialised by ExternalSecrets/SealedSecrets (docs/SECRETS.md, OPS-9).
+KSV-0109

@@ -12,7 +12,8 @@
 # reproduced and executed locally by scripts/ci/simulate-image.sh (see docs/DEPLOYMENT.md).
 
 ARG NODE_IMAGE=node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
-ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.28-alpine@sha256:7377697a821c131a924a7105fafbe7414db4e9fcc77a6f08f776f33f141ec3f8
+ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.30-alpine@sha256:15c994d10d6d78658721c3bcafff14cb281fba2a4bdf9d5ba92c416a472516e3
+ARG GOLANG_IMAGE=golang:1.27-bookworm@sha256:8d48e12ec56735e9358640898b9d9b9fcca110612ed8a5567438c0a1baa24e66
 ARG POSTGRES_IMAGE=postgres:16-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
 # Static FFmpeg 7.1.1 (GPL build: libx264, libx265, libvpx, libaom, libdav1d, libopus, libmp3lame, …) — decodes every
 # codec body-worn cameras produce (H.264/H.265/MJPEG/MPEG-4 in MP4/MOV/AVI/MKV/TS) and encodes H.264 proxies/HLS.
@@ -155,17 +156,14 @@ CMD ["node", "apps/ai-worker/dist/main.js"]
 # repo's @aws-sdk) + age (encryption). Used by the backup / verify / replicate CronJobs and restore.sh.
 FROM ${NODE_IMAGE} AS node-bin
 
-FROM ${POSTGRES_IMAGE} AS age
+FROM ${GOLANG_IMAGE} AS age
+# age is built from the pinned module version with the current Go toolchain: the upstream release binaries are built
+# with older Go releases and fail the image scan on fixed Go-stdlib CVEs. `go install` verifies the module against the
+# Go checksum database (sum.golang.org).
 ARG AGE_VERSION=v1.3.2
-ARG AGE_SHA256_AMD64=cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10
-ARG AGE_SHA256_ARM64=6b8dc4333c53a5a57c9e5834e3a48f92605d7154014cd07269ff3327db5d37f4
-ARG TARGETARCH=amd64
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/* \
- && sum="$AGE_SHA256_AMD64"; [ "$TARGETARCH" = arm64 ] && sum="$AGE_SHA256_ARM64"; \
-    curl -fsSL -o /tmp/age.tgz "https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-${TARGETARCH}.tar.gz" \
- && echo "${sum}  /tmp/age.tgz" | sha256sum -c - \
- && tar -xzf /tmp/age.tgz -C /usr/local/bin --strip-components=1 age/age age/age-keygen && rm /tmp/age.tgz
+ENV CGO_ENABLED=0 GOFLAGS=-trimpath GOTOOLCHAIN=local
+RUN go install "filippo.io/age/cmd/age@${AGE_VERSION}" "filippo.io/age/cmd/age-keygen@${AGE_VERSION}" \
+ && install -m 0755 /go/bin/age /go/bin/age-keygen /usr/local/bin/ && /usr/local/bin/age --version
 
 FROM ${POSTGRES_IMAGE} AS backup
 # gosu (postgres entrypoint helper, a static Go binary) is not used here and is removed with the server binaries' helper.

@@ -1,8 +1,0 @@
-# Reviewed Trivy suppressions (scanned by CI: filesystem + images). Each entry needs a statement and an owner.
-misconfigurations:
-  - id: KSV-0109 # "ConfigMap with sensitive content"
-    paths:
-      - deploy/k8s/base/config.yaml
-    statement: >-
-      The *_KEY / *_CERTIFICATE entries hold `file:/run/secrets/...` mount paths, not key material; the secrets
-      themselves are Kubernetes Secrets materialised by ExternalSecrets/SealedSecrets (docs/SECRETS.md, OPS-9).
