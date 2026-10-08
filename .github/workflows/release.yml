@@ -72,7 +72,7 @@ jobs:
           image: ${{ env.IMAGE_PREFIX }}/${{ matrix.target }}@${{ steps.build.outputs.digest }}
           format: cyclonedx-json
           output-file: sbom-${{ matrix.target }}.cdx.json
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.IMAGE_PREFIX }}/${{ matrix.target }}
           subject-digest: ${{ steps.build.outputs.digest }}
