@@ -50,22 +50,32 @@ async function main(): Promise<void> {
   }
   mark('detailAndPlaybackMs', t);
 
-  const fixityResults: { id: string; ok: boolean; ms: number }[] = [];
+  const fixityResults: { id: string; ok: boolean; ms: number; retries: number }[] = [];
   if (fixity) {
     for (const id of ids) {
       t = Date.now();
-      const before = await call('GET', `/evidence/${id}/integrity`, token);
-      const seen = new Set<string>((before.checks ?? before.items ?? []).map((c: { id: string }) => c.id));
-      await call('POST', `/evidence/${id}/verify`, token);
-      let result: { ok: boolean } | undefined;
-      for (let i = 0; i < 240 && !result; i++) {
-        await new Promise((r) => setTimeout(r, 500));
-        const now = await call('GET', `/evidence/${id}/integrity`, token);
-        result = (now.checks ?? now.items ?? []).find((c: { id: string }) => !seen.has(c.id));
+      // Up to 3 attempts: the throwaway DR gateway (versitygw posix) has been seen to answer NoSuchVersion for a version
+      // it served moments earlier during repoint; a hash MISMATCH is never retried. Retries are reported, not hidden.
+      let result: { ok: boolean; error?: string | null } | undefined;
+      let retries = 0;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const before = await call('GET', `/evidence/${id}/integrity`, token);
+        const seen = new Set<string>((before.checks ?? before.items ?? []).map((c: { id: string }) => c.id));
+        await call('POST', `/evidence/${id}/verify`, token);
+        result = undefined;
+        for (let i = 0; i < 240 && !result; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          const now = await call('GET', `/evidence/${id}/integrity`, token);
+          result = (now.checks ?? now.items ?? []).find((c: { id: string }) => !seen.has(c.id));
+        }
+        if (!result) throw new Error(`fixity check for ${id} did not complete in 120 s`);
+        if (result.ok || !/not found/i.test(result.error ?? '')) break;
+        retries++;
+        console.error(`fixity check for ${id} reported a missing object (${result.error}); retrying in 2 s (${retries}/2)`);
+        await new Promise((r) => setTimeout(r, 2000));
       }
-      if (!result) throw new Error(`fixity check for ${id} did not complete in 120 s`);
-      if (!result.ok) throw new Error(`fixity check FAILED for ${id}: ${JSON.stringify(result)}`);
-      fixityResults.push({ id, ok: true, ms: Date.now() - t });
+      if (!result!.ok) throw new Error(`fixity check FAILED for ${id}: ${JSON.stringify(result)}`);
+      fixityResults.push({ id, ok: true, ms: Date.now() - t, retries });
     }
   }
   console.log(JSON.stringify({ ok: true, evidence: ids.length, timings, fixity: fixityResults, totalMs: Date.now() - t0 }));

@@ -200,7 +200,7 @@ step_end "$(grep '^backup ' "$BASE/logs/backup.log" | cut -c1-160)"
 # ---------------------------------------------------------------- 5 replicate
 step_start replicate-objects
 env "${S3ENV_PRIMARY[@]}" "${DRENV[@]}" "${BUCKETENV[@]}" DATABASE_URL="$APP_URL_BASE/$DB" \
-  node "$ROOT/scripts/backup/s3-replicate.ts" --lock-days 1 > "$BASE/logs/replicate.json" 2>&1 || { cat "$BASE/logs/replicate.json" >&2; exit 1; }
+  node "$ROOT/scripts/backup/s3-replicate.ts" --lock-days 1 > "$BASE/logs/replicate.json" 2> "$BASE/logs/replicate.err" || { cat "$BASE/logs/replicate.json" "$BASE/logs/replicate.err" >&2; exit 1; }
 step_end "$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));console.log(`${j.copied} objects, ${j.bytes} B, ${j.verified} originals hash-verified vs DB, ${j.failed} failed`)' "$BASE/logs/replicate.json")"
 
 # ---------------------------------------------------------------- 6 verify
@@ -227,8 +227,8 @@ step_end "$(tail -1 "$BASE/logs/migrate2.log"); DR buckets verified (missing sta
 
 # ---------------------------------------------------------------- 8 repoint
 step_start repoint
-env "${DRENV[@]}" "${BUCKETENV[@]}" DATABASE_URL="$APP_URL_BASE/$DB" node "$ROOT/scripts/backup/s3-replicate.ts" --repoint > "$BASE/logs/repoint.json" 2>&1 \
-  || { cat "$BASE/logs/repoint.json" >&2; exit 1; }
+env "${DRENV[@]}" "${BUCKETENV[@]}" DATABASE_URL="$APP_URL_BASE/$DB" node "$ROOT/scripts/backup/s3-replicate.ts" --repoint > "$BASE/logs/repoint.json" 2> "$BASE/logs/repoint.err" \
+  || { cat "$BASE/logs/repoint.json" "$BASE/logs/repoint.err" >&2; exit 1; }
 step_end "$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));console.log(`${j.verified} originals re-hashed in DR store, ${j.repointed} pointers moved`)' "$BASE/logs/repoint.json")"
 
 # ---------------------------------------------------------------- 9 recover
@@ -246,12 +246,12 @@ printf '%s\t%s\t%s\n' "RESTORE→SERVICE READY (RTO, excl. detection)" "$RTO_MS"
 
 # ---------------------------------------------------------------- 10 validate
 step_start validate-service
-node "$ROOT/tests/dr/api-check.ts" "http://127.0.0.1:$API_PORT" io.meera 'Ksp@Dev-Passw0rd!' "$FILES" --fixity > "$BASE/logs/api-check.json" 2>&1 \
-  || { cat "$BASE/logs/api-check.json" >&2; tail -30 "$BASE/logs/worker.log" >&2; exit 1; }
+node "$ROOT/tests/dr/api-check.ts" "http://127.0.0.1:$API_PORT" io.meera 'Ksp@Dev-Passw0rd!' "$FILES" --fixity > "$BASE/logs/api-check.json" 2> "$BASE/logs/api-check.err" \
+  || { cat "$BASE/logs/api-check.json" "$BASE/logs/api-check.err" >&2; tail -30 "$BASE/logs/worker.log" >&2; exit 1; }
 step_end "$(cut -c1-200 "$BASE/logs/api-check.json")"
 step_start validate-integrity
-env "${DRENV[@]}" "${BUCKETENV[@]}" DATABASE_URL="$APP_URL_BASE/$DB" node "$ROOT/scripts/backup/s3-replicate.ts" --verify-only > "$BASE/logs/dr-verify.json" 2>&1 \
-  || { cat "$BASE/logs/dr-verify.json" >&2; exit 1; }
+env "${DRENV[@]}" "${BUCKETENV[@]}" DATABASE_URL="$APP_URL_BASE/$DB" node "$ROOT/scripts/backup/s3-replicate.ts" --verify-only > "$BASE/logs/dr-verify.json" 2> "$BASE/logs/dr-verify.err" \
+  || { cat "$BASE/logs/dr-verify.json" "$BASE/logs/dr-verify.err" >&2; exit 1; }
 AV=$(q "SELECT checked || '|' || coalesce(first_bad_seq::text,'none') || '|' || head_seq FROM audit_verify()")
 [ "$(cut -d'|' -f2 <<<"$AV")" = none ] || { log "audit chain broken after recovery: $AV"; exit 1; }
 [ "$(q "SELECT count(*) FROM audit_events WHERE action = 'EVIDENCE_STORAGE_REPOINTED'")" = "$FILES" ] || { log "missing repoint custody events"; exit 1; }
