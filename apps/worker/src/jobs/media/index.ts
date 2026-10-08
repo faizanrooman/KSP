@@ -1,9 +1,9 @@
 /** Media job module: consumes QUEUES.MEDIA_PROCESS ({ evidenceId, force? }) — ./process.ts — and QUEUES.SNAPSHOT_EXTRACT — ./snapshot.ts. */
 import type { JobWithMetadata } from 'pg-boss';
 import { QUEUE_DEFAULTS } from '@ksp/core';
-import { QUEUES, type MediaProcessPayload, type SnapshotExtractPayload } from '@ksp/shared';
+import { QUEUES, type MediaHlsPayload, type MediaProcessPayload, type SnapshotExtractPayload } from '@ksp/shared';
 import type { WorkerContext } from '../../lib/context.js';
-import { processMedia } from './process.js';
+import { buildHlsOnDemand, processMedia } from './process.js';
 import { runSnapshotExtract } from './snapshot.js';
 
 export { runSnapshotExtract };
@@ -20,6 +20,17 @@ export default async function register(ctx: WorkerContext): Promise<void> {
           queueJobId: job.id,
           finalAttempt: job.retryCount >= (job.retryLimit ?? retryLimit),
         });
+      }
+    },
+  );
+  // MEDIA_PROFILE=on-demand-hls: HLS ladder built on first playback (enqueued by the playback endpoint).
+  const hlsRetry = QUEUE_DEFAULTS[QUEUES.MEDIA_HLS].retryLimit;
+  await ctx.boss.work<MediaHlsPayload>(
+    QUEUES.MEDIA_HLS,
+    { localConcurrency: Math.max(1, Math.ceil(ctx.cfg.WORKER_CONCURRENCY / 2)), batchSize: 1, includeMetadata: true },
+    async (jobs) => {
+      for (const job of jobs as JobWithMetadata<MediaHlsPayload>[]) {
+        await buildHlsOnDemand({ db: ctx.db, storage: ctx.storage, cfg: ctx.cfg, log }, job.data, { queueJobId: job.id, finalAttempt: job.retryCount >= (job.retryLimit ?? hlsRetry) });
       }
     },
   );

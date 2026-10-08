@@ -28,6 +28,8 @@ export const QUEUES = {
   QUARANTINE_RELEASE: 'ingest.release',
   /** Extract a still frame (snapshot) from an evidence video. */
   SNAPSHOT_EXTRACT: 'media.snapshot',
+  /** MEDIA_PROFILE=on-demand-hls: build the HLS ladder the first time an item is played. */
+  MEDIA_HLS: 'media.hls',
 } as const;
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 
@@ -47,6 +49,7 @@ export const SCHEDULES = {
 
 export interface IngestFinalizePayload { uploadSessionId: string }
 export interface MediaProcessPayload { evidenceId: string; force?: boolean }
+export interface MediaHlsPayload { evidenceId: string }
 export interface ExportBuildPayload { exportId: string }
 export interface ReportBuildPayload { reportRunId: string }
 export interface FixityCheckPayload {

@@ -10,6 +10,26 @@ import { appendAudit, type AuditActor } from '../audit.js';
 import { evidenceSigner, type Signer } from '../signing.js';
 import { verifyLedger, type LedgerVerifyResult } from './ledger.js';
 
+const remembered = new Set<string>();
+/** Archive the signer's certificate (idempotent) so checkpoints keep verifying after a key rotation. */
+export async function rememberSigningCertificate(db: Database | Tx, signer: Signer): Promise<string> {
+  const cert = new X509Certificate(signer.certificatePem);
+  if (remembered.has(cert.fingerprint256)) return cert.fingerprint256;
+  await db.insertInto('signing_certificates')
+    .values({ fingerprint256: cert.fingerprint256, key_id: signer.keyId, provider: signer.provider, non_evidentiary: signer.nonEvidentiary, certificate_pem: cert.toString() })
+    .onConflict((oc) => oc.column('fingerprint256').doNothing()).execute();
+  remembered.add(cert.fingerprint256);
+  return cert.fingerprint256;
+}
+
+/** The certificate that signed a checkpoint: the current signer's, or the archived one with the recorded fingerprint. */
+export async function checkpointCertificate(db: Database | Tx, certFingerprint: string | null, signer: Signer): Promise<string> {
+  const current = signer.certificatePem;
+  if (!certFingerprint || certFingerprint === new X509Certificate(current).fingerprint256) return current;
+  const r = await db.selectFrom('signing_certificates').select('certificate_pem').where('fingerprint256', '=', certFingerprint).executeTakeFirst();
+  return r?.certificate_pem ?? current;
+}
+
 export function checkpointPayload(c: { headSeq: number; headHash: string; createdAt: Date; keyId: string }): string {
   return `KSP-AUDIT-CHECKPOINT\nv=1\nseq=${c.headSeq}\nhash=${c.headHash}\ncreated=${c.createdAt.toISOString()}\nkey=${c.keyId}\n`;
 }
@@ -93,6 +113,7 @@ export async function createCheckpoint(db: Database, actor: AuditActor, signer: 
   const probe = await signer.sign(Buffer.from('probe'));
   const payload = checkpointPayload({ headSeq: verification.headSeq, headHash: verification.headHash, createdAt, keyId: probe.keyId });
   const sig = await signer.sign(Buffer.from(payload, 'utf8'));
+  await rememberSigningCertificate(db, signer);
   const row = await db.transaction().execute(async (tx) => {
     const r = await tx
       .insertInto('audit_checkpoints')
@@ -122,7 +143,7 @@ export async function verifyCheckpoint(db: Database | Tx, id: number, signer: Si
   const payload = checkpointPayload({ headSeq: cp.headSeq, headHash: cp.headHash, createdAt: new Date(cp.createdAt), keyId: cp.keyId });
   let signatureValid = false;
   try {
-    signatureValid = signer.verify(Buffer.from(payload, 'utf8'), cp.signature, certificatePem);
+    signatureValid = signer.verify(Buffer.from(payload, 'utf8'), cp.signature, certificatePem ?? (await checkpointCertificate(db, cp.certFingerprint, signer)));
   } catch {
     signatureValid = false;
   }

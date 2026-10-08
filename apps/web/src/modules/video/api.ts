@@ -19,6 +19,9 @@ export interface PlaybackInfo {
   sourceHeight: number | null;
   renditions: Array<{ name: string; width: number; height: number }>;
   hlsUrl: string | null;
+  /** MEDIA_PROFILE of the deployment and the adaptive-stream state (PREPARING = on-demand HLS being built). */
+  mediaProfile?: 'full' | 'proxy-only' | 'on-demand-hls';
+  hlsStatus?: 'READY' | 'PREPARING' | 'FAILED' | 'NOT_BUILT';
   mp4Url: string | null;
   posterUrl: string | null;
   thumbnailUrl: string | null;

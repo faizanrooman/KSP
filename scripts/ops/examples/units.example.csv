@@ -1,0 +1,4 @@
+code,name,type,parent,lat,lon
+blr_cp,Bengaluru City Police,COMMISSIONERATE,ksp,,
+blr_north,North Division,DISTRICT,blr_cp,,
+ps_malleshwaram,"Malleshwaram Police Station, Bengaluru",STATION,blr_north,13.0035,77.5707

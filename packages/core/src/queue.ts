@@ -24,6 +24,7 @@ export const QUEUE_DEFAULTS: Record<QueueName, { retryLimit: number; expireInSec
   [QUEUES.ALERT_DELIVER]: { retryLimit: 1, expireInSeconds: 600 },
   [QUEUES.QUARANTINE_RELEASE]: { retryLimit: 3, expireInSeconds: 6 * 3600 },
   [QUEUES.SNAPSHOT_EXTRACT]: { retryLimit: 1, expireInSeconds: 600 },
+  [QUEUES.MEDIA_HLS]: { retryLimit: 2, expireInSeconds: 12 * 3600 },
 };
 
 export async function getQueue(connectionString?: string): Promise<PgBoss> {

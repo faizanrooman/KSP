@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "dr:dispose-sweep": "tsx --conditions=ksp-src src/bin/dr-dispose-sweep.ts"
+    "dr:dispose-sweep": "tsx --conditions=ksp-src src/bin/dr-dispose-sweep.ts",
+    "media:benchmark": "tsx --conditions=ksp-src src/bin/media-benchmark.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1140.0",

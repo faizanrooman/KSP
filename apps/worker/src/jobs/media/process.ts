@@ -24,7 +24,8 @@ import { join } from 'node:path';
 import { sql } from 'kysely';
 import type { Logger } from 'pino';
 import { appendAudit, ffmpeg, MEDIA_FORMAT_WHITELIST, MediaError, probe, systemActor, type AppConfig, type Database, type ProbeResult, type Storage } from '@ksp/core';
-import type { MediaProcessPayload } from '@ksp/shared';
+import type { MediaHlsPayload, MediaProcessPayload } from '@ksp/shared';
+import { encoderArgs, encoderFormatFilter, encoderGlobalArgs, resolveEncoder, type EncoderChoice } from './encoder.js';
 import { ProcessingTracker } from '../../lib/processing.js';
 import {
   analyseSource,
@@ -145,6 +146,8 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
     if (!src.durationMs) throw new UnsupportedMediaError('Media duration could not be determined');
 
     const rate = planRate(src);
+    const enc = await resolveEncoder(cfg, log);
+    const profile = cfg.MEDIA_PROFILE;
     const outputs: DerivativeRow[] = [];
     const progress = (base: number, span: number) => (f: number) => void tracker.progress(base + span * f).catch(() => undefined);
 
@@ -157,21 +160,26 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
     // 1. Proxy MP4 (from the original)
     const proxyPath = join(work, 'proxy.mp4');
     const pdim = fitLongSide(src.displayWidth, src.displayHeight, PROXY_MAX_LONG_SIDE);
-    await runFfmpeg(proxyArgs(url, src, rate, pdim, proxyPath), src.durationMs, 4, progress(0.02, 0.43));
+    await runFfmpeg(proxyArgs(url, src, rate, pdim, proxyPath, enc), src.durationMs, 4, progress(0.02, profile === 'full' ? 0.43 : 0.86));
     const proxyProbe = await probe(proxyPath);
     const proxyDur = Math.round(Number(proxyProbe.format.duration ?? src.durationMs / 1000) * 1000);
     outputs.push(await uploadFile(deps, evidenceId, proxyPath, `${base}proxy/proxy.mp4`, 'PROXY_MP4', 'video/mp4', pdim, {
-      fps: rate.fps, rate: rate.rate, gop: rate.gop, keyframeIntervalSec: rate.gop / rate.fps, crf: 23, preset: 'veryfast', videoCodec: 'h264', pixFmt: 'yuv420p',
+      fps: rate.fps, rate: rate.rate, gop: rate.gop, keyframeIntervalSec: rate.gop / rate.fps, crf: 23, preset: enc.encoder === 'libx264' ? 'veryfast' : null, videoCodec: 'h264', pixFmt: 'yuv420p',
+      encoder: enc.encoder, encoderFallback: enc.fallbackReason, mediaProfile: profile,
       audio: !!src.audio, faststart: true, durationMs: proxyDur, sourceVfr: src.vfr, sourceFps: src.rFps, sourceAvgFps: src.avgFps, rotation: src.rotation,
     }));
 
     phase('proxyMs');
-    // 2. HLS ladder (from the original, so the 1080p rung is not limited by the proxy resolution)
-    const hlsDir = join(work, 'hls');
+    // 2. HLS ladder (from the original, so the 1080p rung is not limited by the proxy resolution). MEDIA_PROFILE
+    //    proxy-only / on-demand-hls skip it at ingest (EXT-9): the player streams the proxy MP4 with HTTP Range, and
+    //    on-demand-hls builds the ladder on first playback (buildHlsOnDemand).
     const ladder = planLadder(src);
-    for (const r of ladder) await mkdir(join(hlsDir, r.name), { recursive: true });
-    await runFfmpeg(hlsArgs(url, src, rate, ladder, hlsDir), src.durationMs, 6, progress(0.45, 0.43));
-    outputs.push(await uploadHls(deps, evidenceId, hlsDir, ladder, rate, base));
+    if (profile === 'full') {
+      const hlsDir = join(work, 'hls');
+      for (const r of ladder) await mkdir(join(hlsDir, r.name), { recursive: true });
+      await runFfmpeg(hlsArgs(url, src, rate, ladder, hlsDir, enc), src.durationMs, 6, progress(0.45, 0.43));
+      outputs.push(await uploadHls(deps, evidenceId, hlsDir, ladder, rate, base));
+    }
 
     phase('hlsMs');
     // 3. Poster + thumbnail (from the proxy)
@@ -213,7 +221,7 @@ async function runLocked(deps: MediaDeps, payload: MediaProcessPayload, meta: Me
       await tx.updateTable('evidence').set({ media_status: 'READY', media_error: null }).where('id', '=', evidenceId).execute();
       await appendAudit(tx, ACTOR, {
         action: 'MEDIA_PROCESSING_COMPLETED', resourceType: 'evidence', resourceId: evidenceId, evidenceId, orgUnitId: ev.org_unit_id,
-        details: { force, derivatives: outputs.length, kinds: [...new Set(outputs.map((o) => o.kind))], durationMs: proxyDur, elapsedMs, renditions: ladder.map((r) => r.name), phases, processingJobId: tracker.id, rebuild, generation, replaced: previous.length },
+        details: { force, derivatives: outputs.length, kinds: [...new Set(outputs.map((o) => o.kind))], durationMs: proxyDur, elapsedMs, renditions: profile === 'full' ? ladder.map((r) => r.name) : [], phases, processingJobId: tracker.id, rebuild, generation, replaced: previous.length, mediaProfile: profile, encoder: enc.encoder },
       });
     });
     // Old objects are deleted only after the switch (best effort; the rows are already gone).
@@ -279,28 +287,28 @@ function audioArgs(src: SourceInfo): string[] {
   return ['-c:a', 'aac', '-b:a', outCh === 1 ? '64k' : '128k', ...(keepRate ? [] : ['-ar', '48000']), ...(outCh !== ch ? ['-ac', '2'] : [])];
 }
 
-const x264 = (gop: number) => ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-g', String(gop), '-keyint_min', String(gop), '-sc_threshold', '0'];
+const CPU_ENCODER: EncoderChoice = { requested: 'libx264', encoder: 'libx264', fallbackReason: null, hwDevice: null };
 
-export function proxyArgs(url: string, src: SourceInfo, rate: { rate: string; gop: number }, dim: { width: number; height: number }, out: string): string[] {
+export function proxyArgs(url: string, src: SourceInfo, rate: { rate: string; gop: number }, dim: { width: number; height: number }, out: string, enc: EncoderChoice = CPU_ENCODER): string[] {
   return [
-    ...inputArgs(url),
+    ...encoderGlobalArgs(enc), ...inputArgs(url),
     '-map', '0:v:0', ...(src.audio ? ['-map', '0:a:0'] : []), '-sn', '-dn',
-    '-vf', `fps=${rate.rate},scale=${dim.width}:${dim.height}:flags=bicubic,setsar=1,format=yuv420p`,
-    ...x264(rate.gop), ...audioArgs(src),
+    '-vf', `fps=${rate.rate},scale=${dim.width}:${dim.height}:flags=bicubic,setsar=1,${encoderFormatFilter(enc)}`,
+    ...encoderArgs(enc, rate.gop), ...audioArgs(src),
     '-movflags', '+faststart', '-max_muxing_queue_size', '4096', out,
   ];
 }
 
-export function hlsArgs(url: string, src: SourceInfo, rate: { rate: string; gop: number }, ladder: ReturnType<typeof planLadder>, dir: string): string[] {
+export function hlsArgs(url: string, src: SourceInfo, rate: { rate: string; gop: number }, ladder: ReturnType<typeof planLadder>, dir: string, enc: EncoderChoice = CPU_ENCODER): string[] {
   const n = ladder.length;
   const labels = ladder.map((_, i) => `[s${i}]`).join('');
-  const chains = ladder.map((r, i) => `[s${i}]scale=${r.width}:${r.height}:flags=bicubic,setsar=1,format=yuv420p[v${i}]`).join(';');
+  const chains = ladder.map((r, i) => `[s${i}]scale=${r.width}:${r.height}:flags=bicubic,setsar=1,${encoderFormatFilter(enc)}[v${i}]`).join(';');
   const graph = `[0:v:0]fps=${rate.rate},split=${n}${labels};${chains}`;
   const maps = ladder.flatMap((_, i) => ['-map', `[v${i}]`, ...(src.audio ? ['-map', '0:a:0'] : [])]);
   const rates = ladder.flatMap((r, i) => [`-maxrate:v:${i}`, `${r.maxrateKbps}k`, `-bufsize:v:${i}`, `${r.maxrateKbps * 2}k`]);
   const varMap = ladder.map((r, i) => (src.audio ? `v:${i},a:${i},name:${r.name}` : `v:${i},name:${r.name}`)).join(' ');
   return [
-    ...inputArgs(url), '-filter_complex', graph, ...maps, ...x264(rate.gop), ...rates, ...audioArgs(src),
+    ...encoderGlobalArgs(enc), ...inputArgs(url), '-filter_complex', graph, ...maps, ...encoderArgs(enc, rate.gop), ...rates, ...audioArgs(src),
     '-f', 'hls', '-hls_time', String(HLS_SEGMENT_SECONDS), '-hls_playlist_type', 'vod', '-hls_flags', 'independent_segments', '-hls_segment_type', 'mpegts',
     '-hls_segment_filename', join(dir, '%v', 'seg_%05d.ts'), '-master_pl_name', 'master.m3u8', '-var_stream_map', varMap, join(dir, '%v', 'index.m3u8'),
   ];
@@ -403,4 +411,76 @@ export async function clearPipelineDerivatives(deps: MediaDeps, evidenceId: stri
     else await deps.storage.delete(r.bucket, r.object_key).catch(() => undefined);
   }
   await deps.db.deleteFrom('evidence_derivatives').where('evidence_id', '=', evidenceId).where('kind', 'in', [...PIPELINE_KINDS]).execute();
+}
+
+// ---------------------------------------------------------------------------------------------
+export type HlsOutcome = { status: 'READY'; elapsedMs: number; renditions: string[] } | { status: 'SKIPPED'; reason: string } | { status: 'UNSUPPORTED'; error: string };
+
+/**
+ * MEDIA_PROFILE=on-demand-hls: build the HLS ladder for an item whose proxy is READY, the first time it is played
+ * (QUEUES.MEDIA_HLS, enqueued by GET /media/evidence/:id/playback with singletonKey hls:<id>). Idempotent: an existing
+ * HLS derivative means SKIPPED. Objects go under a fresh generation prefix; a failed attempt removes only those.
+ */
+export async function buildHlsOnDemand(deps: MediaDeps, payload: MediaHlsPayload, meta: MediaJobMeta = {}): Promise<HlsOutcome> {
+  const { db, storage, cfg, log } = deps;
+  const { evidenceId } = payload;
+  if (!/^[0-9a-f-]{36}$/i.test(evidenceId)) return { status: 'SKIPPED', reason: 'invalid evidence id' };
+  const ev = await db.selectFrom('evidence').select(['id', 'status', 'org_unit_id', 'media_status', 'storage_bucket', 'storage_key', 'storage_version_id', 'duration_ms']).where('id', '=', evidenceId).executeTakeFirst();
+  if (!ev) return { status: 'SKIPPED', reason: 'evidence not found' };
+  if (!['REGISTERED', 'DISPOSAL_PENDING'].includes(ev.status) || !ev.storage_bucket || !ev.storage_key) return { status: 'SKIPPED', reason: `evidence status ${ev.status}` };
+  if (ev.media_status !== 'READY') return { status: 'SKIPPED', reason: `media status ${ev.media_status}` };
+  const has = () => db.selectFrom('evidence_derivatives').select('id').where('evidence_id', '=', evidenceId).where('kind', '=', 'HLS').executeTakeFirst();
+  if (await has()) return { status: 'SKIPPED', reason: 'HLS already built' };
+
+  const tracker = await ProcessingTracker.start(db, { kind: 'MEDIA_HLS', evidenceId, queueJobId: meta.queueJobId });
+  const started = Date.now();
+  const generation = `h${Date.now().toString(36)}${randomUUID().slice(0, 4)}`;
+  const work = join(cfg.WORK_DIR, `hls-${evidenceId}-${randomUUID().slice(0, 8)}`);
+  await appendAudit(db, ACTOR, { action: 'MEDIA_PROCESSING_STARTED', resourceType: 'evidence', resourceId: evidenceId, evidenceId, orgUnitId: ev.org_unit_id, details: { onDemand: true, kinds: ['HLS'], processingJobId: tracker.id, generation } });
+  try {
+    await mkdir(work, { recursive: true });
+    const expectedMs = Number(ev.duration_ms ?? 0);
+    const url = await storage.internalUrl(ev.storage_bucket, ev.storage_key, Math.min(7 * 86400, Math.max(3600, Math.ceil(timeoutFor(expectedMs, 12) / 1000))), ev.storage_version_id ?? undefined);
+    let probed: ProbeResult;
+    try {
+      probed = await probe(url, 120_000);
+    } catch (err) {
+      throw new RetryableMediaError(`original not readable: ${(err as Error).message}`);
+    }
+    const src = analyseSource(probed, expectedMs);
+    if (!src || !src.durationMs) throw new UnsupportedMediaError('No decodable video stream');
+    const rate = planRate(src);
+    const enc = await resolveEncoder(cfg, log);
+    const ladder = planLadder(src);
+    const dir = join(work, 'hls');
+    for (const r of ladder) await mkdir(join(dir, r.name), { recursive: true });
+    await runFfmpeg(hlsArgs(url, src, rate, ladder, dir, enc), src.durationMs, 6, (f) => void tracker.progress(0.02 + 0.9 * f).catch(() => undefined));
+    const row = await uploadHls(deps, evidenceId, dir, ladder, rate, `${generation}/`);
+    const elapsedMs = Date.now() - started;
+    const inserted = await db.transaction().execute(async (tx) => {
+      // A concurrent builder may have won (singletonKey makes this rare): keep the first, drop ours.
+      const other = await tx.selectFrom('evidence_derivatives').select('id').where('evidence_id', '=', evidenceId).where('kind', '=', 'HLS').forUpdate().executeTakeFirst();
+      if (other) return false;
+      await tx.insertInto('evidence_derivatives').values({ ...row, evidence_id: evidenceId, meta: JSON.stringify({ ...row.meta, generation, onDemand: true, encoder: enc.encoder }) }).execute();
+      await appendAudit(tx, ACTOR, {
+        action: 'MEDIA_PROCESSING_COMPLETED', resourceType: 'evidence', resourceId: evidenceId, evidenceId, orgUnitId: ev.org_unit_id,
+        details: { onDemand: true, kinds: ['HLS'], renditions: ladder.map((r) => r.name), elapsedMs, processingJobId: tracker.id, generation, encoder: enc.encoder },
+      });
+      return true;
+    });
+    if (!inserted) await storage.deletePrefix(storage.bucket('derived'), `evidence/${evidenceId}/${generation}/`).catch(() => undefined);
+    await tracker.complete({ onDemand: true, elapsedMs, renditions: ladder.map((r) => r.name) });
+    log.info({ evidenceId, elapsedMs }, 'on-demand HLS built');
+    return { status: 'READY', elapsedMs, renditions: ladder.map((r) => r.name) };
+  } catch (err) {
+    await storage.deletePrefix(storage.bucket('derived'), `evidence/${evidenceId}/${generation}/`).catch(() => undefined);
+    const unsupported = err instanceof UnsupportedMediaError;
+    const message = (err as Error).message.slice(0, 2000);
+    await appendAudit(db, ACTOR, { action: 'MEDIA_PROCESSING_FAILED', outcome: 'FAILURE', resourceType: 'evidence', resourceId: evidenceId, evidenceId, orgUnitId: ev.org_unit_id, details: { onDemand: true, kinds: ['HLS'], unsupported, final: unsupported || !!meta.finalAttempt, error: message.slice(0, 500), processingJobId: tracker.id } });
+    await tracker.fail(err);
+    if (unsupported) return { status: 'UNSUPPORTED', error: message };
+    throw err;
+  } finally {
+    await rm(work, { recursive: true, force: true }).catch(() => undefined);
+  }
 }

@@ -5,12 +5,14 @@ import { api, ApiError, errorMessage } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { Alert, Badge, Button, Card, Checkbox, ConfirmDialog, ErrorState, Field, Input, PageHeader, Spinner, useToast } from '@/components/ui';
 import { useRoles } from './shared';
+import { LegalApprovalsCard, type DeploymentInfo } from './LegalApprovals';
 
 import { t } from '@/lib/i18n';
 interface SettingsResponse {
   settings: SystemSettings;
   defaults: SystemSettings;
   keys: Array<{ key: SettingKey; overridden: boolean; updatedAt: string | null; updatedBy: { id: string; fullName: string } | null }>;
+  deployment?: DeploymentInfo;
 }
 
 type FieldDef = { name: string; label: string; kind: 'int' | 'bool' | 'bytes' | 'roles' | 'list'; min?: number; max?: number; hint?: string };
@@ -185,10 +187,16 @@ function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: Sett
 
 export function SettingsPage() {
   const q = useQuery({ queryKey: ['admin', 'settings'], queryFn: () => api.get<SettingsResponse>('/settings') });
+  const qc = useQueryClient();
   return (
     <div className="space-y-4">
       <PageHeader title={t('System settings')} subtitle={t('Security and operational policies. Every change is recorded in the audit trail with old and new values.')} />
-      {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : GROUPS.map((g) => <GroupForm key={g.key} group={g} data={q.data!} />)}
+      {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : (
+        <>
+          <LegalApprovalsCard settings={q.data!.settings} deployment={q.data!.deployment} onSaved={(r) => qc.setQueryData(['admin', 'settings'], r)} />
+          {GROUPS.map((g) => <GroupForm key={g.key} group={g} data={q.data!} />)}
+        </>
+      )}
     </div>
   );
 }

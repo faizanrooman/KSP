@@ -73,6 +73,10 @@ export interface AiJobs {
   tasks: string[];
 }
 
+export interface AiLegalApprovals {
+  value: Json | null;
+}
+
 export interface AiModels {
   activated_at: Timestamp | null;
   artifact_sha256: string | null;
@@ -915,6 +919,15 @@ export interface Shares {
   watermark: Generated<boolean>;
 }
 
+export interface SigningCertificates {
+  certificate_pem: string;
+  fingerprint256: string;
+  first_used_at: Generated<Timestamp>;
+  key_id: string;
+  non_evidentiary: boolean;
+  provider: string;
+}
+
 export interface SnapshotRequests {
   actor: Json;
   created_at: Generated<Timestamp>;
@@ -1092,6 +1105,7 @@ export interface Workspaces {
 export interface DB {
   ai_detections: AiDetections;
   ai_jobs: AiJobs;
+  ai_legal_approvals: AiLegalApprovals;
   ai_models: AiModels;
   ai_review_events: AiReviewEvents;
   ai_training_exports: AiTrainingExports;
@@ -1147,6 +1161,7 @@ export interface DB {
   share_access_log: ShareAccessLog;
   share_items: ShareItems;
   shares: Shares;
+  signing_certificates: SigningCertificates;
   snapshot_requests: SnapshotRequests;
   storage_snapshots: StorageSnapshots;
   system_settings: SystemSettings;

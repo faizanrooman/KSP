@@ -13,7 +13,7 @@
 import { createHash } from 'node:crypto';
 import QRCode from 'qrcode';
 import type { Database, Tx } from '../db/index.js';
-import { evidenceSigner, type SignatureResult, type Signer } from '../signing.js';
+import { evidenceSigner, NON_EVIDENTIARY_STAMP, type SignatureResult, type Signer } from '../signing.js';
 import { canonicalJson, loadCustodyEvents, verifyCustody, type CustodyEvent, type CustodyVerification } from './ledger.js';
 import { createDoc, drawText, gap, KSP_KN, finish, fmtBytes, fmtDuration, fmtTime, heading, keyValues, para, table, wrapToken } from './pdf.js';
 import { loadEvidenceRecord, personLabel, type EvidenceRecord } from './records.js';
@@ -61,11 +61,11 @@ export async function buildCustodyReport(
   const canonical = canonicalJson(payload);
   const payloadSha256 = createHash('sha256').update(canonical).digest('hex');
   const signature = await signer.sign(Buffer.from(canonical, 'utf8'));
-  const pdf = await renderCustodyPdf(payload, canonical, payloadSha256, signature, generatedAt);
+  const pdf = await renderCustodyPdf(payload, canonical, payloadSha256, signature, generatedAt, signer.nonEvidentiary ? [NON_EVIDENTIARY_STAMP] : []);
   return { payload, canonical, payloadSha256, signature, pdf };
 }
 
-async function renderCustodyPdf(p: CustodyReportPayload, canonical: string, payloadSha256: string, sig: SignatureResult, at: Date): Promise<Buffer> {
+async function renderCustodyPdf(p: CustodyReportPayload, canonical: string, payloadSha256: string, sig: SignatureResult, at: Date, stamps: string[]): Promise<Buffer> {
   const ev = p.evidence;
   const doc = await createDoc({ title: `Chain of Custody Report ${ev.evidenceNumber ?? ev.id}`, createdAt: at });
   para(doc, 'CHAIN OF CUSTODY REPORT', { size: 16, bold: true, color: '#0b2a4a', align: 'center' });
@@ -157,5 +157,5 @@ async function renderCustodyPdf(p: CustodyReportPayload, canonical: string, payl
   doc.file(Buffer.from(canonical, 'utf8'), { name: 'custody-payload.json', type: 'application/json', description: 'Signed canonical custody payload', creationDate: at, modifiedDate: at });
   doc.file(Buffer.from(sig.signature, 'base64'), { name: 'custody-payload.sig', type: 'application/octet-stream', description: `Detached ${sig.algorithm} signature`, creationDate: at, modifiedDate: at });
   doc.file(Buffer.from(sig.certificatePem, 'utf8'), { name: 'signing-cert.pem', type: 'application/x-pem-file', description: 'Signing certificate', creationDate: at, modifiedDate: at });
-  return finish(doc, `Chain of Custody ${ev.evidenceNumber ?? ev.id} - payload SHA-256 ${payloadSha256.slice(0, 16)}...`);
+  return finish(doc, `Chain of Custody ${ev.evidenceNumber ?? ev.id} - payload SHA-256 ${payloadSha256.slice(0, 16)}...`, stamps);
 }

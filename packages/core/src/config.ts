@@ -83,9 +83,64 @@ const schema = z.object({
   MEDIA_TOKEN_SECRET: z.string().min(32),
   MEDIA_TOKEN_TTL_SECONDS: z.coerce.number().int().default(300),
   /** Evidence/ledger signing key (PEM) and certificate (PEM) used for export manifests & audit checkpoints. */
-  SIGNING_PRIVATE_KEY: z.string().min(1),
-  SIGNING_CERTIFICATE: z.string().min(1),
+  SIGNING_PRIVATE_KEY: z.string().min(1).optional(),
+  SIGNING_CERTIFICATE: z.string().min(1).optional(),
   SIGNING_KEY_ID: z.string().default('ksp-dev-signing-key'),
+  /** `pem` (key + certificate PEM above) or `pkcs11` (HSM / token, PKCS11_* below; docs/SECRETS.md#hsm). */
+  SIGNING_PROVIDER: z.enum(['pem', 'pkcs11']).default('pem'),
+  /** Absolute path of the vendor PKCS#11 module (.so), e.g. /usr/lib/softhsm/libsofthsm2.so. */
+  PKCS11_MODULE: z.string().optional(),
+  /** Token selection: slot index/id (PKCS11_SLOT) or token label (PKCS11_TOKEN_LABEL, preferred). */
+  PKCS11_SLOT: z.coerce.number().int().min(0).optional(),
+  PKCS11_TOKEN_LABEL: z.string().optional(),
+  /** File holding the user PIN (mounted secret; never an inline value). */
+  PKCS11_PIN_FILE: z.string().optional(),
+  /** CKA_LABEL of the private key (and of the certificate object when it is read from the token). */
+  PKCS11_KEY_LABEL: z.string().optional(),
+  /** Optional CKA_ID (hex) of the key when labels are not unique. */
+  PKCS11_KEY_ID: z.string().regex(/^[0-9a-fA-F]*$/).optional(),
+  /** Certificate PEM (inline or file:) when it is not stored on the token. */
+  PKCS11_CERTIFICATE: z.string().optional(),
+  /** RSA keys: `pkcs1` (RSA-SHA256, default — matches the PEM signer and `openssl dgst -verify`) or `pss`. */
+  PKCS11_RSA_SCHEME: z.enum(['pkcs1', 'pss']).default('pkcs1'),
+
+  /**
+   * Deployment tier (docs/GO-LIVE-CHECKLIST.md). With NODE_ENV=production the default is `production`: the startup
+   * preflight (preflight.ts) refuses to start on any violation. `staging` allows the documented waivers
+   * (non-evidentiary test signing key); `demo` (minikube/training clusters) may additionally set KSP_PREFLIGHT=warn.
+   */
+  KSP_ENVIRONMENT: z.enum(['production', 'staging', 'demo', 'development', 'test']).optional(),
+  /** `enforce` (default) or `warn` (log violations and start anyway — refused when KSP_ENVIRONMENT=production). */
+  KSP_PREFLIGHT: z.enum(['enforce', 'warn', 'off']).default('enforce'),
+  /** Staging only: allow the dev/self-signed signing key; every export / custody PDF is stamped NON-EVIDENTIARY. */
+  KSP_ALLOW_NONEVIDENTIARY_SIGNING: bool.default('false'),
+  /** Accept OBJECT_LOCK_MODE=GOVERNANCE in production (custodian decision EXT-8; preflight warns). */
+  OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE: bool.default('false'),
+  /** Accept a database connection without TLS (e.g. Unix socket / same-pod proxy). Preflight warns. */
+  DATABASE_TLS_WAIVED: bool.default('false'),
+  /** Expected number of API replicas (preflight: an in-memory rate-limit store is refused with more than one). */
+  KSP_EXPECTED_API_REPLICAS: z.coerce.number().int().min(1).optional(),
+
+  /**
+   * AI tasks this deployment may run (comma-separated AiTask codes). Default: all tasks in development/test;
+   * OBJECT_DETECTION,PERSON_DETECTION,CLASSIFICATION in production. FACE_DETECTION, FACE_RECOGNITION and ANPR
+   * additionally need a recorded legal approval (system setting aiLegalApprovals) while legal gates are enforced.
+   */
+  AI_TASKS_ENABLED: z.string().optional(),
+  /** `enforce` (default in production) / `off` (default elsewhere): require aiLegalApprovals for gated tasks. */
+  AI_LEGAL_GATES: z.enum(['enforce', 'off']).optional(),
+
+  /**
+   * Media derivative profile (docs/VIDEO-PIPELINE.md#profiles, EXT-9):
+   *   full           proxy MP4 + HLS ladder + stills + sprites at ingest (default)
+   *   proxy-only     proxy MP4 + stills + sprites; the player streams the MP4 with HTTP Range
+   *   on-demand-hls  like proxy-only at ingest; the HLS ladder is built the first time someone plays the item
+   */
+  MEDIA_PROFILE: z.enum(['full', 'proxy-only', 'on-demand-hls']).default('full'),
+  /** Preferred H.264 encoder; falls back to libx264 when FFmpeg lacks it or the device cannot open. */
+  MEDIA_ENCODER: z.enum(['libx264', 'h264_nvenc', 'h264_qsv', 'h264_vaapi']).default('libx264'),
+  /** DRM render node for h264_vaapi / h264_qsv. */
+  MEDIA_HW_DEVICE: z.string().default('/dev/dri/renderD128'),
 
   FFMPEG_PATH: z.string().default('ffmpeg'),
   FFPROBE_PATH: z.string().default('ffprobe'),
@@ -134,9 +189,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error(`Invalid configuration: ${issues}`);
   }
   const cfg = parsed.data;
-  for (const k of ['JWT_PRIVATE_KEY', 'JWT_PUBLIC_KEY', 'SIGNING_PRIVATE_KEY', 'SIGNING_CERTIFICATE'] as const) {
-    cfg[k] = resolvePem(cfg[k]);
+  cfg.JWT_PRIVATE_KEY = resolvePem(cfg.JWT_PRIVATE_KEY);
+  cfg.JWT_PUBLIC_KEY = resolvePem(cfg.JWT_PUBLIC_KEY);
+  for (const k of ['SIGNING_PRIVATE_KEY', 'SIGNING_CERTIFICATE', 'PKCS11_CERTIFICATE'] as const) {
+    const v = cfg[k];
+    // The isolated AI worker never signs: its inert placeholders are not file references.
+    if (v !== undefined && v !== 'not-available-in-ai-worker') cfg[k] = resolvePem(v);
   }
+  if (cfg.SIGNING_PROVIDER === 'pem' && (!cfg.SIGNING_PRIVATE_KEY || !cfg.SIGNING_CERTIFICATE)) {
+    throw new Error('Invalid configuration: SIGNING_PRIVATE_KEY and SIGNING_CERTIFICATE are required when SIGNING_PROVIDER=pem');
+  }
+  if (cfg.SIGNING_PROVIDER === 'pkcs11' && env.KSP_SERVICE !== 'ksp-ai-worker' && (!cfg.PKCS11_MODULE || !cfg.PKCS11_KEY_LABEL || (cfg.PKCS11_SLOT === undefined && !cfg.PKCS11_TOKEN_LABEL))) {
+    throw new Error('Invalid configuration: SIGNING_PROVIDER=pkcs11 needs PKCS11_MODULE, PKCS11_KEY_LABEL and PKCS11_TOKEN_LABEL or PKCS11_SLOT');
+  }
+  cfg.KSP_ENVIRONMENT ??= cfg.NODE_ENV === 'production' ? 'production' : cfg.NODE_ENV;
+  cfg.AI_LEGAL_GATES ??= cfg.NODE_ENV === 'production' ? 'enforce' : 'off';
   if (cfg.NODE_ENV === 'production') {
     if (cfg.OBJECT_LOCK_MODE === 'NONE') throw new Error('OBJECT_LOCK_MODE=NONE is not permitted in production');
     if (!cfg.COOKIE_SECURE) throw new Error('COOKIE_SECURE must be true in production');

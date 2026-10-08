@@ -2,7 +2,7 @@
  * AI analysis & human-review contracts shared by API, isolated AI worker and web.
  * No AI output is authoritative until a human reviewer approves it (docs/AI-ARCHITECTURE.md).
  */
-import type { AiTask, ReviewStatus } from './domain.js';
+import { AI_TASKS, type AiTask, type ReviewStatus } from './domain.js';
 
 export const AI_TASK_INFO: Record<AiTask, { label: string; description: string; dependsOn?: AiTask[] }> = {
   PERSON_DETECTION: { label: 'Person detection', description: 'Locates people in sampled frames.' },
@@ -12,6 +12,50 @@ export const AI_TASK_INFO: Record<AiTask, { label: string; description: string; 
   ANPR: { label: 'Number plate recognition', description: 'Detects and reads licence plates; flags VEHICLE watchlist hits.' },
   CLASSIFICATION: { label: 'Evidence tagging', description: 'Suggests evidence-level tags (person, vehicle, weapon:knife, crowd). Tags are applied only after approval.', dependsOn: ['OBJECT_DETECTION'] },
 };
+
+/** Tasks that need a recorded legal approval (settings.aiLegalApprovals) while AI legal gates are enforced. */
+export const LEGALLY_GATED_AI_TASKS = ['FACE_DETECTION', 'FACE_RECOGNITION', 'ANPR'] as const satisfies readonly AiTask[];
+export type LegallyGatedAiTask = (typeof LEGALLY_GATED_AI_TASKS)[number];
+/** AI_TASKS_ENABLED default in production (no biometric / licence-restricted processing). */
+export const PRODUCTION_DEFAULT_AI_TASKS: readonly AiTask[] = ['OBJECT_DETECTION', 'PERSON_DETECTION', 'CLASSIFICATION'];
+
+export type AiTaskGateReason = 'DISABLED_BY_DEPLOYMENT' | 'LEGAL_APPROVAL_REQUIRED';
+export interface AiTaskGate {
+  task: AiTask;
+  allowed: boolean;
+  reason: AiTaskGateReason | null;
+  explanation: string | null;
+  approval: { approvedBy: string; reference: string; date: string } | null;
+}
+
+/**
+ * Whether a task may run. `enabled` = the deployment's AI_TASKS_ENABLED list; `approvals` = settings.aiLegalApprovals.
+ * A task needed only as an internal dependency (FACE_DETECTION for FACE_RECOGNITION) is covered by the parent's approval.
+ */
+export function aiTaskGate(
+  task: AiTask,
+  enabled: readonly AiTask[],
+  approvals: Partial<Record<LegallyGatedAiTask, { approvedBy: string; reference: string; date: string } | null>>,
+  enforceLegal: boolean,
+): AiTaskGate {
+  if (!enabled.includes(task)) {
+    return { task, allowed: false, reason: 'DISABLED_BY_DEPLOYMENT', explanation: `${AI_TASK_INFO[task].label} is not enabled on this deployment (AI_TASKS_ENABLED).`, approval: null };
+  }
+  const gated = (LEGALLY_GATED_AI_TASKS as readonly AiTask[]).includes(task);
+  const a = gated ? (approvals[task as LegallyGatedAiTask] ?? null) : null;
+  if (gated && enforceLegal && !a) {
+    return { task, allowed: false, reason: 'LEGAL_APPROVAL_REQUIRED', explanation: `${AI_TASK_INFO[task].label} is disabled until a system administrator records the legal approval reference (biometric / licence review).`, approval: null };
+  }
+  return { task, allowed: true, reason: null, explanation: null, approval: a ? { approvedBy: a.approvedBy, reference: a.reference, date: a.date } : null };
+}
+
+/** Parse an AI_TASKS_ENABLED value (comma-separated; `all` = every task). Unknown codes are ignored. */
+export function parseAiTaskList(v: string | undefined, fallback: readonly AiTask[]): AiTask[] {
+  if (v === undefined || v.trim() === '') return [...fallback];
+  const parts = v.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+  if (parts.includes('ALL')) return [...AI_TASKS];
+  return AI_TASKS.filter((t) => parts.includes(t));
+}
 
 /** Tasks whose approval requires two approvals by different reviewers. */
 export const DUAL_APPROVAL_TASKS: readonly AiTask[] = ['FACE_RECOGNITION'];
@@ -78,6 +122,9 @@ export interface AiTaskDto {
   label: string;
   description: string;
   available: boolean;
+  /** Deployment / legal gate: false = the task is refused regardless of models (see `gate.explanation`). */
+  allowed: boolean;
+  gate: AiTaskGate;
   models: Array<Pick<AiModelDto, 'id' | 'code' | 'name' | 'version' | 'defaultThreshold' | 'labels'> & { licence: string | null }>;
 }
 

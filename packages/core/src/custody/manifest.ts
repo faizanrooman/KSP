@@ -72,11 +72,12 @@ export function sha256sums(files: Array<{ path: string; sha256: string }>): stri
   return files.map((f) => `${f.sha256}  ${f.path}`).join('\n') + '\n';
 }
 
-export function verifyInstructions(o: { exportNumber: string; algorithm: string; keyId: string; fingerprint: string }): string {
+export function verifyInstructions(o: { exportNumber: string; algorithm: string; keyId: string; fingerprint: string; stamps?: string[] }): string {
   const sig = opensslVerifyCommands(o.algorithm, 'manifest.sig', 'manifest.json');
   return [
     `KSP VIDEO EVIDENCE - COURT EXPORT ${o.exportNumber}`,
     '===============================================================',
+    ...(o.stamps?.length ? ['', ...o.stamps.map((s) => `*** ${s} ***`)] : []),
     '',
     'This package can be verified offline with OpenSSL and GNU coreutils. Unzip it and run the',
     'commands below from the directory that contains manifest.json.',

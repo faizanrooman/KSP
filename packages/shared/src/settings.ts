@@ -52,6 +52,29 @@ export interface IntegrityPolicy {
   maxPerNight: number;
 }
 
+/** A recorded legal / DPO / prosecution approval (reference to the file or order that authorises a capability). */
+export interface LegalApproval {
+  approvedBy: string; // name + designation of the approving authority
+  reference: string; // order / file / DPIA reference number
+  date: string; // YYYY-MM-DD
+  notes?: string;
+  recordedBy?: string; // filled by the API (username of the administrator who recorded it)
+  recordedAt?: string; // ISO timestamp, filled by the API
+}
+/**
+ * Legal gates for biometric / licence-restricted AI tasks (EXT-4, EXT-5). While AI_LEGAL_GATES=enforce (production
+ * default) a gated task runs only when its approval is recorded here AND it is listed in AI_TASKS_ENABLED.
+ */
+export interface AiLegalApprovals {
+  FACE_DETECTION: LegalApproval | null;
+  FACE_RECOGNITION: LegalApproval | null;
+  ANPR: LegalApproval | null;
+}
+/** Legal acceptance of the court export Fact Sheet + BSA s.63 certificate template (EXT-6). */
+export interface ExportLegalApproval {
+  approval: LegalApproval | null;
+}
+
 export interface SystemSettings {
   passwordPolicy: PasswordPolicy;
   lockoutPolicy: LockoutPolicy;
@@ -61,6 +84,8 @@ export interface SystemSettings {
   shareExportPolicy: ShareExportPolicy;
   alertDeliveryPolicy: AlertDeliveryPolicy;
   integrityPolicy: IntegrityPolicy;
+  aiLegalApprovals: AiLegalApprovals;
+  exportLegalApproval: ExportLegalApproval;
 }
 
 export const DEFAULT_SETTINGS: SystemSettings = {
@@ -77,7 +102,12 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   shareExportPolicy: { maxShareDays: 30, exportRetentionDays: 30, excessiveDownloadsPerHour: 20 },
   alertDeliveryPolicy: { maxAttempts: 5, baseDelaySeconds: 60, emailAlertManagers: true, warningRecipients: [], criticalRecipients: [] },
   integrityPolicy: { fullCycleDays: 90, maxBytesPerNight: 2 * 1024 ** 4, minPerNight: 100, maxPerNight: 200_000 },
+  aiLegalApprovals: { FACE_DETECTION: null, FACE_RECOGNITION: null, ANPR: null },
+  exportLegalApproval: { approval: null },
 };
+
+/** Stamp printed on the Fact Sheet / s.63 template until exportLegalApproval is recorded. */
+export const EXPORT_TEMPLATE_PENDING_STAMP = 'TEMPLATE – PENDING LEGAL APPROVAL';
 
 export type SettingKey = keyof SystemSettings;
 export const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS) as SettingKey[];

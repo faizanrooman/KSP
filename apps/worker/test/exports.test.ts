@@ -48,6 +48,9 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+/** poppler pdftotext (embedded CID fonts carry /ActualText), whitespace-normalised. */
+const pdfText = (buf: Buffer) => execFileSync('pdftotext', ['-raw', '-', '-'], { input: buf, encoding: 'utf8' }).normalize('NFC').replace(/[ \t]+/g, ' ');
+
 async function approvedExport(options: Record<string, unknown>, caseId: string | null = null): Promise<string> {
   const org = await db.selectFrom('org_units').select('id').where('code', '=', 'ps_cubbonpark').executeTakeFirstOrThrow();
   const x = await db
@@ -88,9 +91,38 @@ describe('EXPORT_BUILD via the queue', () => {
     const fs = await readFile(join(dir, 'a', 'FACT_SHEET.pdf'));
     expect(fs.subarray(0, 5).toString()).toBe('%PDF-');
     expect(fs.length).toBeGreaterThan(3000);
+    // EXT-3 / EXT-6: dev signing key + no recorded legal approval -> both stamps on the Fact Sheet, custody PDF, VERIFY.txt.
+    const fsText = pdfText(fs);
+    expect(fsText).toContain('NON-EVIDENTIARY – TEST KEY');
+    expect(fsText).toContain('TEMPLATE – PENDING LEGAL APPROVAL');
+    const custodyPdf = (await readdir(join(dir, 'a', 'custody')))[0]!;
+    expect(pdfText(await readFile(join(dir, 'a', 'custody', custodyPdf)))).toContain('NON-EVIDENTIARY – TEST KEY');
+    expect(await readFile(join(dir, 'a', 'VERIFY.txt'), 'utf8')).toMatch(/\*\*\* NON-EVIDENTIARY – TEST KEY \*\*\*[\s\S]*TEMPLATE – PENDING LEGAL APPROVAL/);
     const audit = await db.selectFrom('audit_events').select(['action', 'actor_id']).where('resource_id', '=', id).orderBy('seq').execute();
     expect(audit.map((a) => a.action)).toContain('EXPORT_GENERATED');
     expect(audit.find((a) => a.action === 'EXPORT_GENERATED')!.actor_id).toBe('export-worker');
+  });
+
+  it('a recorded export legal approval removes the template stamp and is printed in the annex', async () => {
+    await db.insertInto('system_settings').values({ key: 'exportLegalApproval', value: JSON.stringify({ approval: { approvedBy: 'Director of Prosecution', reference: 'DoP/BSA63/2026/4', date: '2026-09-10' } }) })
+      .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify({ approval: { approvedBy: 'Director of Prosecution', reference: 'DoP/BSA63/2026/4', date: '2026-09-10' } }) })).execute();
+    try {
+      const id = await approvedExport({ includeOriginal: false, includeWatermarked: false, includeCustodyReport: false, includeFactSheet: true });
+      await enqueue(QUEUES.EXPORT_BUILD, { exportId: id }, { singletonKey: id });
+      const row = await waitFor(async () => {
+        const r = await db.selectFrom('exports').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
+        return ['READY', 'FAILED'].includes(r.status) ? r : undefined;
+      });
+      expect(row.status, row.error ?? '').toBe('READY');
+      await writeFile(join(dir, 'l.zip'), await ctx.storage.getBuffer(row.bucket!, row.object_key!));
+      execFileSync('unzip', ['-q', join(dir, 'l.zip'), '-d', join(dir, 'l')]);
+      const text = pdfText(await readFile(join(dir, 'l', 'FACT_SHEET.pdf')));
+      expect(text).not.toContain('TEMPLATE – PENDING LEGAL APPROVAL');
+      expect(text).toContain('DoP/BSA63/2026/4');
+      expect(text).toContain('NON-EVIDENTIARY – TEST KEY'); // still the dev key
+    } finally {
+      await db.deleteFrom('system_settings').where('key', '=', 'exportLegalApproval').execute();
+    }
   });
 
   it('watermarked-only package: no originals, watermarked copy present and listed', async () => {

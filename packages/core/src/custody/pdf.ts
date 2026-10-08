@@ -48,7 +48,11 @@ export async function createDoc(info: DocOptions): Promise<Doc> {
   });
 }
 
-export function finish(doc: Doc, footer: string): Promise<Buffer> {
+/**
+ * Close the document: footer + page numbers on every page, and optional STAMPS (e.g. "NON-EVIDENTIARY – TEST KEY",
+ * "TEMPLATE – PENDING LEGAL APPROVAL") printed in red in the top margin of every page.
+ */
+export function finish(doc: Doc, footer: string, stamps: readonly string[] = []): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     doc.on('data', (c: Buffer) => chunks.push(c));
@@ -58,6 +62,14 @@ export function finish(doc: Doc, footer: string): Promise<Buffer> {
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
       drawText(doc, `${footer}  |  Page ${i + 1} of ${range.count}`, doc.page.margins.left, doc.page.height - 32, { size: 7, color: '#555555', width: contentWidth(doc), align: 'center', maxHeight: 9 });
+      if (stamps.length) {
+        const text = stamps.join('   |   ');
+        const y = 16;
+        doc.save();
+        doc.rect(doc.page.margins.left, y - 3, contentWidth(doc), 16).lineWidth(1).strokeColor('#b00020').stroke();
+        doc.restore();
+        drawText(doc, text, doc.page.margins.left, y, { size: 9, bold: true, color: '#b00020', width: contentWidth(doc), align: 'center', maxHeight: 12 });
+      }
     }
     doc.end();
   });
