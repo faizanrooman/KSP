@@ -24,7 +24,8 @@ has "$encoders" ' png ' "encoder png (exact-frame snapshots)"
 for d in h264 hevc mjpeg mpeg4 aac pcm_s16le; do has "$decoders" " $d " "decoder $d"; done
 for d in mov mp4 matroska avi mpegts; do has "$demuxers" "[ ,]${d}[ ,]" "demuxer $d"; done
 [ -x "$FP" ] || command -v "$FP" >/dev/null 2>&1 || missing+=("ffprobe next to ffmpeg ($FP)")
-"$FF" -hide_banner -version | head -1
+# first line only, without a pipe: `| head -1` makes ffmpeg die of SIGPIPE (exit 141) under pipefail in image builds
+version=$("$FF" -hide_banner -version 2>/dev/null); printf '%s\n' "${version%%$'\n'*}"
 if [ ${#missing[@]} -gt 0 ]; then
   printf 'MISSING: %s\n' "${missing[@]}" >&2
   exit 1

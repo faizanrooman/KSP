@@ -11,9 +11,9 @@
 # STATUS: UNVERIFIED — Docker is not available on the development host; the file layout of the runtime stages was
 # reproduced and executed locally by scripts/ci/simulate-image.sh (see docs/DEPLOYMENT.md).
 
-ARG NODE_IMAGE=node:22-bookworm-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c
+ARG NODE_IMAGE=node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
 ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.28-alpine@sha256:7377697a821c131a924a7105fafbe7414db4e9fcc77a6f08f776f33f141ec3f8
-ARG POSTGRES_IMAGE=postgres:16-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
+ARG POSTGRES_IMAGE=postgres:16-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
 # Static FFmpeg 7.1.1 (GPL build: libx264, libx265, libvpx, libaom, libdav1d, libopus, libmp3lame, …) — decodes every
 # codec body-worn cameras produce (H.264/H.265/MJPEG/MPEG-4 in MP4/MOV/AVI/MKV/TS) and encodes H.264 proxies/HLS.
 ARG FFMPEG_IMAGE=mwader/static-ffmpeg:7.1.1@sha256:11a44711684c0b9f754c047dcd64235b8b52deab251bd0e0a86f22faa160749c
@@ -66,9 +66,12 @@ RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev -w @ksp/shared -w @ks
 # runtime-base: slim Node runtime, tini as PID 1, non-root uid/gid 10001 (`ksp`, > 10000 so it never collides with a
 # host/system account — OPS-9), no secrets.
 FROM ${NODE_IMAGE} AS runtime-base
+# apt upgrade: the pinned base digest lags Debian security updates; runtime images carry only `node` — npm/npx/corepack
+# (and npm's bundled dependencies, a recurring source of HIGH findings) are removed.
 RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends tini ca-certificates \
- && rm -rf /var/lib/apt/lists/* \
+ && rm -rf /var/lib/apt/lists/* /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
  && groupadd --gid 10001 ksp && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /work --shell /usr/sbin/nologin ksp
 ENV NODE_ENV=production \
     NODE_OPTIONS=--enable-source-maps \
@@ -153,9 +156,9 @@ CMD ["node", "apps/ai-worker/dist/main.js"]
 FROM ${NODE_IMAGE} AS node-bin
 
 FROM ${POSTGRES_IMAGE} AS age
-ARG AGE_VERSION=v1.2.1
-ARG AGE_SHA256_AMD64=7df45a6cc87d4da11cc03a539a7470c15b1041ab2b396af088fe9990f7c79d50
-ARG AGE_SHA256_ARM64=57fd79a7ece5fe501f351b9dd51a82fbee1ea8db65a8839db17f5c080245e99f
+ARG AGE_VERSION=v1.3.2
+ARG AGE_SHA256_AMD64=cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10
+ARG AGE_SHA256_ARM64=6b8dc4333c53a5a57c9e5834e3a48f92605d7154014cd07269ff3327db5d37f4
 ARG TARGETARCH=amd64
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/* \
@@ -165,7 +168,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
  && tar -xzf /tmp/age.tgz -C /usr/local/bin --strip-components=1 age/age age/age-keygen && rm /tmp/age.tgz
 
 FROM ${POSTGRES_IMAGE} AS backup
-RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates && rm -rf /var/lib/apt/lists/*
+# gosu (postgres entrypoint helper, a static Go binary) is not used here and is removed with the server binaries' helper.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && apt-get install -y --no-install-recommends tini ca-certificates \
+ && rm -rf /var/lib/apt/lists/* /usr/local/bin/gosu /usr/local/bin/docker-entrypoint.sh
 COPY --from=node-bin /usr/local/bin/node /usr/local/bin/node
 COPY --from=age /usr/local/bin/age /usr/local/bin/age-keygen /usr/local/bin/
 WORKDIR /app
@@ -196,7 +201,7 @@ COPY --chown=root:root deploy/docker/nginx/default.conf.template /etc/nginx/temp
 COPY --chown=root:root deploy/docker/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build --chown=root:root /src/apps/web/dist /usr/share/nginx/html
 USER root
-RUN chown -R 10101:10101 /var/cache/nginx /etc/nginx/conf.d
+RUN apk upgrade --no-cache && chown -R 10101:10101 /var/cache/nginx /etc/nginx/conf.d
 USER 10101:10101
 ENV API_UPSTREAM_HOSTPORT=api:4000 NGINX_ENVSUBST_FILTER=API_UPSTREAM
 EXPOSE 8080
