@@ -37,5 +37,14 @@
   "court export": "ನ್ಯಾಯಾಲಯ ರಫ್ತು",
   "tier migration": "ಶ್ರೇಣಿ ಸ್ಥಳಾಂತರ",
   "restore": "ಮರುಸ್ಥಾಪನೆ",
-  "check": "ಪರಿಶೀಲನೆ"
+  "check": "ಪರಿಶೀಲನೆ",
+  "{from} – {to} · ledger #{firstSeq}–#{lastSeq}, all verified": "{from} – {to} · ಲೆಡ್ಜರ್ #{firstSeq}–#{lastSeq}, ಎಲ್ಲವೂ ಪರಿಶೀಲಿತ",
+  "All {count} ledger events for this item were recomputed and are linked to their predecessors (ledger head seq {seq}, verified {date}).": "ಈ ಐಟಂನ ಎಲ್ಲಾ {count} ಲೆಡ್ಜರ್ ಘಟನೆಗಳನ್ನು ಮರು-ಲೆಕ್ಕಹಾಕಲಾಗಿದೆ ಮತ್ತು ಅವು ಹಿಂದಿನ ಘಟನೆಗಳಿಗೆ ಜೋಡಿಸಲ್ಪಟ್ಟಿವೆ (ಲೆಡ್ಜರ್ ಮುಖ್ಯ ಕ್ರಮ ಸಂಖ್ಯೆ {seq}, {date} ರಂದು ಪರಿಶೀಲಿಸಲಾಗಿದೆ).",
+  "Every custody event": "ಪ್ರತಿ ಪಾಲನಾ ಘಟನೆ",
+  "Key events": "ಪ್ರಮುಖ ಘಟನೆಗಳು",
+  "Ledger events {seqs} do not verify: the audit ledger was modified outside the application. A critical alert should be raised; report to the compliance team immediately.": "ಲೆಡ್ಜರ್ ಘಟನೆಗಳು {seqs} ಪರಿಶೀಲನೆಯಲ್ಲಿ ವಿಫಲವಾಗಿವೆ: ಲೆಕ್ಕಪರಿಶೋಧನಾ ಲೆಡ್ಜರ್ ಅನ್ನು ಅಪ್ಲಿಕೇಶನ್‌ನ ಹೊರಗೆ ಬದಲಾಯಿಸಲಾಗಿದೆ. ಗಂಭೀರ ಎಚ್ಚರಿಕೆ ನೀಡಬೇಕು; ತಕ್ಷಣ ಅನುಸರಣಾ ತಂಡಕ್ಕೆ ವರದಿ ಮಾಡಿ.",
+  "Load more ({next} of {remaining} remaining)": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಿ (ಉಳಿದ {remaining} ರಲ್ಲಿ {next})",
+  "Showing {shown} of {total} custody events": "{total} ಪಾಲನಾ ಘಟನೆಗಳಲ್ಲಿ {shown} ತೋರಿಸಲಾಗುತ್ತಿದೆ",
+  "Showing {shown} of {total} linked events": "{total} ಸಂಬಂಧಿತ ಘಟನೆಗಳಲ್ಲಿ {shown} ತೋರಿಸಲಾಗುತ್ತಿದೆ",
+  "Routine views ×{count} · {names}": "ಸಾಮಾನ್ಯ ವೀಕ್ಷಣೆಗಳು ×{count} · {names}"
 }

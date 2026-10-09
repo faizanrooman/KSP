@@ -1,6 +1,6 @@
 /** CustodyTab paging (FN-19): first page, "Load more" with the server's nextAfter cursor, server-side filter. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { CustodyTab, type CustodyEvent, type CustodyResponse } from './CustodyTab';
@@ -18,7 +18,7 @@ const page = (events: CustodyEvent[], p: Partial<CustodyResponse['page']>): Cust
   verification,
 });
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('CustodyTab paging', () => {
   it('loads the next keyset page on "Load more" and passes the filter to the server', async () => {
@@ -42,5 +42,29 @@ describe('CustodyTab paging', () => {
     fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'all' } });
     await waitFor(() => expect(screen.getByText('Showing 1 of 1 linked events')).toBeTruthy());
     expect(get).toHaveBeenCalledWith('/custody/evidence/x', { filter: 'all', limit: 200, after: undefined });
+  });
+});
+
+describe('CustodyTab key events', () => {
+  it('collapses runs of routine views between milestones, never milestones or events that do not verify', async () => {
+    const registered = { ...ev(1), action: 'EVIDENCE_REGISTERED' };
+    const views = [ev(2), ev(3), ev(4)];
+    const broken = { ...ev(5), verified: false };
+    const linked = { ...ev(6), action: 'EVIDENCE_LINKED_TO_CASE' };
+    vi.spyOn(api, 'get').mockResolvedValue(page([registered, ...views, broken, linked], { filter: 'custody', total: 6 }) as never);
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <CustodyTab evidence={{ id: 'x' } as never} />
+      </QueryClientProvider>,
+    );
+    const run = await screen.findByRole('button', { name: /Routine views ×3 · Meera/ });
+    expect(run.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByText('Evidence Registered')).toBeTruthy();
+    expect(screen.getByText('Evidence Linked To Case')).toBeTruthy();
+    expect(screen.getByText('Hash mismatch')).toBeTruthy(); // the unverified view stays its own row
+    fireEvent.click(run);
+    expect(screen.getAllByText('Evidence Viewed')).toHaveLength(4); // three in the run + the unverified one
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'custody' } });
+    await waitFor(() => expect(screen.queryByRole('button', { name: /×3/ })).toBeNull());
   });
 });
