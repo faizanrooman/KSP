@@ -103,3 +103,19 @@ cat /var/lib/ksp-autodeploy/history.tsv            # deployed commits (start, en
 systemctl start ksp-autodeploy                     # check/deploy now
 bash deploy/proxmox/enable-autodeploy.sh --disable # turn off
 ```
+\n
+## Demo content
+
+A fresh install has the organisation, the demo users and no evidence. To load a realistic demo data set:
+
+```bash
+cd /opt/ksp && git pull -q && bash deploy/proxmox/load-demo-content.sh
+```
+
+10 body‑worn‑camera style videos (camera/officer overlay, running IST clock, GPS) uploaded through the real pipeline
+by `io.meera`, `fo.ravi`, `op.cubbon` (Cubbon Park), `io.arjun` (Indiranagar) and `io.mysuru` (Nazarbad, Mysuru) —
+GPS taken from the file, declared at upload, or the station fallback; 6 demo cameras; FIRs 0412/2026 and 0377/2026
+with cases, linked evidence and case diary; AI analyses (number plates, persons, faces, objects) waiting in the review
+queue; an investigation workspace with bookmarks; a court export waiting for `sup.kavya` to approve. Re-running is a
+no-op (`--force` loads another copy; `--password` if the demo password was changed). The demo seed re-creates demo users
+that were deleted — use it on demo systems only.

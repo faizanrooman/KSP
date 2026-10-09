@@ -5,7 +5,6 @@
  *                                      (must change password and enrol MFA on first login). No fixtures.
  * Idempotent: existing rows are left untouched (roles' permissions are NOT overwritten once edited by admins).
  */
-import { sql } from 'kysely';
 import { ALERT_RULE_CODES, DEFAULT_ROLES, DEFAULT_SETTINGS, SETTING_KEYS } from '@ksp/shared';
 import { createDb, type Database } from '../db/index.js';
 import { hashSecret, randomToken } from '../crypto.js';
@@ -148,6 +147,31 @@ export async function createUser(
   return true;
 }
 
+/** Demo body-worn cameras assigned to the demo officers (CLI demo seed only; the test suites seed without devices). */
+const DEMO_DEVICES: Array<{ serial: string; make: string; model: string; firmware: string; org: string; officer: string | null; status?: string }> = [
+  { serial: 'BWC-KA-1001', make: 'Axon', model: 'Body 4', firmware: '1.32.4', org: 'ps_cubbonpark', officer: 'fo.ravi' },
+  { serial: 'BWC-KA-1003', make: 'Axon', model: 'Body 4', firmware: '1.32.4', org: 'ps_cubbonpark', officer: null },
+  { serial: 'BWC-KA-1007', make: 'Motorola', model: 'V300', firmware: '4.8.1', org: 'ps_cubbonpark', officer: 'io.meera' },
+  { serial: 'BWC-KA-2203', make: 'Motorola', model: 'V300', firmware: '4.8.1', org: 'ps_indiranagar', officer: 'io.arjun' },
+  { serial: 'BWC-KA-5102', make: 'Hikvision', model: 'DS-MH2311', firmware: '5.2.0', org: 'ps_nazarbad', officer: 'io.mysuru' },
+  { serial: 'BWC-KA-1009', make: 'Axon', model: 'Body 3', firmware: '1.29.0', org: 'ps_cubbonpark', officer: null, status: 'IN_REPAIR' },
+];
+
+async function seedDemoDevices(db: Database): Promise<number> {
+  let n = 0;
+  for (const d of DEMO_DEVICES) {
+    const org = await db.selectFrom('org_units').select('id').where('code', '=', d.org).executeTakeFirst();
+    if (!org) continue;
+    const officer = d.officer ? await db.selectFrom('users').select('id').where('username', '=', d.officer).executeTakeFirst() : undefined;
+    const r = await db.insertInto('devices')
+      .values({ serial_number: d.serial, device_type: 'BODY_WORN_CAMERA', make: d.make, model: d.model, firmware_version: d.firmware, org_unit_id: org.id, assigned_officer_id: officer?.id ?? null, status: d.status ?? 'ACTIVE', notes: 'Demo device' })
+      .onConflict((oc) => oc.column('serial_number').doNothing())
+      .executeTakeFirst();
+    n += Number(r.numInsertedOrUpdatedRows ?? 0);
+  }
+  return n;
+}
+
 async function main() {
   const { db, pool } = createDb(process.env.DATABASE_URL);
   try {
@@ -161,8 +185,8 @@ async function main() {
       await seedOrg(db, ORG);
       let n = 0;
       for (const u of DEV_USERS) if (await createUser(db, u, DEV_PASSWORD, false)) n++;
-      await sql`SELECT 1`.execute(db);
-      console.log(`Seeded reference data, ${ORG.length} org units, ${n} new dev users. Dev password for all dev users: ${DEV_PASSWORD}`);
+      const devices = await seedDemoDevices(db);
+      console.log(`Seeded reference data, ${ORG.length} org units, ${n} new dev users, ${devices} new demo devices. Dev password for all dev users: ${DEV_PASSWORD}`);
     }
   } finally {
     await db.destroy();
