@@ -125,8 +125,8 @@ function Viewer({ share, items, selected, onSelect, session, onEnded }: { share:
         <div className="text-ink-700">{tr('Purpose:')}{' '}{share.purpose}</div>
         <div className="mt-1 text-xs text-ink-600">
           {tr('Shared by')}{' '}{[share.sharedBy.rank, share.sharedBy.name].filter(Boolean).join(' ')} ({share.sharedBy.unit}{tr(') · available until')}{' '}{formatDateTime(share.expiresAt)}
-          {share.maxViews ? ` · view ${share.viewCount} of ${share.maxViews}` : ''}
-          {share.permissions.watermark ? ' · video is watermarked with your identity' : ''}
+          {share.maxViews ? tr(' · view {viewCount} of {maxViews}', { viewCount: share.viewCount, maxViews: share.maxViews }) : ''}
+          {share.permissions.watermark ? tr(' · video is watermarked with your identity') : ''}
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
@@ -137,7 +137,7 @@ function Viewer({ share, items, selected, onSelect, session, onEnded }: { share:
                 <button type="button" onClick={() => onSelect(i)} aria-current={selected?.evidenceId === i.evidenceId ? 'true' : undefined}
                   className={`w-full px-3 py-2 text-left text-sm hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${selected?.evidenceId === i.evidenceId ? 'bg-brand-50' : ''}`}>
                   <div className="mono text-xs">{i.evidenceNumber}</div>
-                  <div className="text-ink-700">{i.title ?? 'Untitled'}</div>
+                  <div className="text-ink-700">{i.title ?? tr('Untitled')}</div>
                   <div className="text-xs text-ink-500">{formatDuration(i.durationMs)}{' '}{tr('· recorded')}{' '}{formatDateTime(i.recordedAt)}</div>
                 </button>
               </li>
@@ -238,7 +238,7 @@ function ItemPlayer({ item, share, session, onEnded }: { item: PortalItem; share
   };
 
   return (
-    <section aria-label={`Evidence ${item.evidenceNumber ?? ''}`} className="space-y-3">
+    <section aria-label={tr('Evidence {value}', { value: item.evidenceNumber ?? '' })} className="space-y-3">
       <div className="overflow-hidden rounded-lg bg-black">
         {pb?.status === 'READY' && pb.mp4Url ? (
           <video
@@ -257,12 +257,12 @@ function ItemPlayer({ item, share, session, onEnded }: { item: PortalItem; share
           </video>
         ) : (
           <div className="flex aspect-video items-center justify-center gap-2 text-sm text-ink-200">
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> {pb?.message ?? 'Loading video…'}
+            <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> {pb?.message ?? tr('Loading video…')}
           </div>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {share.permissions.allowDownload && <Button variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === 'download'} onClick={() => void download('watermarked')}>{tr('Download')}{' '}{share.permissions.watermark ? 'watermarked copy' : 'copy'}</Button>}
+        {share.permissions.allowDownload && <Button variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === 'download'} onClick={() => void download('watermarked')}>{tr('Download')}{' '}{share.permissions.watermark ? tr('watermarked copy') : tr('copy')}</Button>}
         {share.permissions.allowOriginal && <Button variant="secondary" icon={<Download className="h-4 w-4" />} loading={busy === 'original'} onClick={() => void download('original')}>{tr('Download original')}</Button>}
         {share.permissions.allowPrint && <Button variant="secondary" icon={<Printer className="h-4 w-4" />} loading={busy === 'print'} disabled={pb?.status !== 'READY'} onClick={() => void print()}>{tr('Print current frame')}</Button>}
         <span className="text-xs text-ink-500">{tr('Every view, download and print is recorded.')}</span>

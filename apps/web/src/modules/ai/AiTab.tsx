@@ -72,12 +72,12 @@ function RequestForm({ evidence }: { evidence: EvidenceDetail }) {
       {gated.length > 0 && (
         <Alert tone="amber" title={tr('Some analyses are disabled on this deployment')}>
           <ul className="list-disc pl-5" data-testid="ai-gated-tasks">
-            {gated.map((t) => <li key={t.task}>{t.gate.explanation ?? `${t.label} is disabled.`}</li>)}
+            {gated.map((t) => <li key={t.task}>{t.gate.explanation ?? tr('{label} is disabled.', { label: t.label })}</li>)}
           </ul>
         </Alert>
       )}
       {available.length === 0 ? (
-        <EmptyState title={gated.length ? 'No AI analysis is available' : 'No AI models are active'}description={tr('An administrator must register and activate models before analysis can run.')} />
+        <EmptyState title={gated.length ? tr('No AI analysis is available') : tr('No AI models are active')}description={tr('An administrator must register and activate models before analysis can run.')} />
       ) : (
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submit(); }}>
           <fieldset>
@@ -87,13 +87,13 @@ function RequestForm({ evidence }: { evidence: EvidenceDetail }) {
                 <div key={t.task} className="rounded border border-ink-200 p-2">
                   <Checkbox
                     label={t.label}
-                    description={`${t.description} Model: ${t.models.map((m) => `${m.code}@${m.version}`).join(', ')}`}
+                    description={tr('{description} Model: {value}', { description: t.description, value: t.models.map((m) => `${m.code}@${m.version}`).join(', ') })}
                     checked={sel.has(t.task)}
                     onChange={(v) => setSel((s) => { const n = new Set(s); if (v) n.add(t.task); else n.delete(t.task); return n; })}
                   />
                   {sel.has(t.task) && (
                     <div className="mt-2 pl-6">
-                      <Field label={tr('Threshold')} htmlFor={`thr-${t.task}`} hint={`Default ${t.models[0]?.defaultThreshold}`}>
+                      <Field label={tr('Threshold')} htmlFor={`thr-${t.task}`} hint={tr('Default {defaultThreshold}', { defaultThreshold: t.models[0]?.defaultThreshold })}>
                         <Input id={`thr-${t.task}`} type="number" step="0.01" min={0.05} max={0.99} placeholder={String(t.models[0]?.defaultThreshold ?? '')} value={thresholds[t.task] ?? ''} onChange={(e) => setThresholds((x) => ({ ...x, [t.task]: e.target.value }))} className="w-28" />
                       </Field>
                     </div>
@@ -110,11 +110,11 @@ function RequestForm({ evidence }: { evidence: EvidenceDetail }) {
             <fieldset>
               <legend className="mb-1 text-sm font-medium text-ink-800">{tr('Watchlists covering this jurisdiction')}</legend>
               {watchlists.isLoading ? <Spinner /> : watchlists.error ? <ErrorState error={watchlists.error} onRetry={() => void watchlists.refetch()} /> : watchlists.data!.items.length === 0 ? (
-                <p className="text-sm text-ink-600">{tr('No watchlists apply to this evidence.')}{sel.has('FACE_RECOGNITION') && ' Face recognition needs a FACE watchlist.'}</p>
+                <p className="text-sm text-ink-600">{tr('No watchlists apply to this evidence.')}{sel.has('FACE_RECOGNITION') && tr(' Face recognition needs a FACE watchlist.')}</p>
               ) : (
                 <div className="space-y-1">
                   {watchlists.data!.items.map((w) => (
-                    <Checkbox key={w.id} label={`${w.name} (${w.kind === 'FACE' ? 'faces' : 'vehicles'}, ${w.readyEntries}/${w.entries} ready, ${w.orgUnitName})`} checked={lists ? lists.has(w.id) : true}
+                    <Checkbox key={w.id} label={tr('{name} ({value}, {readyEntries}/{entries} ready, {orgUnitName})', { name: w.name, value: w.kind === 'FACE' ? tr('faces') : tr('vehicles'), readyEntries: w.readyEntries, entries: w.entries, orgUnitName: w.orgUnitName })} checked={lists ? lists.has(w.id) : true}
                       onChange={(v) => setLists((s) => { const n = new Set(s ?? watchlists.data!.items.map((x) => x.id)); if (v) n.add(w.id); else n.delete(w.id); return n; })} />
                   ))}
                 </div>
@@ -151,7 +151,7 @@ function JobsCard({ evidenceId, canCancel }: { evidenceId: string; canCancel: bo
               )}
               {j.status === 'COMPLETED' && (
                 <span className="text-xs text-ink-600">
-                  {j.stats.framesProcessed}{' '}{tr('frames ·')}{' '}{Object.entries(j.stats.detections ?? {}).map(([t, n]) => `${n} ${taskLabel(t).toLowerCase()}`).join(', ') || 'no detections'} · {j.stats.msPerFrame}{' '}{tr('ms/frame')}
+                  {j.stats.framesProcessed}{' '}{tr('frames ·')}{' '}{Object.entries(j.stats.detections ?? {}).map(([t, n]) => `${n} ${taskLabel(t).toLowerCase()}`).join(', ') || tr('no detections')} · {j.stats.msPerFrame}{' '}{tr('ms/frame')}
                 </span>
               )}
               {j.status === 'FAILED' && <span className="text-xs text-red-700">{j.error}</span>}
@@ -191,7 +191,7 @@ function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPl
   const visible = items.filter((d) => d.bbox && Math.abs(d.frameTimeMs - now) <= 600);
 
   return (
-    <Card title={`Detections${q.data ? ` (${q.data.total})` : ''}`} actions={canPlay && items.length > 0 ? <Button size="sm" variant="secondary" onClick={() => setShowPlayer((v) => !v)}>{showPlayer ? 'Hide player' : 'Show on video'}</Button> : undefined}>
+    <Card title={q.data ? tr('Detections ({total})', { total: q.data.total }) : tr('Detections')} actions={canPlay && items.length > 0 ? <Button size="sm" variant="secondary" onClick={() => setShowPlayer((v) => !v)}>{showPlayer ? tr('Hide player') : tr('Show on video')}</Button> : undefined}>
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <Field label={tr('Task')} htmlFor="d-task">
           <Select id="d-task" value={f.task} onChange={(e) => setF({ ...f, task: e.target.value })}>
@@ -272,7 +272,7 @@ function Timeline({ items, durationMs, onPick }: { items: AiDetectionDto[]; dura
           <span className="w-40 shrink-0 truncate text-xs text-ink-600">{taskLabel(t)}</span>
           <div className="relative h-4 flex-1 rounded bg-ink-100">
             {items.filter((d) => d.task === t).map((d) => (
-              <button key={d.id} type="button" title={`${d.label} at ${formatTimecode(d.frameTimeMs)} (${Math.round(d.confidence * 100)}%)`} aria-label={`${d.label} at ${formatTimecode(d.frameTimeMs)}`}
+              <button key={d.id} type="button" title={tr('{label} at {frameTimeMs} ({value}%)', { label: d.label, frameTimeMs: formatTimecode(d.frameTimeMs), value: Math.round(d.confidence * 100) })} aria-label={tr('{label} at {frameTimeMs}', { label: d.label, frameTimeMs: formatTimecode(d.frameTimeMs) })}
                 onClick={() => onPick(d)} className="absolute top-0 h-4 w-1.5 -translate-x-1/2 rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                 style={{ left: `${Math.min(100, (d.frameTimeMs / durationMs) * 100)}%`, background: TASK_COLORS[d.task], opacity: d.reviewStatus === 'REJECTED' ? 0.3 : 1 }} />
             ))}

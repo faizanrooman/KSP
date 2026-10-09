@@ -46,7 +46,7 @@ function DeviceModal({ device, onClose }: { device: Device | null; onClose: (cre
   const valid = (!isNew || f.serialNumber.trim().length >= 3) && !!f.orgUnitId;
   const fld = (k: keyof Form) => ({ id: `dv-${k}`, value: f[k], onChange: (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value }) });
   return (
-    <Modal open onClose={() => onClose()} title={isNew ? 'Register device' : `Edit ${device.serialNumber}`} size="lg" footer={<><Button variant="secondary" onClick={() => onClose()} disabled={m.isPending}>{tr('Cancel')}</Button><Button onClick={() => m.mutate()} disabled={!valid} loading={m.isPending}>{tr('Save')}</Button></>}>
+    <Modal open onClose={() => onClose()} title={isNew ? tr('Register device') : tr('Edit {serialNumber}', { serialNumber: device.serialNumber })} size="lg" footer={<><Button variant="secondary" onClick={() => onClose()} disabled={m.isPending}>{tr('Cancel')}</Button><Button onClick={() => m.mutate()} disabled={!valid} loading={m.isPending}>{tr('Save')}</Button></>}>
       <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); if (valid) m.mutate(); }}>
         {isNew && (
           <Field label={tr('Serial number')} htmlFor="dv-serialNumber" required hint={tr('Unique; stored upper-case.')}>
@@ -118,7 +118,7 @@ export function DevicesPage() {
       </Card>
       <Card bodyClassName="p-0">
         <DataTable caption={tr('Devices')} columns={cols} rows={list.data?.items} rowKey={(r) => r.id} loading={list.isFetching} error={list.error} onRetry={() => void list.refetch()} sort={s.sort} onSort={(sort) => set({ sort })} onRowClick={(r) => navigate(`/admin/devices/${r.id}`)}
-          empty={<EmptyState icon={<Camera className="h-6 w-6" />} title={filtered ? 'No devices match these filters' : 'No devices registered'} />} />
+          empty={<EmptyState icon={<Camera className="h-6 w-6" />} title={filtered ? tr('No devices match these filters') : tr('No devices registered')} />} />
         {list.data && <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onPage={(p) => set({ page: String(p) })} />}
       </Card>
       {registering && <DeviceModal device={null} onClose={(d) => { setRegistering(false); if (d) navigate(`/admin/devices/${d.id}`); }} />}
@@ -142,7 +142,7 @@ export function DeviceDetailPage() {
     onSuccess: (_r, { a }) => { setConfirm(null); done(a === 'retire' ? 'Device retired' : 'Assignment removed'); },
   });
   if (q.isLoading) return <Spinner />;
-  if (q.error) return <ErrorState error={q.error} onRetry={() => void q.refetch()} title={q.error instanceof ApiError && q.error.status === 404 ? 'Device not found' : undefined} />;
+  if (q.error) return <ErrorState error={q.error} onRetry={() => void q.refetch()} title={q.error instanceof ApiError && q.error.status === 404 ? tr('Device not found') : undefined} />;
   const d = q.data!;
   const manage = d.canManage && d.status !== 'RETIRED';
   return (
@@ -176,7 +176,7 @@ export function DeviceDetailPage() {
               <li key={h.seq} className="flex flex-wrap gap-x-3 px-4 py-2">
                 <span className="w-44 shrink-0 text-ink-500">{formatDateTime(h.occurredAt)}</span>
                 <span className="font-medium">{titleCase(h.action.replace(/^DEVICE_/, ''))}</span>
-                <span className="text-ink-600">{h.actorName ? `by ${h.actorName}` : ''}</span>
+                <span className="text-ink-600">{h.actorName ? tr('by {actorName}', { actorName: h.actorName }) : ''}</span>
                 {typeof h.details.reason === 'string' && <span className="text-ink-600">— {h.details.reason}</span>}
               </li>
             ))}
@@ -192,9 +192,9 @@ export function DeviceDetailPage() {
       </Modal>
       <ConfirmDialog
         open={!!confirm}
-        title={confirm === 'retire' ? 'Retire device' : 'Remove assignment'}
-        message={confirm === 'retire' ? 'Retiring is permanent: the device can no longer be assigned or edited. Evidence it recorded is unaffected.' : `Unassign ${d.serialNumber} from ${d.assignedOfficer?.fullName ?? ''}?`}
-        confirmLabel={confirm === 'retire' ? 'Retire' : 'Unassign'}
+        title={confirm === 'retire' ? tr('Retire device') : tr('Remove assignment')}
+        message={confirm === 'retire' ? tr('Retiring is permanent: the device can no longer be assigned or edited. Evidence it recorded is unaffected.') : tr('Unassign {serialNumber} from {value}?', { serialNumber: d.serialNumber, value: d.assignedOfficer?.fullName ?? '' })}
+        confirmLabel={confirm === 'retire' ? tr('Retire') : tr('Unassign')}
         variant="danger"
         requireReason={confirm === 'retire'}
         loading={actM.isPending}

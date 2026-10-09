@@ -115,12 +115,12 @@ export function AlertDetailPage() {
           <ul className="space-y-1 text-sm">
             {a.deliveries.map((d, i) => (
               <li key={i}>
-                <span className="font-mono text-xs">{d.channel}</span> · <StatusBadge status={d.status} />{d.attempt > 1 && ` · attempt ${d.attempt}`} {d.recipients !== null && `· ${d.recipients} recipient(s)`} {d.detail && <span className="text-ink-600">· {d.detail}</span>} · {formatDateTime(d.at)}
+                <span className="font-mono text-xs">{d.channel}</span> · <StatusBadge status={d.status} />{d.attempt > 1 && t(' · attempt {attempt}', { attempt: d.attempt })} {d.recipients !== null && t('· {recipients} recipient(s)', { recipients: d.recipients })} {d.detail && <span className="text-ink-600">· {d.detail}</span>} · {formatDateTime(d.at)}
                 {d.status === 'RETRYING' && d.nextAttemptAt && <span className="text-ink-600">{' '}{t('· next attempt')}{' '}{formatDateTime(d.nextAttemptAt)}</span>}
               </li>
             ))}
           </ul>
-        ) : <p className="text-sm text-ink-600">{a.severity === 'INFO' ? 'INFO alerts are not fanned out.' : 'Not yet dispatched (the alert evaluator runs every minute).'}</p>}
+        ) : <p className="text-sm text-ink-600">{a.severity === 'INFO' ? t('INFO alerts are not fanned out.') : t('Not yet dispatched (the alert evaluator runs every minute).')}</p>}
       </Card>
       <ConfirmDialog open={dialog === 'ack'} title={t('Acknowledge alert')} message={t('Acknowledging tells other managers you are handling this alert. It stays open until resolved.')} confirmLabel={t('Acknowledge')}
         loading={act.isPending} error={act.error} onCancel={() => setDialog(null)} onConfirm={(note) => act.mutate({ kind: 'ack', note })} />
@@ -173,7 +173,7 @@ function RuleCard({ rule, canEdit }: { rule: AlertRule; canEdit: boolean }) {
         <Field label={t('Extra e-mail recipients')} hint={t('Comma-separated. In addition to alert managers in scope and the Alert delivery settings.')} htmlFor={`${rule.code}-emails`}>
           <Input id={`${rule.code}-emails`} value={emails} disabled={!canEdit} onChange={(e) => setEmails(e.target.value)} />
         </Field>
-        <p className="text-xs text-ink-600">{t('Last evaluated:')}{' '}{rule.lastEvaluatedAt ? formatDateTime(rule.lastEvaluatedAt) : 'never'}{' '}{t('· updated')}{' '}{formatDateTime(rule.updatedAt)}{rule.updatedBy ? ` by ${rule.updatedBy}` : ''}</p>
+        <p className="text-xs text-ink-600">{t('Last evaluated:')}{' '}{rule.lastEvaluatedAt ? formatDateTime(rule.lastEvaluatedAt) : t('never')}{' '}{t('· updated')}{' '}{formatDateTime(rule.updatedAt)}{rule.updatedBy ? t(' by {updatedBy}', { updatedBy: rule.updatedBy }) : ''}</p>
         {save.error && <Alert tone="red">{errorMessage(save.error)}</Alert>}
         {save.isSuccess && <Alert tone="green">{t('Saved.')}</Alert>}
         {canEdit && <div className="flex justify-end"><Button type="submit" loading={save.isPending}>{t('Save')}</Button></div>}
@@ -192,7 +192,7 @@ export function NotificationsPage() {
   const { can } = useAuth();
   return (
     <div className="space-y-5">
-      <PageHeader title={t('Notifications')} subtitle={query.data ? `${query.data.unread} unread` : undefined}
+      <PageHeader title={t('Notifications')} subtitle={query.data ? t('{unread} unread', { unread: query.data.unread }) : undefined}
         actions={<Button variant="secondary" onClick={() => readAll.mutate()} loading={readAll.isPending} disabled={!query.data?.unread}>{t('Mark all read')}</Button>} />
       <Card>
         <Checkbox label={t('Unread only')} checked={q.unread === 'true'} onChange={(v) => setQ({ unread: v ? 'true' : '' })} />

@@ -31,7 +31,7 @@ class ChunkErrorBoundary extends Component<{ children: ReactNode }, { error: Err
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-10 text-center" role="alert">
         <p className="font-medium text-ink-800">{t('This part of the application could not be loaded')}</p>
-        <p className="max-w-lg text-sm text-ink-600">{this.state.error.message || 'Network error'}{' '}{t('— the application may have been updated.')}</p>
+        <p className="max-w-lg text-sm text-ink-600">{this.state.error.message || t('Network error')}{' '}{t('— the application may have been updated.')}</p>
         <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>{t('Reload')}</Button>
       </div>
     );

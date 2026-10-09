@@ -103,13 +103,20 @@ const uploadFailed: Evaluator = async ({ tx, from, to }) => {
   return { raised, resolved: 0 };
 };
 
+// Alert titles are read by supervisors on the dashboard: name the work in words and the item by its evidence number or
+// file name, never by a job code or an internal id.
+const JOB_LABEL: Record<string, string> = {
+  VALIDATE_REGISTER: 'Upload validation and registration', MEDIA_PROCESS: 'Video processing', MEDIA_HLS: 'Adaptive stream preparation',
+  TIER_MIGRATE: 'Storage tier migration', FIXITY_CHECK: 'Integrity check', DISPOSE: 'Disposal', SNAPSHOT: 'Snapshot', SHARE_WATERMARK: 'Share watermarking',
+};
+
 const processingFailed: Evaluator = async ({ tx, from, to }) => {
   let raised = 0;
   const rows = await tx
     .selectFrom('processing_jobs as pj')
     .leftJoin('evidence as e', 'e.id', 'pj.evidence_id')
     .leftJoin('upload_sessions as us', 'us.id', 'pj.upload_session_id')
-    .select(['pj.id', 'pj.kind', 'pj.error', 'pj.evidence_id', 'pj.upload_session_id', 'e.evidence_number', 'e.org_unit_id as ev_org', 'us.org_unit_id as us_org'])
+    .select(['pj.id', 'pj.kind', 'pj.error', 'pj.evidence_id', 'pj.upload_session_id', 'e.evidence_number', 'e.org_unit_id as ev_org', 'us.org_unit_id as us_org', 'us.original_filename'])
     .where('pj.status', '=', 'FAILED')
     .where('pj.finished_at', '>', overlapFrom(from))
     .where('pj.finished_at', '<=', ts(to))
@@ -117,9 +124,9 @@ const processingFailed: Evaluator = async ({ tx, from, to }) => {
     .limit(500)
     .execute();
   for (const r of rows) {
-    const subject = r.evidence_number ?? r.evidence_id ?? r.upload_session_id ?? r.id;
+    const subject = r.evidence_number ?? (r.original_filename ? `upload "${r.original_filename}"` : r.evidence_id ? 'an unnumbered evidence item' : 'an upload');
     raised += await raiseCounted(tx, {
-      ruleCode: 'PROCESSING_FAILED', title: `${r.kind} failed for ${subject}`,
+      ruleCode: 'PROCESSING_FAILED', title: `${JOB_LABEL[r.kind] ?? 'Processing'} failed for ${subject}`,
       message: (r.error ?? 'processing failed').slice(0, 1000),
       resourceType: r.evidence_id ? 'evidence' : 'processing_job', resourceId: r.evidence_id ?? r.id,
       orgUnitId: r.ev_org ?? r.us_org ?? null, dedupeKey: `PROCESSING_FAILED:${r.id}`, onlyIfNew: true,

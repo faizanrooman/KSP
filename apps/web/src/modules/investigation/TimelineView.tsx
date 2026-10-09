@@ -84,7 +84,7 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
                   onKeyDown={(e) => laneKey(e, lane.itemId)}
                   tabIndex={0}
                   role="button"
-                  aria-label={`${lane.label}: click a position to open the video at that moment`}
+                  aria-label={tr('{label}: click a position to open the video at that moment', { label: lane.label })}
                 >
                   <div className="absolute inset-y-1 rounded bg-brand-300/70" style={{ left: `${lane.left}%`, width: `${lane.width}%` }} />
                   {lane.marks.map((m) => (
@@ -167,7 +167,7 @@ export function TimelineView({ workspaceId, items, editable, onOpen, onCompare }
                     {e.kind === 'ANNOTATION' && <>{e.annotationKind.toLowerCase()}: {e.body ?? '—'} <span className="text-xs text-ink-500">({labelOf(e.evidenceId)} @ {formatTimecode(e.startMs)}, {e.author})</span></>}
                   </div>
                   {target && <Button size="sm" variant="ghost" onClick={() => onOpen(target.itemId, target.ms)}>{tr('Open')}</Button>}
-                  {e.kind === 'EVENT' && editable && <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={`Delete event ${e.title}`} onClick={() => delEvent.mutate(e.id)} />}
+                  {e.kind === 'EVENT' && editable && <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={tr('Delete event {title}', { title: e.title })} onClick={() => delEvent.mutate(e.id)} />}
                 </li>
               );
             })}

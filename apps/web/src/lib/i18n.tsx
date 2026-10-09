@@ -65,10 +65,10 @@ function applyDocumentLang(): void {
  * Translate a UI string. `vars` fills `{name}` placeholders after translation, so word order can differ per language.
  * Unknown keys return the English text unchanged.
  */
-export function t(key: string, vars?: Record<string, string | number>): string {
+export function t(key: string, vars?: Record<string, string | number | null | undefined>): string {
   const dict = dictionaries[currentLang];
   let out = (currentLang !== 'en' && dict[key]) || key;
-  if (vars) for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(String(v));
+  if (vars) for (const [k, v] of Object.entries(vars)) out = out.split(`{${k}}`).join(v == null ? '' : String(v));
   return out;
 }
 

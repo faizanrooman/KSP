@@ -88,7 +88,7 @@ interface Candidate {
 function Candidates({ page, onPage }: { page: number; onPage: (p: number) => void }) {
   const q = useQuery({ queryKey: ['evidence', 'disposal-candidates', page], queryFn: () => api.get<Paged<Candidate>>('/evidence/disposal-candidates', { page, pageSize: 25 }), placeholderData: keepPreviousData });
   const cols: Column<Candidate>[] = [
-    { key: 'n', header: t('Evidence'), render: (r) => (<Link className="text-brand-700 hover:underline" to={`/evidence/${r.id}?tab=lifecycle`}><span className="mono">{r.evidenceNumber}</span> — {r.title ?? 'Untitled'}</Link>) },
+    { key: 'n', header: t('Evidence'), render: (r) => (<Link className="text-brand-700 hover:underline" to={`/evidence/${r.id}?tab=lifecycle`}><span className="mono">{r.evidenceNumber}</span> — {r.title ?? t('Untitled')}</Link>) },
     { key: 'u', header: t('Unit'), render: (r) => r.orgUnit.name },
     { key: 'p', header: t('Policy'), render: (r) => r.retentionPolicy ?? '—' },
     { key: 'r', header: t('Retention ended'), render: (r) => formatDate(r.retainUntil) },
@@ -114,7 +114,7 @@ export function DisposalApprovalsPage() {
     enabled: s.view === 'requests',
   });
   const cols: Column<DisposalRequest>[] = [
-    { key: 'ev', header: t('Evidence'), render: (r) => (<div><Link className="text-brand-700 hover:underline" to={`/evidence/${r.evidence.id}?tab=lifecycle`}><span className="mono">{r.evidence.evidenceNumber}</span></Link><p className="text-xs text-ink-500">{r.evidence.title ?? 'Untitled'} · {r.evidence.orgUnit.name}</p>{r.evidence.legalHold && <Badge tone="red">{t('Legal hold')}</Badge>}</div>) },
+    { key: 'ev', header: t('Evidence'), render: (r) => (<div><Link className="text-brand-700 hover:underline" to={`/evidence/${r.evidence.id}?tab=lifecycle`}><span className="mono">{r.evidence.evidenceNumber}</span></Link><p className="text-xs text-ink-500">{r.evidence.title ?? t('Untitled')} · {r.evidence.orgUnit.name}</p>{r.evidence.legalHold && <Badge tone="red">{t('Legal hold')}</Badge>}</div>) },
     { key: 'st', header: t('Status'), render: (r) => <StatusBadge status={r.status} /> },
     { key: 'rq', header: t('Requested by'), render: (r) => (<div><p>{r.requestedBy.fullName}</p><p className="text-xs text-ink-500">{formatDateTime(r.createdAt)}</p></div>) },
     { key: 'why', header: t('Reason / authority'), render: (r) => (<div className="max-w-sm"><p>{r.reason}</p><p className="text-xs text-ink-500">{r.authorityRef}</p></div>) },
@@ -143,7 +143,7 @@ export function DisposalApprovalsPage() {
             ))}
           </div>
           <DataTable caption={t('Disposal requests')} columns={cols} rows={q.data?.items} rowKey={(r) => r.id} loading={q.isFetching} error={q.error} onRetry={() => void q.refetch()}
-            empty={<EmptyState title={`No ${s.status.toLowerCase()} requests`} />} />
+            empty={<EmptyState title={t('No {value} requests', { value: s.status.toLowerCase() })} />} />
           {q.data && <Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onPage={(p) => set({ page: String(p) })} />}
         </Card>
       )}

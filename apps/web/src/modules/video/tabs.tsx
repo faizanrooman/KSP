@@ -97,24 +97,24 @@ export function SnapshotsTab({ evidence }: { evidence: EvidenceSummary }) {
       ) : list.isError ? (
         <ErrorState error={list.error} onRetry={() => void list.refetch()} />
       ) : !list.data?.items.length ? (
-        <EmptyState title={tr('No snapshots yet')} description={canCreate ? 'Capture frames from the player or at a specific time above.' : 'Snapshots created by investigators appear here.'} icon={<Camera className="h-8 w-8" />} />
+        <EmptyState title={tr('No snapshots yet')} description={canCreate ? tr('Capture frames from the player or at a specific time above.') : tr('Snapshots created by investigators appear here.')} icon={<Camera className="h-8 w-8" />} />
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label={tr('Snapshots')}>
           {list.data.items.map((s) => (
             <li key={s.id} className="card overflow-hidden">
-              <a href={s.url} target="_blank" rel="noreferrer" className="block bg-black" aria-label={`Open snapshot at ${formatTimecode(s.frameTimeMs ?? s.timeMs ?? 0)} in a new tab`}>
-                <img src={s.url} alt={`Frame ${s.frameNumber ?? ''} at ${formatTimecode(s.frameTimeMs ?? s.timeMs ?? 0)}`} className="mx-auto max-h-48 object-contain" loading="lazy" />
+              <a href={s.url} target="_blank" rel="noreferrer" className="block bg-black" aria-label={tr('Open snapshot at {value} in a new tab', { value: formatTimecode(s.frameTimeMs ?? s.timeMs ?? 0) })}>
+                <img src={s.url} alt={tr('Frame {value} at {value2}', { value: s.frameNumber ?? '', value2: formatTimecode(s.frameTimeMs ?? s.timeMs ?? 0) })} className="mx-auto max-h-48 object-contain" loading="lazy" />
               </a>
               <div className="space-y-1 p-3 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="mono font-medium text-ink-900">{formatTimecode(s.frameTimeMs ?? s.timeMs ?? 0)}</span>
-                  <span className="text-ink-600">{tr('Frame')}{' '}{s.frameNumber ?? '—'} · {s.source === 'original' ? 'original' : 'proxy'}</span>
+                  <span className="text-ink-600">{tr('Frame')}{' '}{s.frameNumber ?? '—'} · {s.source === 'original' ? tr('original') : tr('proxy')}</span>
                 </div>
                 <div className="flex items-center gap-1 text-ink-600">
                   <span className="mono" title={s.sha256 ?? ''}>{tr('SHA-256')}{' '}{shortHash(s.sha256)}</span>
                   {s.sha256 && <CopyButton value={s.sha256} label={tr('Copy hash')} />}
                 </div>
-                <div className="text-ink-500">{s.width}×{s.height} · {s.createdBy?.name ?? 'System'} · {formatDateTime(s.createdAt)}</div>
+                <div className="text-ink-500">{s.width}×{s.height} · {s.createdBy?.name ?? tr('System')} · {formatDateTime(s.createdAt)}</div>
                 <div className="flex gap-2 pt-1">
                   <Link to={`/evidence/${evidence.id}?tab=playback&t=${Math.round(s.frameTimeMs ?? s.timeMs ?? 0) + 1}`} className="text-brand-700 hover:underline">{tr('Show in player')}</Link>
                   <a href={s.downloadUrl} className="inline-flex items-center gap-1 text-brand-700 hover:underline"><Download className="h-3.5 w-3.5" aria-hidden />{' '}{tr('Download PNG')}</a>

@@ -83,7 +83,7 @@ export function ReportsPage() {
               <Field label={tr('Report type')} htmlFor="rep-type" required>
                 <Select id="rep-type" value={type} required onChange={(e) => setType(e.target.value)}>
                   <option value="">{tr('Choose…')}</option>
-                  {types.data!.items.map((t) => <option key={t.code} value={t.code} disabled={!t.available}>{t.title}{t.available ? '' : ' (not permitted)'}</option>)}
+                  {types.data!.items.map((t) => <option key={t.code} value={t.code} disabled={!t.available}>{t.title}{t.available ? '' : tr(' (not permitted)')}</option>)}
                 </Select>
               </Field>
               <Field label={tr('Format')} htmlFor="rep-format"><Select id="rep-format" value={format} onChange={(e) => setFormat(e.target.value)}>{types.data!.formats.map((f) => <option key={f}>{f}</option>)}</Select></Field>

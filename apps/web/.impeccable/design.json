@@ -1,0 +1,581 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-09T10:21:33.440119+00:00",
+  "title": "Design System: KSP Video Evidence Management",
+  "extensions": {
+    "colorMeta": {
+      "brand-950": {
+        "role": "primary",
+        "displayName": "Midnight Duty Navy",
+        "tonalRamp": [
+          "#0f1b45",
+          "#1e338a",
+          "#1e35af",
+          "#1d3ed8",
+          "#2550eb",
+          "#3b6cf6",
+          "#bfd3fe",
+          "#eef4ff"
+        ]
+      },
+      "brand-900": {
+        "role": "primary",
+        "displayName": "Deep Duty Navy",
+        "tonalRamp": [
+          "#0f1b45",
+          "#1e338a",
+          "#1e35af",
+          "#1d3ed8",
+          "#2550eb",
+          "#3b6cf6",
+          "#bfd3fe",
+          "#eef4ff"
+        ]
+      },
+      "brand-800": {
+        "role": "primary",
+        "displayName": "Deep Service Blue",
+        "tonalRamp": [
+          "#0f1b45",
+          "#1e338a",
+          "#1e35af",
+          "#1d3ed8",
+          "#2550eb",
+          "#3b6cf6",
+          "#bfd3fe",
+          "#eef4ff"
+        ]
+      },
+      "brand-700": {
+        "role": "primary",
+        "displayName": "Service Blue",
+        "tonalRamp": [
+          "#0f1b45",
+          "#1e338a",
+          "#1e35af",
+          "#1d3ed8",
+          "#2550eb",
+          "#3b6cf6",
+          "#bfd3fe",
+          "#eef4ff"
+        ]
+      },
+      "brand-600": {
+        "role": "primary",
+        "displayName": "Bar Blue",
+        "tonalRamp": [
+          "#0f1b45",
+          "#1e338a",
+          "#1e35af",
+          "#1d3ed8",
+          "#2550eb",
+          "#3b6cf6",
+          "#bfd3fe",
+          "#eef4ff"
+        ]
+      },
+      "brand-500": {
+        "role": "primary",
+        "displayName": "Signal Blue",
+        "tonalRamp": [
+          "#0f1b45",
+          "#1e338a",
+          "#1e35af",
+          "#1d3ed8",
+          "#2550eb",
+          "#3b6cf6",
+          "#bfd3fe",
+          "#eef4ff"
+        ]
+      },
+      "brand-200": {
+        "role": "primary",
+        "displayName": "Pale Duty Blue 200",
+        "tonalRamp": [
+          "#0f1b45",
+          "#1e338a",
+          "#1e35af",
+          "#1d3ed8",
+          "#2550eb",
+          "#3b6cf6",
+          "#bfd3fe",
+          "#eef4ff"
+        ]
+      },
+      "brand-100": {
+        "role": "primary",
+        "displayName": "Pale Duty Blue 100",
+        "tonalRamp": [
+          "#0f1b45",
+          "#1e338a",
+          "#1e35af",
+          "#1d3ed8",
+          "#2550eb",
+          "#3b6cf6",
+          "#bfd3fe",
+          "#eef4ff"
+        ]
+      },
+      "brand-50": {
+        "role": "primary",
+        "displayName": "Pale Duty Blue 50",
+        "tonalRamp": [
+          "#0f1b45",
+          "#1e338a",
+          "#1e35af",
+          "#1d3ed8",
+          "#2550eb",
+          "#3b6cf6",
+          "#bfd3fe",
+          "#eef4ff"
+        ]
+      },
+      "ink-950": {
+        "role": "neutral",
+        "displayName": "Night Overlay",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "ink-900": {
+        "role": "neutral",
+        "displayName": "Case-File Black",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "ink-800": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "ink-700": {
+        "role": "neutral",
+        "displayName": "Graphite Light",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "ink-600": {
+        "role": "neutral",
+        "displayName": "Slate",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "ink-500": {
+        "role": "neutral",
+        "displayName": "Slate Light",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "ink-300": {
+        "role": "neutral",
+        "displayName": "Rule Grey",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "ink-200": {
+        "role": "neutral",
+        "displayName": "Rule Grey Light",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "ink-100": {
+        "role": "neutral",
+        "displayName": "Rule Grey Pale",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "ink-50": {
+        "role": "neutral",
+        "displayName": "Station Floor",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "tonalRamp": [
+          "#0c0f14",
+          "#161a22",
+          "#262b36",
+          "#3d4453",
+          "#687285",
+          "#c2c8d3",
+          "#eef0f4",
+          "#f7f8fa"
+        ]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Seal Red"
+      },
+      "danger-deep": {
+        "role": "semantic",
+        "displayName": "Seal Red Deep"
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Cleared Green"
+      },
+      "warning-text": {
+        "role": "semantic",
+        "displayName": "Caution Amber"
+      },
+      "warning-icon": {
+        "role": "semantic",
+        "displayName": "Caution Amber Icon"
+      },
+      "chart-blue": {
+        "role": "data",
+        "displayName": "Chart Blue"
+      },
+      "chart-orange": {
+        "role": "data",
+        "displayName": "Chart Orange"
+      },
+      "chart-aqua": {
+        "role": "data",
+        "displayName": "Chart Aqua"
+      },
+      "status-good": {
+        "role": "data",
+        "displayName": "Status Good"
+      },
+      "status-warning": {
+        "role": "data",
+        "displayName": "Status Warning"
+      },
+      "status-serious": {
+        "role": "data",
+        "displayName": "Status Serious"
+      },
+      "status-critical": {
+        "role": "data",
+        "displayName": "Status Critical"
+      },
+      "chart-grid": {
+        "role": "data",
+        "displayName": "Chart Grid"
+      },
+      "chart-axis": {
+        "role": "data",
+        "displayName": "Chart Axis"
+      },
+      "chart-label": {
+        "role": "data",
+        "displayName": "Chart Label"
+      },
+      "annotation-red": {
+        "role": "data",
+        "displayName": "Annotation Red"
+      },
+      "annotation-amber": {
+        "role": "data",
+        "displayName": "Annotation Amber (bookmark default)"
+      },
+      "annotation-green": {
+        "role": "data",
+        "displayName": "Annotation Green"
+      },
+      "annotation-blue": {
+        "role": "data",
+        "displayName": "Annotation Blue (annotation default)"
+      },
+      "annotation-violet": {
+        "role": "data",
+        "displayName": "Annotation Violet"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page title (PageHeader h1), one per page."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card and section h2."
+      },
+      "stat": {
+        "displayName": "Stat",
+        "purpose": "KPI values in Stat tiles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Almost all UI text: tables, forms, dialogs."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase table headers, key/value and stat labels."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Hashes, evidence numbers, ids; break-all."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Sidebar section captions, banner kicker, chart axis ticks (11px uppercase)."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Counts in tiny badges and chart threshold labels (10px)."
+      }
+    },
+    "shadows": [
+      {
+        "name": "resting",
+        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "purpose": "Cards, inputs, buttons."
+      },
+      {
+        "name": "floating",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Toasts."
+      },
+      {
+        "name": "overlay",
+        "value": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+        "purpose": "Modal dialogs."
+      }
+    ],
+    "focus": [
+      {
+        "name": "focus-ring",
+        "value": "2px #3b6cf6 ring, 1px offset (global :focus-visible)",
+        "purpose": "Every focusable element."
+      }
+    ],
+    "motion": [
+      {
+        "name": "color-transition",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1) on colors",
+        "purpose": "Button and nav hover; no other motion beyond spinners and progress."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px",
+        "purpose": "Sidebar becomes a drawer below this."
+      },
+      {
+        "name": "tested",
+        "value": "768px and 1280px: no horizontal page scroll (E2E)"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single action colour; one primary action per area.",
+      "html": "<button class=\"ds-btn-primary\">Verify integrity</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;font-family:'Noto Sans Variable','Noto Sans Kannada Variable','Segoe UI',system-ui,sans-serif;font-weight:500;font-size:14px;line-height:20px;padding:8px 14px;box-shadow:0 1px 2px 0 rgb(0 0 0/.05);transition:background-color .15s;cursor:pointer;background:#1d3ed8;color:#fff;border:0;}.ds-btn-primary:hover{background:#1e35af;}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 1px #fff,0 0 0 3px #3b6cf6;}.ds-btn-primary:disabled{background:#93b4fd;cursor:not-allowed;}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral actions beside a primary.",
+      "html": "<button class=\"ds-btn-secondary\">Add to workspace</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;font-family:'Noto Sans Variable','Noto Sans Kannada Variable','Segoe UI',system-ui,sans-serif;font-weight:500;font-size:14px;line-height:20px;padding:8px 14px;box-shadow:0 1px 2px 0 rgb(0 0 0/.05);transition:background-color .15s;cursor:pointer;background:#fff;color:#262b36;border:1px solid #c2c8d3;}.ds-btn-secondary:hover{background:#f7f8fa;}.ds-btn-secondary:focus-visible{outline:none;box-shadow:0 0 0 1px #fff,0 0 0 3px #3b6cf6;}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive actions, normally inside a ConfirmDialog with a reason.",
+      "html": "<button class=\"ds-btn-danger\">Request disposal</button>",
+      "css": ".ds-btn-danger{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:6px;font-family:'Noto Sans Variable','Noto Sans Kannada Variable','Segoe UI',system-ui,sans-serif;font-weight:500;font-size:14px;line-height:20px;padding:8px 14px;box-shadow:0 1px 2px 0 rgb(0 0 0/.05);transition:background-color .15s;cursor:pointer;background:#dc2626;color:#fff;border:0;}.ds-btn-danger:hover{background:#b91c1c;}.ds-btn-danger:focus-visible{outline:none;box-shadow:0 0 0 1px #fff,0 0 0 3px #3b6cf6;}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Always rendered inside Field so the label is associated.",
+      "html": "<label class=\"ds-label\" for=\"ds-q\">Evidence number</label><input id=\"ds-q\" class=\"ds-input\" placeholder=\"e.g. EV-2026-000123\">",
+      "css": ".ds-label{display:block;margin-bottom:4px;font-family:'Noto Sans Variable','Noto Sans Kannada Variable','Segoe UI',system-ui,sans-serif;font-size:14px;font-weight:500;color:#3d4453;}.ds-input{display:block;width:100%;max-width:320px;border:1px solid #c2c8d3;border-radius:6px;background:#fff;padding:8px 12px;font-family:'Noto Sans Variable','Noto Sans Kannada Variable','Segoe UI',system-ui,sans-serif;font-size:14px;color:#161a22;box-shadow:0 1px 2px 0 rgb(0 0 0/.05);}.ds-input::placeholder{color:#687285;}.ds-input:focus{outline:none;border-color:#3b6cf6;box-shadow:0 0 0 1px #3b6cf6;}"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Status always as words; tone is secondary.",
+      "html": "<span class=\"ds-badge ds-green\">Registered</span> <span class=\"ds-badge ds-amber\">Pending review</span> <span class=\"ds-badge ds-red\">Quarantined</span> <span class=\"ds-badge ds-gray\">Archived</span>",
+      "css": ".ds-badge{display:inline-flex;align-items:center;white-space:nowrap;border-radius:4px;padding:2px 6px;font-family:'Noto Sans Variable','Noto Sans Kannada Variable','Segoe UI',system-ui,sans-serif;font-size:12px;font-weight:500;line-height:16px;}.ds-green{background:#ecfdf5;color:#065f46;box-shadow:inset 0 0 0 1px #a7f3d0;}.ds-amber{background:#fffbeb;color:#92400e;box-shadow:inset 0 0 0 1px #fde68a;}.ds-red{background:#fef2f2;color:#991b1b;box-shadow:inset 0 0 0 1px #fecaca;}.ds-gray{background:#eef0f4;color:#3d4453;box-shadow:inset 0 0 0 1px #dde1e8;}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White working surface on the ink-50 floor; a titled card is a named region.",
+      "html": "<section class=\"ds-card\"><header class=\"ds-card-h\"><h2>Integrity</h2></header><dl class=\"ds-card-b\"><dt>SHA-256</dt><dd class=\"ds-mono\">9f2c4e1a7b0d3c58e6f1a2b4c7d9e0f13a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d</dd></dl></section>",
+      "css": ".ds-card{max-width:420px;border:1px solid #dde1e8;border-radius:8px;background:#fff;box-shadow:0 1px 2px 0 rgb(0 0 0/.05);font-family:'Noto Sans Variable','Noto Sans Kannada Variable','Segoe UI',system-ui,sans-serif;}.ds-card-h{border-bottom:1px solid #eef0f4;padding:12px 16px;}.ds-card-h h2{margin:0;font-size:16px;font-weight:600;color:#161a22;}.ds-card-b{margin:0;padding:16px;}.ds-card-b dt{font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.025em;color:#687285;}.ds-card-b dd{margin:2px 0 0;color:#161a22;}.ds-mono{font-family:'JetBrains Mono Variable',ui-monospace,Consolas,monospace;font-size:12px;word-break:break-all;}"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Navy authority frame with the emblem above captioned sections.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main\"><p class=\"ds-nav-cap\">Evidence</p><a class=\"ds-nav-i ds-on\" href=\"#\">Evidence</a><a class=\"ds-nav-i\" href=\"#\">Search</a><a class=\"ds-nav-i\" href=\"#\">Upload evidence</a></nav>",
+      "css": ".ds-nav{width:240px;background:#0f1b45;padding:12px 8px;border-radius:8px;font-family:'Noto Sans Variable','Noto Sans Kannada Variable','Segoe UI',system-ui,sans-serif;}.ds-nav-cap{margin:0 8px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:rgb(147 180 253/.8);}.ds-nav-i{display:block;border-radius:6px;padding:6px 8px;font-size:14px;color:#dbe6fe;text-decoration:none;}.ds-nav-i:hover{background:#1e338a;color:#fff;}.ds-nav-i:focus-visible{outline:none;box-shadow:0 0 0 1px #fff,0 0 0 3px #3b6cf6;}.ds-on{background:#1e35af;color:#fff;}"
+    },
+    {
+      "name": "Tabs",
+      "kind": "nav",
+      "refersTo": "tabs",
+      "description": "Roving-tabindex tabs that wrap rather than scroll.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button class=\"ds-tab ds-tab-on\" role=\"tab\" aria-selected=\"true\">Overview</button><button class=\"ds-tab\" role=\"tab\">Playback</button><button class=\"ds-tab\" role=\"tab\">Chain of custody <span class=\"ds-count\">42</span></button></div>",
+      "css": ".ds-tabs{display:flex;flex-wrap:wrap;gap:0 4px;border-bottom:1px solid #dde1e8;font-family:'Noto Sans Variable','Noto Sans Kannada Variable','Segoe UI',system-ui,sans-serif;}.ds-tab{margin-bottom:-1px;border:0;border-bottom:2px solid transparent;background:none;padding:8px 12px;font-size:14px;font-weight:500;color:#4f586a;cursor:pointer;}.ds-tab:hover{color:#161a22;}.ds-tab:focus-visible{outline:none;box-shadow:0 0 0 1px #fff,0 0 0 3px #3b6cf6;}.ds-tab-on{border-bottom-color:#1d3ed8;color:#1e35af;}.ds-count{margin-left:6px;border-radius:4px;background:#eef0f4;padding:0 6px;font-size:12px;color:#4f586a;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Evidence Room",
+    "overview": "**Creative North Star: \"The Evidence Room\"**\n\nThe interface is a well-run evidence room. Every item has a label, a place and a record of who touched it, and nothing is there for decoration. A deep navy frame (the sidebar, the sign-in page, the dashboard welcome banner) carries the department's authority and the KSP emblem. Inside it, the working surface is plain white cards on a cool grey floor, where evidence, hashes, statuses and custody entries sit in tidy, labelled rows. Integrity is shown plainly, never dramatised: a verified hash is text in a badge, not a glowing shield.\n\nThe system is **crisp and efficient**. It is compact and dense enough for long shifts on shared station desktop PCs, keyboard-complete, and quick to scan. Most UI text is 14px, labels are small uppercase captions, and identifiers are set in monospace so they can be read and compared character by character. One blue does all the interactive work; colour otherwise only reports status, and status is always written in words as well.\n\nPhotography appears only at the edges (the sign-in hero and the dashboard banner), always under a navy gradient, and always decorative. Work screens show evidence, not atmosphere.",
+    "keyCharacteristics": [
+      "Navy frame, white working surface, cool grey floor.",
+      "One interactive blue; status colours only for status, always with text.",
+      "Dense 14px body, small uppercase labels, monospace identifiers.",
+      "Thin borders and small shadows; flat and orderly rather than lifted.",
+      "The official emblem appears exactly where the department's authority belongs and is never altered."
+    ],
+    "rules": [
+      {
+        "name": "The One Blue Rule",
+        "body": "Interactive means blue: brand-700 for actions, brand-500 for focus. No second accent colour is ever introduced for buttons, links or selection.",
+        "section": "colors"
+      },
+      {
+        "name": "The Words-First Status Rule",
+        "body": "Status colour never stands alone. Every red, green, amber or violet carries its status as visible text (`StatusBadge`, `Badge`, `Stat`), so the meaning survives greyscale printing and colour blindness.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ink-500 Floor",
+        "body": "On white, text is ink-500 or darker (≥ 4.5:1). ink-400 and ink-300 are only for decorative icons and borders.",
+        "section": "colors"
+      },
+      {
+        "name": "The Identifier Rule",
+        "body": "Anything a person might compare character by character (hash, evidence number, device id, token) is monospace, and it stays English in every UI language.",
+        "section": "typography"
+      },
+      {
+        "name": "The Screen-Equals-Paper Rule",
+        "body": "UI and PDFs share Noto Sans / Noto Sans Kannada. Never introduce a UI face the PDF renderer (`packages/core/assets/fonts`) does not also embed.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Display Rule",
+        "body": "There is no display face and no type above 24px inside the app. Emphasis is weight, not size.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline-First Rule",
+        "body": "Separation comes from a 1px ink-200 / ink-100 border before any shadow. A shadow larger than `shadow-sm` means the element floats above the page (a toast or a dialog).",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** use the shared primitives in `@/components/ui` (`Button`, `Field`, `Card`, `DataTable`, `StatusBadge`,",
+      "**Do** keep every action in Service Blue (brand-700) and every focus state in the brand-500 ring.",
+      "**Do** load fonts only from the bundled `@fontsource-variable` packages (no CDN: station networks and the CSP are `'self'`-only).",
+      "**Do** set hashes, evidence numbers and ids in monospace and let them wrap (`break-all`).",
+      "**Do** keep photography decorative (`alt=\"\"`) and under a brand-950 gradient so overlaid text keeps AA contrast.",
+      "**Do** design every state: loading (\"Loading…\" spinner), error with Retry, empty, and success.",
+      "**Do** check layouts at 768px and 1280px for horizontal scroll."
+    ],
+    "donts": [
+      "**Don't** use ink-400 or ink-300 for text on white. They fall below 4.5:1.",
+      "**Don't** put white text on emerald-600 or any `*-600` fill other than red-600. Use the `*-700` fill.",
+      "**Don't** signal status by colour alone. Always write the word.",
+      "**Don't** introduce a second accent colour, gradient buttons or decorative glows on work screens.",
+      "**Don't** alter, recolour, crop or animate the KSP emblem, and don't use it outside the shell headers, sign-in page,",
+      "**Don't** add third-party imagery without recording its licence in `public/brand/README.md`.",
+      "**Don't** render storage URLs, bucket names or presigned links anywhere in the UI."
+    ]
+  }
+}

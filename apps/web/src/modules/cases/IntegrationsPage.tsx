@@ -18,7 +18,7 @@ export function IntegrationsPage() {
     { key: 'type', header: tr('Type'), render: (r) => titleCase(r.systemType) },
     { key: 'adapter', header: tr('Adapter'), render: (r) => <span className="mono text-sm">{r.adapter}</span> },
     { key: 'verified', header: tr('Contract'), render: (r) => <VerificationBadge status={r.verificationStatus} /> },
-    { key: 'enabled', header: tr('State'), render: (r) => <Badge tone={r.enabled ? 'green' : 'gray'}>{r.enabled ? 'Enabled' : 'Disabled'}</Badge> },
+    { key: 'enabled', header: tr('State'), render: (r) => <Badge tone={r.enabled ? 'green' : 'gray'}>{r.enabled ? tr('Enabled') : tr('Disabled')}</Badge> },
     { key: 'last', header: tr('Last activity'), render: (r) => <div className="text-xs">{formatDateTime(r.lastSyncAt)}<p className="text-ink-500">{r.lastStatus ?? ''}</p></div> },
   ];
   const sel = q.data?.items.find((s) => s.id === selected) ?? null;
@@ -69,12 +69,12 @@ function SystemPanel({ sys, onEdit }: { sys: IntegrationSystem; onEdit: () => vo
   ];
   return (
     <div className="grid gap-4 lg:grid-cols-3">
-      <Card title={sys.name} actions={<div className="flex gap-2"><Button size="sm" variant="secondary" onClick={onEdit}>{tr('Edit')}</Button><Button size="sm" variant={sys.enabled ? 'danger' : 'success'} loading={toggle.isPending} onClick={() => toggle.mutate()}>{sys.enabled ? 'Disable' : 'Enable'}</Button></div>}>
+      <Card title={sys.name} actions={<div className="flex gap-2"><Button size="sm" variant="secondary" onClick={onEdit}>{tr('Edit')}</Button><Button size="sm" variant={sys.enabled ? 'danger' : 'success'} loading={toggle.isPending} onClick={() => toggle.mutate()}>{sys.enabled ? tr('Disable') : tr('Enable')}</Button></div>}>
         <dl className="space-y-1 text-sm">
           <div><dt className="inline text-ink-500">{tr('Base URL:')}{' '}</dt><dd className="mono inline break-all">{sys.baseUrl ?? '—'}</dd></div>
-          <div><dt className="inline text-ink-500">{tr('Auth:')}{' '}</dt><dd className="inline">{sys.config?.authType ?? '—'}{sys.credentialsRef ? ` via secret ${sys.credentialsRef}` : ''} {sys.config?.authType !== 'none' && <Badge tone={sys.credentialsPresent ? 'green' : 'red'}>{sys.credentialsPresent ? 'secret present' : 'secret missing'}</Badge>}</dd></div>
+          <div><dt className="inline text-ink-500">{tr('Auth:')}{' '}</dt><dd className="inline">{sys.config?.authType ?? '—'}{sys.credentialsRef ? tr(' via secret {credentialsRef}', { credentialsRef: sys.credentialsRef }) : ''} {sys.config?.authType !== 'none' && <Badge tone={sys.credentialsPresent ? 'green' : 'red'}>{sys.credentialsPresent ? tr('secret present') : tr('secret missing')}</Badge>}</dd></div>
           <div><dt className="inline text-ink-500">{tr('Timeout / retries:')}{' '}</dt><dd className="inline">{sys.config?.timeoutMs}{' '}{tr('ms /')}{' '}{sys.config?.retries}</dd></div>
-          <div><dt className="inline text-ink-500">{tr('Contract:')}{' '}</dt><dd className="inline"><VerificationBadge status={sys.verificationStatus} />{sys.verifiedAt ? ` since ${formatDateTime(sys.verifiedAt)}` : ''}</dd></div>
+          <div><dt className="inline text-ink-500">{tr('Contract:')}{' '}</dt><dd className="inline"><VerificationBadge status={sys.verificationStatus} />{sys.verifiedAt ? tr(' since {verifiedAt}', { verifiedAt: formatDateTime(sys.verifiedAt) }) : ''}</dd></div>
         </dl>
       </Card>
       <Card title={tr('Test connection')} className="lg:col-span-2">
@@ -95,8 +95,8 @@ function SystemPanel({ sys, onEdit }: { sys: IntegrationSystem; onEdit: () => vo
             <Button loading={test.isPending && test.variables === true} disabled={isFir ? !probe.stationCode || !probe.firNumber : sys.systemType === 'CASE_DIARY' ? !probe.caseRef : !probe.evidenceRef} onClick={() => test.mutate(true)}>{tr('Run contract test')}</Button>
           </div>
           {test.data && (
-            <Alert tone={test.data.ok ? 'green' : 'red'} title={test.data.ok ? `Passed (${test.data.latencyMs} ms)` : `Failed: ${test.data.errorCode}`}>
-              <ul className="list-disc pl-5">{test.data.steps.map((s, i) => <li key={i}>{s.step}: {s.ok ? 'ok' : 'failed'}{s.detail ? ` — ${s.detail}` : ''}</li>)}</ul>
+            <Alert tone={test.data.ok ? 'green' : 'red'} title={test.data.ok ? tr('Passed ({latencyMs} ms)', { latencyMs: test.data.latencyMs }) : tr('Failed: {errorCode}', { errorCode: test.data.errorCode })}>
+              <ul className="list-disc pl-5">{test.data.steps.map((s, i) => <li key={i}>{s.step}: {s.ok ? tr('ok') : tr('failed')}{s.detail ? ` — ${s.detail}` : ''}</li>)}</ul>
               <p className="mt-1">{test.data.note}</p>
             </Alert>
           )}
@@ -138,7 +138,7 @@ function SystemFormModal({ sys, onClose }: { sys: IntegrationSystem | null; onCl
     },
   });
   return (
-    <Modal open onClose={onClose} title={sys ? `Edit ${sys.name}` : 'Add integration system'} size="lg" footer={<><Button variant="secondary" onClick={onClose}>{tr('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={!f.name.trim() || (!sys && !f.code.trim())}>{tr('Save')}</Button></>}>
+    <Modal open onClose={onClose} title={sys ? tr('Edit {name}', { name: sys.name }) : tr('Add integration system')} size="lg" footer={<><Button variant="secondary" onClick={onClose}>{tr('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={!f.name.trim() || (!sys && !f.code.trim())}>{tr('Save')}</Button></>}>
       <div className="grid gap-3 md:grid-cols-2">
         {!sys && <Field label={tr('Code')} required htmlFor="is-code" hint={tr('lowercase letters, digits, - and _')}><Input id="is-code" value={f.code} onChange={upd('code')} /></Field>}
         <Field label={tr('Name')} required htmlFor="is-name"><Input id="is-name" value={f.name} onChange={upd('name')} /></Field>

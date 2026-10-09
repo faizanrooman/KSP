@@ -95,7 +95,7 @@ function TagEditor({ ev }: { ev: EvidenceDetail }) {
               {t.tag}
               {t.source !== 'MANUAL' && <span className="ml-1 opacity-70">({titleCase(t.source)})</span>}
               {ev.permissions.canEdit && t.source === 'MANUAL' && (
-                <button type="button" className="ml-1 rounded hover:bg-brand-100" aria-label={`Remove tag ${t.tag}`} onClick={() => remove.mutate(t.tag)} disabled={remove.isPending}>
+                <button type="button" className="ml-1 rounded hover:bg-brand-100" aria-label={tr('Remove tag {tag}', { tag: t.tag })} onClick={() => remove.mutate(t.tag)} disabled={remove.isPending}>
                   <X className="h-3 w-3" />
                 </button>
               )}
@@ -160,7 +160,7 @@ export function OverviewTab({ evidence }: { evidence: EvidenceSummary }) {
                 value: (
                   <span>
                     {formatDateTime(ev.recordedAt)}
-                    {ev.recordedAtSource && <span className="ml-1 text-xs text-ink-500">({ev.recordedAtSource === 'CONTAINER_TAG' ? 'camera clock in file' : 'declared at upload'})</span>}
+                    {ev.recordedAtSource && <span className="ml-1 text-xs text-ink-500">({ev.recordedAtSource === 'CONTAINER_TAG' ? tr('camera clock in file') : tr('declared at upload')})</span>}
                     {ev.recordedAtFlagged && (
                       <span className="ml-1"><Badge tone="amber">{tr('Time discrepancy')}</Badge> <span className="text-xs text-ink-700">{tr('declared')}{' '}{formatDateTime(ev.declaredRecordedAt ?? null)}{' '}{tr('— differs by')}{' '}{Math.round((ev.recordedAtDiscrepancySeconds ?? 0) / 60)}{' '}{tr('min')}</span></span>
                     )}
@@ -219,7 +219,7 @@ export function OverviewTab({ evidence }: { evidence: EvidenceSummary }) {
         </Card>
         <Card title={tr('Linked cases')}>
           {ev.cases.length === 0 ? (
-            <p className="text-sm text-ink-500">{tr('Not linked to any case')}{' '}{ev.hiddenCaseCount ? ` you can see (${ev.hiddenCaseCount} restricted)` : ''}.</p>
+            <p className="text-sm text-ink-500">{tr('Not linked to any case')}{' '}{ev.hiddenCaseCount ? tr(' you can see ({hiddenCaseCount} restricted)', { hiddenCaseCount: ev.hiddenCaseCount }) : ''}.</p>
           ) : (
             <ul className="space-y-1 text-sm">
               {ev.cases.map((c) => (

@@ -116,7 +116,7 @@ export function UserCreatePage() {
                     <Field label={t('Expires (optional)')} htmlFor={`g-exp-${i}`}>
                       <Input id={`g-exp-${i}`} type="datetime-local" value={g.expiresAt} onChange={(e) => setGrants(grants.map((x, j) => (j === i ? { ...x, expiresAt: e.target.value } : x)))} />
                     </Field>
-                    <Button variant="ghost" aria-label={`Remove role row ${i + 1}`} icon={<Trash2 className="h-4 w-4" />} onClick={() => setGrants(grants.filter((_, j) => j !== i))} />
+                    <Button variant="ghost" aria-label={t('Remove role row {value}', { value: i + 1 })} icon={<Trash2 className="h-4 w-4" />} onClick={() => setGrants(grants.filter((_, j) => j !== i))} />
                   </li>
                 ))}
               </ul>

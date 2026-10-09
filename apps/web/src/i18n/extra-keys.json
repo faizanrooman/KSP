@@ -192,5 +192,13 @@
   "Watchlists",
   "Watermarked",
   "Workspaces",
-  "Zone"
+  "Zone",
+  "Relevance",
+  "Recorded (newest)",
+  "Recorded (oldest)",
+  "Uploaded (newest)",
+  "Uploaded (oldest)",
+  "All units",
+  "API client",
+  "External recipient"
 ]

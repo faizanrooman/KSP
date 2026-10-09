@@ -67,7 +67,7 @@ export function ExportsPage() {
           error={q.error}
           onRetry={() => void q.refetch()}
           onRowClick={(r) => navigate(`/exports/${r.id}`)}
-          empty={<EmptyState title={view === 'pending' ? 'Nothing awaiting your approval' : 'No exports'} description={canAny('export:create') && view === 'mine' ? 'Start an export from an evidence item ("Export for court") or with New export.' : undefined} />}
+          empty={<EmptyState title={view === 'pending' ? t('Nothing awaiting your approval') : t('No exports')} description={canAny('export:create') && view === 'mine' ? t('Start an export from an evidence item ("Export for court") or with New export.') : undefined} />}
         />
         {q.data && q.data.total > q.data.pageSize && <Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onPage={(p) => set({ page: String(p) })} />}
       </Card>

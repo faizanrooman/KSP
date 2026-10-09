@@ -100,7 +100,7 @@ export function CasesListPage() {
           sort={s.sort}
           onSort={(sort) => set({ sort })}
           onRowClick={(r) => navigate(`/cases/${r.id}`)}
-          empty={<EmptyState title={filtered ? 'No cases match these filters' : 'No cases yet'} action={filtered ? <Button variant="secondary" onClick={reset}>{tr('Clear filters')}</Button> : undefined} />}
+          empty={<EmptyState title={filtered ? tr('No cases match these filters') : tr('No cases yet')} action={filtered ? <Button variant="secondary" onClick={reset}>{tr('Clear filters')}</Button> : undefined} />}
         />
         {list.data && <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onPage={(p) => set({ page: String(p) })} />}
       </Card>

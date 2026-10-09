@@ -48,7 +48,7 @@ export function LifecycleTab({ evidence }: { evidence: EvidenceSummary }) {
   const jobCols: Column<Job>[] = [
     { key: 'kind', header: t('Job'), render: (r) => titleCase(r.kind) },
     { key: 'status', header: t('Status'), render: (r) => <StatusBadge status={r.status} /> },
-    { key: 'progress', header: t('Progress'), render: (r) => (r.status === 'RUNNING' ? <ProgressBar value={r.progress} label={`${r.kind} progress`} /> : `${Math.round(r.progress * 100)}%`) },
+    { key: 'progress', header: t('Progress'), render: (r) => (r.status === 'RUNNING' ? <ProgressBar value={r.progress} label={t('{kind} progress', { kind: r.kind })} /> : `${Math.round(r.progress * 100)}%`) },
     { key: 'attempts', header: t('Attempts'), render: (r) => r.attempts },
     { key: 'created', header: t('Queued'), render: (r) => <span className="whitespace-nowrap">{formatDateTime(r.createdAt)}</span> },
     { key: 'error', header: t('Error'), render: (r) => (r.error ? <span className="text-red-700">{r.error}</span> : '—') },
@@ -110,7 +110,7 @@ export function LifecycleTab({ evidence }: { evidence: EvidenceSummary }) {
           <ol className="space-y-2 text-sm">
             {l.legalHoldHistory.map((h) => (
               <li key={h.id} className="flex flex-wrap gap-2">
-                <Badge tone={h.action === 'SET' ? 'red' : 'green'}>{h.action === 'SET' ? 'Placed' : 'Released'}</Badge>
+                <Badge tone={h.action === 'SET' ? 'red' : 'green'}>{h.action === 'SET' ? t('Placed') : t('Released')}</Badge>
                 <span>{formatDateTime(h.at)}{' '}{t('by')}{' '}{h.by.fullName}:</span>
                 <span className="text-ink-700">{h.reason}</span>
                 <span className="text-xs text-ink-500">{t('storage lock')}{' '}{titleCase(h.storageHold)}</span>

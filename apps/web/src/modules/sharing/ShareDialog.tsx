@@ -58,11 +58,11 @@ export function ShareDialog({ items, caseId, onClose }: { items: ShareTarget[]; 
         <div className="space-y-3 text-sm">
           {deliveryText(created.delivery) && <Alert tone={created.delivery?.link === 'FAILED' || created.delivery?.accessCode === 'FAILED' ? 'red' : 'green'}>{deliveryText(created.delivery)}{' '}{t('to')}{' '}{created.share.recipient.email}.</Alert>}
           <Alert tone="amber" title={t('Shown only once')}>
-            {created.delivery?.link === 'SENT' && created.delivery.accessCode !== 'SENT' ? 'Give the access code to the recipient by phone/SMS or in person — it was not e-mailed. ' : ''}{' '}{t('Send the link and the access code to')}{' '}{created.share.recipient.name}{' '}{t('through')}{' '}<strong>{t('different channels')}</strong>{t('(for example the link by e-mail and the code by phone/SMS). Neither can be displayed again.')}
+            {created.delivery?.link === 'SENT' && created.delivery.accessCode !== 'SENT' ? t('Give the access code to the recipient by phone/SMS or in person — it was not e-mailed. ') : ''}{' '}{t('Send the link and the access code to')}{' '}{created.share.recipient.name}{' '}{t('through')}{' '}<strong>{t('different channels')}</strong>{t('(for example the link by e-mail and the code by phone/SMS). Neither can be displayed again.')}
           </Alert>
           <Field label={t('Link')} htmlFor="sd-link"><div className="flex gap-2"><Input id="sd-link" readOnly value={created.link} className="mono text-xs" /><CopyButton value={created.link!} /></div></Field>
           <Field label={t('Access code')} htmlFor="sd-code"><div className="flex gap-2"><Input id="sd-code" readOnly value={created.accessCode} className="mono text-lg tracking-widest" /><CopyButton value={created.accessCode!} /></div></Field>
-          <p className="text-xs text-ink-600">{t('Expires')}{' '}{formatDateTime(created.share.expiresAt)}{created.share.maxViews ? ` or after ${created.share.maxViews} views` : ''}{t('. Five wrong codes lock the share.')}</p>
+          <p className="text-xs text-ink-600">{t('Expires')}{' '}{formatDateTime(created.share.expiresAt)}{created.share.maxViews ? t(' or after {maxViews} views', { maxViews: created.share.maxViews }) : ''}{t('. Five wrong codes lock the share.')}</p>
         </div>
       </Modal>
     );
@@ -72,7 +72,7 @@ export function ShareDialog({ items, caseId, onClose }: { items: ShareTarget[]; 
       open
       onClose={onClose}
       size="lg"
-      title={`Share ${items.length === 1 ? (items[0]!.evidenceNumber ?? 'evidence') : `${items.length} items`}`}
+      title={t('Share {value}', { value: items.length === 1 ? (items[0]!.evidenceNumber ?? t('evidence')) : t('{count} items', { count: items.length }) })}
       footer={<><Button variant="secondary" onClick={onClose}>{t('Cancel')}</Button><Button disabled={!valid} loading={m.isPending} onClick={() => m.mutate()}>{t('Create share')}</Button></>}
     >
       <div className="space-y-3 text-sm">
@@ -94,14 +94,14 @@ export function ShareDialog({ items, caseId, onClose }: { items: ShareTarget[]; 
         <Field label={t('Purpose')} required htmlFor="sd-purpose" hint={t('At least 5 characters; recorded in the chain of custody.')}><Textarea id="sd-purpose" rows={2} value={purpose} onChange={(e) => setPurpose(e.target.value)} /></Field>
         <fieldset className="space-y-2">
           <legend className="text-xs font-semibold uppercase text-ink-600">{t('Permissions')}</legend>
-          <Checkbox label={t('Allow download')} description={canOriginal ? (type === 'EXTERNAL' ? 'External recipients receive the watermarked copy.' : 'The recipient may download the original.') : 'Requires that you may download the original.'} checked={perm.allowDownload} disabled={!canOriginal} onChange={(v) => setPerm({ ...perm, allowDownload: v, allowOriginal: v && perm.allowOriginal })} />
+          <Checkbox label={t('Allow download')} description={canOriginal ? (type === 'EXTERNAL' ? t('External recipients receive the watermarked copy.') : t('The recipient may download the original.')) : t('Requires that you may download the original.')} checked={perm.allowDownload} disabled={!canOriginal} onChange={(v) => setPerm({ ...perm, allowDownload: v, allowOriginal: v && perm.allowOriginal })} />
           {type === 'EXTERNAL' && perm.allowDownload && <Checkbox label={t('Also allow the ORIGINAL file')} description={t('Only when the recipient must hold the unmodified original.')} checked={perm.allowOriginal} onChange={(v) => setPerm({ ...perm, allowOriginal: v })} />}
           {type === 'EXTERNAL' && <Checkbox label={t('Allow printing watermarked stills')} checked={perm.allowPrint} onChange={(v) => setPerm({ ...perm, allowPrint: v })} />}
-          {type === 'EXTERNAL' && <Checkbox label={t('Watermark playback with the recipient\'s identity')} description={canOriginal ? 'Strongly recommended.' : 'Mandatory unless you may download the original.'} checked={perm.watermark} disabled={!canOriginal} onChange={(v) => setPerm({ ...perm, watermark: v })} />}
+          {type === 'EXTERNAL' && <Checkbox label={t('Watermark playback with the recipient\'s identity')} description={canOriginal ? t('Strongly recommended.') : t('Mandatory unless you may download the original.')} checked={perm.watermark} disabled={!canOriginal} onChange={(v) => setPerm({ ...perm, watermark: v })} />}
         </fieldset>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Field label={t('Expires')} required htmlFor="sd-exp" hint={t('Limited by the system share policy (default 30 days).')}><Input id="sd-exp" type="datetime-local" value={expires} onChange={(e) => setExpires(e.target.value)} /></Field>
-          <Field label={t('Maximum views (optional)')} htmlFor="sd-views" hint={type === 'INTERNAL_USER' ? 'Counts openings of each item (one per 30-minute viewing session).' : undefined}><Input id="sd-views" inputMode="numeric" value={maxViews} onChange={(e) => setMaxViews(e.target.value.replace(/\D/g, ''))} /></Field>
+          <Field label={t('Maximum views (optional)')} htmlFor="sd-views" hint={type === 'INTERNAL_USER' ? t('Counts openings of each item (one per 30-minute viewing session).') : undefined}><Input id="sd-views" inputMode="numeric" value={maxViews} onChange={(e) => setMaxViews(e.target.value.replace(/\D/g, ''))} /></Field>
         </div>
         {emailOk && (
           <fieldset className="space-y-2">

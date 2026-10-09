@@ -131,10 +131,10 @@ function EventDrawer({ seq, onClose }: { seq: number; onClose: () => void }) {
   const q = useQuery({ queryKey: ['audit', 'event', seq], queryFn: () => api.get<AuditEvent & { verification: { hashOk: boolean; linkOk: boolean; verified: boolean } }>(`/audit/events/${seq}`) });
   const e = q.data;
   return (
-    <Modal open onClose={onClose} title={`Audit event #${seq}`} size="lg">
+    <Modal open onClose={onClose} title={t('Audit event #{seq}', { seq })} size="lg">
       {q.isLoading ? <Spinner /> : q.error || !e ? <Alert tone="red">{t('Could not load the event.')}</Alert> : (
         <div className="space-y-3 text-sm">
-          {e.verification.verified ? <Alert tone="green" title={t('Verified')}>{t('Hash recomputed from the row contents and linked to event #')}{seq - 1}.</Alert> : <Alert tone="red" title={t('Does not verify')}>{!e.verification.hashOk ? 'The row contents no longer match its hash.' : 'The previous-hash link is broken.'}</Alert>}
+          {e.verification.verified ? <Alert tone="green" title={t('Verified')}>{t('Hash recomputed from the row contents and linked to event #')}{seq - 1}.</Alert> : <Alert tone="red" title={t('Does not verify')}>{!e.verification.hashOk ? t('The row contents no longer match its hash.') : t('The previous-hash link is broken.')}</Alert>}
           <KeyValue
             columns={1}
             items={[
@@ -168,7 +168,7 @@ function ExportDialog({ filters, onClose }: { filters: Record<string, string>; o
       footer={<><Button variant="secondary" onClick={onClose}>{t('Close')}</Button>{!m.data && <Button loading={m.isPending} onClick={() => m.mutate()}>{t('Generate export')}</Button>}</>}
     >
       <div className="space-y-3 text-sm">
-        <p>{t('The export uses the filters currently applied (')}{Object.keys(filters).length ? Object.keys(filters).join(', ') : 'none — the whole ledger in your scope'}{t('). It is stored, hashed and recorded in the audit trail.')}</p>
+        <p>{t('The export uses the filters currently applied (')}{Object.keys(filters).length ? Object.keys(filters).join(', ') : t('none — the whole ledger in your scope')}{t('). It is stored, hashed and recorded in the audit trail.')}</p>
         <Field label={t('Format')} htmlFor="ae-format">
           <Select id="ae-format" value={format} onChange={(e) => setFormat(e.target.value as 'csv' | 'json')} disabled={!!m.data}>
             <option value="csv">{t('CSV (spreadsheet-safe)')}</option>
@@ -177,7 +177,7 @@ function ExportDialog({ filters, onClose }: { filters: Record<string, string>; o
         </Field>
         {m.error ? <Alert tone="red">{(m.error as Error).message}</Alert> : null}
         {m.data && (
-          <Alert tone="green" title={`${m.data.rowCount} events exported`}>
+          <Alert tone="green" title={t('{rowCount} events exported', { rowCount: m.data.rowCount })}>
             <div className="space-y-1">
               <div>{t('SHA-256 of the file:')}{' '}<code className="mono break-all text-xs">{m.data.sha256}</code></div>
               {m.data.truncated && <div>{t('The export was truncated at the row limit; narrow the filters.')}</div>}

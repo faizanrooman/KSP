@@ -45,7 +45,7 @@ function NotesTab({ evidence }: { evidence: EvidenceSummary }) {
             </Select>
           </Field>
           <Field label={t('Time')} htmlFor="na-time"><Input id="na-time" value={time} onChange={(e) => setTime(e.target.value)} className="font-mono" /></Field>
-          <Field label={kind === 'NOTE' ? 'Note (visible to everyone who can see this evidence)' : 'Label'} htmlFor="na-label">
+          <Field label={kind === 'NOTE' ? t('Note (visible to everyone who can see this evidence)') : t('Label')} htmlFor="na-label">
             {kind === 'NOTE' ? <Textarea id="na-label" rows={1} value={label} maxLength={5000} onChange={(e) => setLabel(e.target.value)} /> : <Input id="na-label" value={label} maxLength={200} onChange={(e) => setLabel(e.target.value)} />}
           </Field>
           <Button loading={addBm.isPending || addNote.isPending} onClick={submit}>{t('Add')}</Button>
@@ -60,8 +60,8 @@ function NotesTab({ evidence }: { evidence: EvidenceSummary }) {
               {bookmarks.data.items.map((b) => (
                 <li key={b.id} className="flex items-center gap-2 py-1.5 text-sm">
                   <Link to={at(evidence.id, b.timeMs)} className="mono text-xs text-brand-700 hover:underline">{formatTimecode(b.timeMs)}</Link>
-                  <span className="flex-1">{b.label}<span className="block text-xs text-ink-500">{b.user.fullName} · {b.workspaceTitle ?? 'personal'}</span></span>
-                  {b.canDelete && <Button size="sm" variant="ghost" onClick={() => delBm.mutate(b.id)} aria-label={`Delete bookmark ${b.label}`}>{t('Delete')}</Button>}
+                  <span className="flex-1">{b.label}<span className="block text-xs text-ink-500">{b.user.fullName} · {b.workspaceTitle ?? t('personal')}</span></span>
+                  {b.canDelete && <Button size="sm" variant="ghost" onClick={() => delBm.mutate(b.id)} aria-label={t('Delete bookmark {label}', { label: b.label })}>{t('Delete')}</Button>}
                 </li>
               ))}
             </ul>
@@ -75,10 +75,10 @@ function NotesTab({ evidence }: { evidence: EvidenceSummary }) {
                   <div className="flex items-center gap-2">
                     <Link to={at(evidence.id, a.startMs)} className="mono text-xs text-brand-700 hover:underline">{formatTimecode(a.startMs)}{a.endMs !== null ? `–${formatTimecode(a.endMs)}` : ''}</Link>
                     <Badge>{a.kind.toLowerCase()}</Badge>
-                    {a.deleted && <Badge tone="red">{t('deleted')}{' '}{a.deletedBy ? ` by ${a.deletedBy}` : ''}</Badge>}
+                    {a.deleted && <Badge tone="red">{t('deleted')}{' '}{a.deletedBy ? t(' by {deletedBy}', { deletedBy: a.deletedBy }) : ''}</Badge>}
                   </div>
                   {a.body && <p className={a.deleted ? 'line-through' : ''}>{a.body}</p>}
-                  <p className="text-xs text-ink-500">{a.author.fullName} · {a.workspaceTitle ?? 'shared on evidence'}</p>
+                  <p className="text-xs text-ink-500">{a.author.fullName} · {a.workspaceTitle ?? t('shared on evidence')}</p>
                 </li>
               ))}
             </ul>
@@ -123,7 +123,7 @@ function RelatedTab({ evidence }: { evidence: EvidenceSummary }) {
           <ul className="divide-y divide-ink-100">
             {related.data.items.map((r) => (
               <li key={r.id} className="py-2 text-sm">
-                <Link to={`/evidence/${r.id}`} className="mono text-xs font-semibold text-brand-800 hover:underline">{r.evidenceNumber ?? r.id}</Link> <span>{r.title ?? 'Untitled'}</span>
+                <Link to={`/evidence/${r.id}`} className="mono text-xs font-semibold text-brand-800 hover:underline">{r.evidenceNumber ?? r.id}</Link> <span>{r.title ?? t('Untitled')}</span>
                 <span className="ml-2 text-xs text-ink-500">{r.orgUnit.name}</span>
                 <div className="mt-0.5 flex flex-wrap gap-1">{r.reasons.map((x, i) => <Badge key={i} tone={x.kind === 'RELATION' ? 'blue' : 'gray'}>{x.detail}</Badge>)}</div>
               </li>

@@ -40,7 +40,7 @@ function HashRow({ label, value }: { label: string; value: string | null }) {
     <div className="flex min-w-0 items-center gap-2 text-xs">
       <span className="w-14 shrink-0 font-medium uppercase text-ink-500">{label}</span>
       <code className="mono truncate text-ink-800" title={value}>{value}</code>
-      <CopyButton value={value} label={`Copy ${label}`} />
+      <CopyButton value={value} label={tr('Copy {label}', { label })} />
     </div>
   );
 }
@@ -70,7 +70,7 @@ export function EvidenceDetailPage() {
         breadcrumb={<Link to="/evidence" className="hover:underline">{tr('Evidence')}</Link>}
         title={
           <span className="flex flex-wrap items-center gap-2">
-            <span className="break-all font-mono">{ev.evidenceNumber ?? 'Unnumbered'}</span>
+            <span className="break-all font-mono">{ev.evidenceNumber ?? tr('Unnumbered')}</span>
             <StatusBadge status={ev.status} />
             {ev.legalHold && (
               <Badge tone="red">
@@ -83,7 +83,7 @@ export function EvidenceDetailPage() {
         }
         subtitle={
           <span>
-            {ev.title ?? 'Untitled'} · {ev.orgUnit.name} · {ev.recordedAt ? `recorded ${formatDateTime(ev.recordedAt)}` : 'recording time unknown'}
+            {ev.title ?? tr('Untitled')} · {ev.orgUnit.name} · {ev.recordedAt ? tr('recorded {recordedAt}', { recordedAt: formatDateTime(ev.recordedAt) }) : tr('recording time unknown')}
           </span>
         }
         actions={
@@ -98,7 +98,7 @@ export function EvidenceDetailPage() {
       />
       {ev.legalHold && (
         <Alert tone="red" title={tr('Under legal hold')}>
-          {ev.legalHoldReason}{' '}{tr('— placed by')}{' '}{ev.legalHoldBy?.fullName ?? 'unknown'}{' '}{tr('on')}{' '}{formatDateTime(ev.legalHoldAt)}{tr('. Disposal is blocked until the hold is released.')}
+          {ev.legalHoldReason}{' '}{tr('— placed by')}{' '}{ev.legalHoldBy?.fullName ?? tr('unknown')}{' '}{tr('on')}{' '}{formatDateTime(ev.legalHoldAt)}{tr('. Disposal is blocked until the hold is released.')}
         </Alert>
       )}
       {ev.status === 'DISPOSED' && (
@@ -111,7 +111,7 @@ export function EvidenceDetailPage() {
         <div className="mb-1 flex items-center gap-2 text-sm font-medium text-ink-700">
           <ShieldCheck className="h-4 w-4 text-emerald-700" aria-hidden />
           {tr('Registered hashes')}
-          <span className="text-xs font-normal text-ink-500">{ev.lastVerifiedAt ? `last verified ${formatDateTime(ev.lastVerifiedAt)}` : 'not yet re-verified'}</span>
+          <span className="text-xs font-normal text-ink-500">{ev.lastVerifiedAt ? tr('last verified {lastVerifiedAt}', { lastVerifiedAt: formatDateTime(ev.lastVerifiedAt) }) : tr('not yet re-verified')}</span>
         </div>
         <HashRow label={tr('SHA-256')} value={ev.sha256} />
         <HashRow label={tr('SHA-512')} value={ev.sha512} />

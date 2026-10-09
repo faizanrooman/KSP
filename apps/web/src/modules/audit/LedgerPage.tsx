@@ -72,7 +72,7 @@ export function LedgerPage() {
         const res = cpResults[r.id];
         if (!can('audit:verify')) return '—';
         if (res === 'error') return <Badge tone="red">{t('Error')}</Badge>;
-        if (res) return res.ok ? <Badge tone="green">{t('Valid')}</Badge> : <Badge tone="red">{!res.signatureValid ? 'Bad signature' : !res.headMatches ? 'Head mismatch' : `Chain broken at ${res.chain.firstBadSeq}`}</Badge>;
+        if (res) return res.ok ? <Badge tone="green">{t('Valid')}</Badge> : <Badge tone="red">{!res.signatureValid ? t('Bad signature') : !res.headMatches ? t('Head mismatch') : t('Chain broken at {firstBadSeq}', { firstBadSeq: res.chain.firstBadSeq })}</Badge>;
         return <Button size="sm" variant="secondary" loading={verifyCp.isPending && verifyCp.variables === r.id} onClick={() => verifyCp.mutate(r.id)}>{t('Verify')}</Button>;
       },
     },
@@ -108,7 +108,7 @@ export function LedgerPage() {
                 <Alert tone="green" title={t('Ledger intact')}>{v.checked}{' '}{t('events recomputed;')}{' '}{v.checkpoints.length}{' '}{t('checkpoint(s) in range match and their signatures are valid.')}</Alert>
               ) : (
                 <Alert tone="red" title={t('Verification FAILED')}>
-                  {!v.chainOk ? `The hash chain breaks at seq ${v.firstBadSeq}. A critical AUDIT_CHAIN_BROKEN alert was raised.` : 'One or more checkpoints do not match the ledger or carry an invalid signature.'}
+                  {!v.chainOk ? t('The hash chain breaks at seq {firstBadSeq}. A critical AUDIT_CHAIN_BROKEN alert was raised.', { firstBadSeq: v.firstBadSeq }) : t('One or more checkpoints do not match the ledger or carry an invalid signature.')}
                 </Alert>
               )}
               <KeyValue items={[

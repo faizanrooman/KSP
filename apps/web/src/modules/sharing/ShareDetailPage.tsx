@@ -38,12 +38,12 @@ export function ShareDetailPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title={`Share with ${s.recipient.name ?? 'recipient'}`}
+        title={t('Share with {value}', { value: s.recipient.name ?? t('recipient') })}
         subtitle={s.purpose}
         breadcrumb={<Link to="/shares" className="text-brand-700 hover:underline">{t('Shares')}</Link>}
         actions={<div className="flex flex-wrap gap-2"><ShareManageActions share={s} />{s.canRevoke && <Button variant="danger" onClick={() => { revoke.reset(); setRevoking(true); }}>{t('Revoke')}</Button>}</div>}
       />
-      {s.status === 'LOCKED' && <Alert tone="red" title={t('Locked')}>{t('Too many wrong access codes were entered (')}{s.failedCodeAttempts}). {s.canUnlock ? 'Confirm with the recipient, then unlock it — or revoke it.' : 'Ask the sender to unlock or revoke it.'}</Alert>}
+      {s.status === 'LOCKED' && <Alert tone="red" title={t('Locked')}>{t('Too many wrong access codes were entered (')}{s.failedCodeAttempts}). {s.canUnlock ? t('Confirm with the recipient, then unlock it — or revoke it.') : t('Ask the sender to unlock or revoke it.')}</Alert>}
       <Card title={t('Share')}>
         <KeyValue items={[
           { label: t('Status'), value: <StatusBadge status={s.status} /> },
@@ -57,13 +57,13 @@ export function ShareDetailPage() {
           !!s.revokedAt && { label: t('Revoked'), value: `${s.revokedBy?.name ?? '—'} · ${formatDateTime(s.revokedAt)} — ${s.revokeReason ?? ''}` },
         ]} />
       </Card>
-      <Card title={`Items (${s.items.length})`}>
+      <Card title={t('Items ({count})', { count: s.items.length })}>
         <ul className="divide-y divide-ink-100 text-sm">
           {s.items.map((i) => <li key={i.evidenceId} className="py-1.5"><Link className="mono text-brand-700 hover:underline" to={`/evidence/${i.evidenceId}`}>{i.evidenceNumber}</Link> {i.title && <span className="text-ink-600">— {i.title}</span>}</li>)}
         </ul>
       </Card>
       <Card title={t('Access log')} bodyClassName="p-0">
-        <DataTable caption={t('Share access log')} columns={logCols} rows={s.accessLog} rowKey={(l) => String(l.id)} empty={<EmptyState title={s.recipientType === 'EXTERNAL' ? 'Not opened yet' : 'Internal shares are logged in the chain of custody of each item'} />} />
+        <DataTable caption={t('Share access log')} columns={logCols} rows={s.accessLog} rowKey={(l) => String(l.id)} empty={<EmptyState title={s.recipientType === 'EXTERNAL' ? t('Not opened yet') : t('Internal shares are logged in the chain of custody of each item')} />} />
       </Card>
       <ConfirmDialog
         open={revoking}

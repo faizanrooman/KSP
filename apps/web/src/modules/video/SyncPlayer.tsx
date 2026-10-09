@@ -189,15 +189,15 @@ export function SyncPlayer({ items: input, onOffsetsChange, className }: SyncPla
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1.5 text-xs">
                 <span className="flex min-w-[13rem] flex-1 flex-wrap items-center gap-x-2">
                   <span className="font-medium text-ink-800 [overflow-wrap:anywhere]">{it.label}</span>
-                  <span className="mono whitespace-nowrap text-ink-500">{local < 0 ? `starts in ${formatTimecode(-local)}` : formatTimecode(local)}</span>
+                  <span className="mono whitespace-nowrap text-ink-500">{local < 0 ? t('starts in {value}', { value: formatTimecode(-local) }) : formatTimecode(local)}</span>
                 </span>
                 <span className="ml-auto inline-flex items-center gap-1 whitespace-nowrap">
                 <span className="text-ink-600">{t('Offset')}</span>
-                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, -100)} aria-label={`${it.label}: offset −100 ms`}>{t('−100ms')}</button>
-                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, -f)} aria-label={`${it.label}: offset −1 frame`}>−1f</button>
+                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, -100)} aria-label={t('{label}: offset −100 ms', { label: it.label })}>{t('−100ms')}</button>
+                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, -f)} aria-label={t('{label}: offset −1 frame', { label: it.label })}>−1f</button>
                 <span className="mono w-20 text-center" aria-live="polite">{(offsets[i] ?? 0) >= 0 ? '+' : '−'}{formatTimecode(Math.abs(offsets[i] ?? 0))}</span>
-                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, f)} aria-label={`${it.label}: offset +1 frame`}>+1f</button>
-                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, 100)} aria-label={`${it.label}: offset +100 ms`}>{t('+100ms')}</button>
+                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, f)} aria-label={t('{label}: offset +1 frame', { label: it.label })}>+1f</button>
+                <button type="button" className="rounded border border-ink-200 px-1 hover:bg-ink-50" onClick={() => adjust(i, 100)} aria-label={t('{label}: offset +100 ms', { label: it.label })}>{t('+100ms')}</button>
                 </span>
               </div>
             </div>
@@ -205,7 +205,7 @@ export function SyncPlayer({ items: input, onOffsetsChange, className }: SyncPla
         })}
       </div>
       <div className="flex flex-wrap items-center gap-2 rounded-lg bg-ink-950 px-3 py-2 text-ink-100" role="group" aria-label={t('Synchronised transport')}>
-        <button type="button" className={btn} onClick={togglePlay} aria-label={playing ? 'Pause all' : 'Play all'}>{playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
+        <button type="button" className={btn} onClick={togglePlay} aria-label={playing ? t('Pause all') : t('Play all')}>{playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
         <button type="button" className={btn} onClick={() => stepMaster(-1)} aria-label={t('All: previous frame')}><StepBack className="h-4 w-4" /></button>
         <button type="button" className={btn} onClick={() => stepMaster(1)} aria-label={t('All: next frame')}><StepForward className="h-4 w-4" /></button>
         <input

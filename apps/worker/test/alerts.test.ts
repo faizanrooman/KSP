@@ -134,6 +134,7 @@ describe('alert rules', () => {
     await evaluateRule(db, 'PROCESSING_FAILED');
     const [a] = await alertsFor(`PROCESSING_FAILED:${pj.id}`);
     expect(a).toMatchObject({ status: 'OPEN', resource_id: ev.id, org_unit_id: ev.orgUnitId });
+    expect(a!.title).toMatch(/^Video processing failed for /);
     await db.updateTable('processing_jobs').set({ status: 'COMPLETED' }).where('id', '=', pj.id).execute();
     const r = await evaluateRule(db, 'PROCESSING_FAILED');
     expect(r.resolved).toBe(1);

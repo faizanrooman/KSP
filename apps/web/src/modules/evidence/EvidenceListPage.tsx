@@ -1,13 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { Film, Lock, MapPin } from 'lucide-react';
+import { Film, Lock, MapPin, SlidersHorizontal } from 'lucide-react';
 import { EVIDENCE_STATUSES, MEDIA_STATUSES, STORAGE_TIERS } from '@ksp/shared';
 import { api } from '@/lib/api';
 import { useUrlState } from '@/lib/hooks';
 import { formatBytes, formatDateTime, formatDuration, titleCase } from '@/lib/format';
 import { OrgUnitSelect } from '@/components/pickers';
-import { Badge, Button, Card, DataTable, EmptyState, Field, Input, PageHeader, Pagination, Select, StatusBadge, type Column } from '@/components/ui';
+import { Badge, Button, Card, DataTable, EmptyState, Field, Input, PageHeader, Pagination, Select, StatusBadge, clsx, type Column } from '@/components/ui';
 import type { EvidenceListItem, Paged } from './types';
 
 import { t as tr } from '@/lib/i18n';
@@ -26,12 +26,12 @@ function toIsoEnd(d: string) {
 export function Thumb({ url, label }: { url: string | null; label: string }) {
   if (!url) {
     return (
-      <div className="flex h-12 w-20 items-center justify-center rounded bg-ink-100 text-ink-400" role="img" aria-label={`${label}: no thumbnail`}>
+      <div className="flex h-12 w-20 items-center justify-center rounded bg-ink-100 text-ink-400" role="img" aria-label={tr('{label}: no thumbnail', { label })}>
         <Film className="h-5 w-5" aria-hidden />
       </div>
     );
   }
-  return <img src={url} alt={`Thumbnail of ${label}`} className="h-12 w-20 rounded bg-ink-900 object-cover" loading="lazy" />;
+  return <img src={url} alt={tr('Thumbnail of {label}', { label })} className="h-12 w-20 rounded bg-ink-900 object-cover" loading="lazy" />;
 }
 
 export function EvidenceListPage() {
@@ -47,9 +47,12 @@ export function EvidenceListPage() {
   );
   const list = useQuery({ queryKey: ['evidence', 'list', query], queryFn: () => api.get<Paged<EvidenceListItem>>('/evidence', query), placeholderData: keepPreviousData });
   const filtered = Object.entries(s).some(([k, v]) => !['sort', 'page', 'pageSize'].includes(k) && v !== '');
+  // Phones show search, unit and status; the rest sits behind "More filters" (always visible from md up).
+  const moreActive = (['mediaStatus', 'storageTier', 'recordedFrom', 'recordedTo', 'tag', 'legalHold', 'hasGps'] as const).filter((k) => s[k] !== '').length;
+  const [moreOpen, setMoreOpen] = useState(moreActive > 0);
 
   const columns: Column<EvidenceListItem>[] = [
-    { key: 'thumb', header: <span className="sr-only">{tr('Thumbnail')}</span>, render: (r) => <Thumb url={r.thumbnailUrl} label={r.evidenceNumber ?? r.id} />, className: 'w-24' },
+    { key: 'thumb', header: <span className="sr-only">{tr('Thumbnail')}</span>, render: (r) => <Thumb url={r.thumbnailUrl} label={r.evidenceNumber ?? r.id} />, className: 'hidden w-24 sm:table-cell' },
     {
       key: 'number',
       header: tr('Evidence'),
@@ -86,11 +89,11 @@ export function EvidenceListPage() {
         </div>
       ),
     },
-    { key: 'unit', header: tr('Unit / officer'), className: 'min-w-[9rem]', render: (r) => (<div><p>{r.orgUnit.name}</p><p className="text-xs text-ink-500">{r.officer ? `${r.officer.fullName}${r.officer.badgeNumber ? ` (${r.officer.badgeNumber})` : ''}` : `Uploaded by ${r.uploadedBy.fullName}`}</p></div>) },
+    { key: 'unit', header: tr('Unit / officer'), className: 'min-w-[9rem]', render: (r) => (<div><p>{r.orgUnit.name}</p><p className="text-xs text-ink-500">{r.officer ? `${r.officer.fullName}${r.officer.badgeNumber ? ` (${r.officer.badgeNumber})` : ''}` : tr('Uploaded by {fullName}', { fullName: r.uploadedBy.fullName })}</p></div>) },
     { key: 'recorded', header: tr('Recorded'), sortKey: 'recorded_at', className: 'min-w-[7rem]', render: (r) => formatDateTime(r.recordedAt) },
-    { key: 'duration', header: tr('Duration'), sortKey: 'duration_ms', render: (r) => formatDuration(r.durationMs) },
-    { key: 'size', header: tr('Size'), sortKey: 'size_bytes', render: (r) => <span className="whitespace-nowrap">{formatBytes(r.sizeBytes)}</span> },
-    { key: 'created', header: tr('Received'), sortKey: 'created_at', className: 'min-w-[7rem]', render: (r) => formatDateTime(r.createdAt) },
+    { key: 'duration', header: tr('Duration'), sortKey: 'duration_ms', className: 'hidden md:table-cell', render: (r) => formatDuration(r.durationMs) },
+    { key: 'size', header: tr('Size'), sortKey: 'size_bytes', className: 'hidden md:table-cell', render: (r) => <span className="whitespace-nowrap">{formatBytes(r.sizeBytes)}</span> },
+    { key: 'created', header: tr('Received'), sortKey: 'created_at', className: 'hidden min-w-[7rem] md:table-cell', render: (r) => formatDateTime(r.createdAt) },
   ];
 
   return (
@@ -98,14 +101,14 @@ export function EvidenceListPage() {
       <PageHeader title={tr('Evidence')} subtitle={tr('Video evidence within your jurisdiction. Every view is recorded in the chain of custody.')} />
       <Card>
         <form
-          className="grid gap-3 md:grid-cols-3 xl:grid-cols-6"
+          className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6"
           onSubmit={(e) => {
             e.preventDefault();
             const q = new FormData(e.currentTarget).get('q');
             set({ q: String(q ?? '').trim() });
           }}
         >
-          <div className="md:col-span-2">
+          <div className="col-span-2">
             <Field label={tr('Search')} htmlFor="ev-q">
               <Input id="ev-q" name="q" defaultValue={s.q} key={s.q} placeholder={tr('Evidence number, title, description, location…')} />
             </Field>
@@ -121,6 +124,13 @@ export function EvidenceListPage() {
               ))}
             </Select>
           </Field>
+          <div className="col-span-2 md:hidden">
+            <Button variant="secondary" size="sm" aria-expanded={moreOpen} aria-controls="ev-more" onClick={() => setMoreOpen((v) => !v)}>
+              <SlidersHorizontal className="h-4 w-4" aria-hidden />
+              {moreActive ? tr('More filters ({count} active)', { count: moreActive }) : tr('More filters')}
+            </Button>
+          </div>
+          <div id="ev-more" className={clsx(moreOpen ? 'grid' : 'hidden', 'col-span-2 grid-cols-2 gap-3 md:contents')}>
           <Field label={tr('Media')} htmlFor="ev-media">
             <Select id="ev-media" value={s.mediaStatus} onChange={(e) => set({ mediaStatus: e.target.value })}>
               <option value="">{tr('Any')}</option>
@@ -160,7 +170,8 @@ export function EvidenceListPage() {
               <option value="false">{tr('No GPS')}</option>
             </Select>
           </Field>
-          <div className="flex items-end gap-2">
+          </div>
+          <div className="col-span-2 flex items-end gap-2 md:col-span-1">
             <Button type="submit">{tr('Search')}</Button>
             {filtered && (
               <Button variant="ghost" onClick={reset}>
@@ -185,8 +196,8 @@ export function EvidenceListPage() {
           empty={
             <EmptyState
               icon={<MapPin className="h-10 w-10" aria-hidden />}
-              title={filtered ? 'No evidence matches these filters' : 'No evidence yet'}
-              description={filtered ? 'Try widening the date range or clearing filters.' : 'Uploaded footage appears here once it is registered.'}
+              title={filtered ? tr('No evidence matches these filters') : tr('No evidence yet')}
+              description={filtered ? tr('Try widening the date range or clearing filters.') : tr('Uploaded footage appears here once it is registered.')}
               action={filtered ? <Button variant="secondary" onClick={reset}>{tr('Clear filters')}</Button> : undefined}
             />
           }

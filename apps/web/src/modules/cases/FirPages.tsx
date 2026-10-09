@@ -70,7 +70,7 @@ export function FirListPage() {
         </form>
       </Card>
       <Card bodyClassName="p-0">
-        <DataTable caption={t('FIRs')} columns={cols} rows={list.data?.items} rowKey={(r) => r.id} loading={list.isFetching} error={list.error} onRetry={() => void list.refetch()} sort={s.sort} onSort={(sort) => set({ sort })} onRowClick={(r) => navigate(`/firs/${r.id}`)} empty={<EmptyState title={filtered ? 'No FIRs match these filters' : 'No FIRs yet'} />} />
+        <DataTable caption={t('FIRs')} columns={cols} rows={list.data?.items} rowKey={(r) => r.id} loading={list.isFetching} error={list.error} onRetry={() => void list.refetch()} sort={s.sort} onSort={(sort) => set({ sort })} onRowClick={(r) => navigate(`/firs/${r.id}`)} empty={<EmptyState title={filtered ? t('No FIRs match these filters') : t('No FIRs yet')} />} />
         {list.data && <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onPage={(p) => set({ page: String(p) })} />}
       </Card>
       {creating && <FirFormModal onClose={() => setCreating(false)} />}
@@ -108,7 +108,7 @@ function FirFormModal({ fir, onClose }: { fir?: FirDetail; onClose: () => void }
   });
   const valid = f.registeredAt && (fir || (f.firNumber.trim() && f.orgUnitId && f.firYear));
   return (
-    <Modal open onClose={onClose} title={fir ? `Edit FIR ${fir.displayNumber}` : 'Register FIR'} size="lg" footer={<><Button variant="secondary" onClick={onClose}>{t('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={!valid}>{fir ? 'Save' : 'Register'}</Button></>}>
+    <Modal open onClose={onClose} title={fir ? t('Edit FIR {displayNumber}', { displayNumber: fir.displayNumber }) : t('Register FIR')} size="lg" footer={<><Button variant="secondary" onClick={onClose}>{t('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={!valid}>{fir ? t('Save') : t('Register')}</Button></>}>
       <div className="grid gap-3 md:grid-cols-3">
         {!fir && (
           <>
@@ -166,10 +166,8 @@ export function ImportFirModal({ onClose }: { onClose: () => void }) {
             <div className="flex items-center gap-2 text-sm">{t('Integration status:')}{' '}<VerificationBadge status={sys.verificationStatus} /></div>
           )}
           {sys && sys.verificationStatus !== 'VERIFIED' && (
-            <Alert tone="amber" title={sys.verificationStatus === 'FIXTURE' ? 'Fixture data' : 'Unverified integration'}>
-              {sys.verificationStatus === 'FIXTURE'
-                ? 'This source returns synthetic fixture records for development/testing. Do not use for real investigations.'
-                : 'The external API contract for this system has not been verified by a live contract test. Check imported data against the source record.'}
+            <Alert tone="amber" title={sys.verificationStatus === 'FIXTURE' ? t('Fixture data') : t('Unverified integration')}>
+              {sys.verificationStatus === 'FIXTURE' ? t('This source returns synthetic fixture records for development/testing. Do not use for real investigations.') : t('The external API contract for this system has not been verified by a live contract test. Check imported data against the source record.')}
             </Alert>
           )}
           <div className="grid gap-3 md:grid-cols-3">

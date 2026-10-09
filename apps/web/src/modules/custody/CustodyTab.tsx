@@ -104,7 +104,7 @@ export function CustodyTab({ evidence }: { evidence: EvidenceSummary }) {
                     <span className="text-ink-500">{formatDateTime(e.occurredAt)}</span>
                   </div>
                   <div className="mt-0.5 flex flex-wrap gap-x-4 text-xs text-ink-600">
-                    <span>{e.actor.name ?? e.actor.id ?? '—'} ({ACTOR_LABEL[e.actor.type] ?? e.actor.type})</span>
+                    <span>{e.actor.name ?? e.actor.id ?? '—'} ({t(ACTOR_LABEL[e.actor.type] ?? e.actor.type)})</span>
                     {e.ip && <span>{t('IP')}{' '}{e.ip}</span>}
                     <span className="mono">#{e.seq} · {shortHash(e.hash, 16)}</span>
                   </div>
@@ -114,7 +114,7 @@ export function CustodyTab({ evidence }: { evidence: EvidenceSummary }) {
           </ol>
         )}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-600">
-          <span role="status" aria-live="polite">{t('Showing')}{' '}{events.length}{' '}{t('of')}{' '}{total} {filter === 'custody' ? 'custody' : 'linked'}{' '}{t('events')}</span>
+          <span role="status" aria-live="polite">{t('Showing')}{' '}{events.length}{' '}{t('of')}{' '}{total} {filter === 'custody' ? t('custody') : t('linked')}{' '}{t('events')}</span>
           {q.hasNextPage && (
             <Button size="sm" variant="secondary" loading={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
               {t('Load more (')}{Math.min(PAGE_SIZE, total - events.length)}{' '}{t('of')}{' '}{total - events.length}{' '}{t('remaining)')}
@@ -124,7 +124,7 @@ export function CustodyTab({ evidence }: { evidence: EvidenceSummary }) {
         {q.error && q.data ? <div className="mt-2"><Alert tone="red">{t('Could not load more events.')}{' '}<Button size="sm" variant="ghost" onClick={() => void q.fetchNextPage()}>{t('Retry')}</Button></Alert></div> : null}
       </Card>
       {open && (
-        <Modal open onClose={() => setOpen(null)} title={`Ledger event #${open.seq}`} size="lg">
+        <Modal open onClose={() => setOpen(null)} title={t('Ledger event #{seq}', { seq: open.seq })} size="lg">
           <div className="space-y-3 text-sm">
             <KeyValue
               columns={1}
@@ -132,7 +132,7 @@ export function CustodyTab({ evidence }: { evidence: EvidenceSummary }) {
                 { label: t('Action'), value: `${titleCase(open.action)} (${open.category})` },
                 { label: t('Outcome'), value: <StatusBadge status={open.outcome} /> },
                 { label: t('Time'), value: formatDateTime(open.occurredAt) },
-                { label: t('Actor'), value: `${open.actor.name ?? '—'} · ${ACTOR_LABEL[open.actor.type] ?? open.actor.type}${open.actor.username ? ` · @${open.actor.username}` : ''}` },
+                { label: t('Actor'), value: `${open.actor.name ?? '—'} · ${t(ACTOR_LABEL[open.actor.type] ?? open.actor.type)}${open.actor.username ? ` · @${open.actor.username}` : ''}` },
                 { label: t('IP address'), value: open.ip ?? '—' },
                 { label: t('Resource'), value: open.resourceType ? `${open.resourceType} ${open.resourceId ?? ''}` : '—', mono: true },
                 { label: t('Hash'), value: open.hash, mono: true },

@@ -42,7 +42,7 @@ export function VerifyPackagePage() {
     { key: 'p', header: t('File'), render: (f) => <span className="mono text-xs">{f.path}</span> },
     { key: 'e', header: t('Manifest SHA-256'), render: (f) => <code className="mono text-xs">{shortHash(f.expectedSha256, 16)}</code> },
     { key: 'a', header: t('Computed SHA-256'), render: (f) => <code className="mono text-xs">{shortHash(f.actualSha256, 16)}</code> },
-    { key: 'ok', header: t('Result'), render: (f) => (f.ok ? <Badge tone="green">{t('OK')}</Badge> : <Badge tone="red">{f.problem ?? 'Mismatch'}</Badge>) },
+    { key: 'ok', header: t('Result'), render: (f) => (f.ok ? <Badge tone="green">{t('OK')}</Badge> : <Badge tone="red">{f.problem ?? t('Mismatch')}</Badge>) },
   ];
   return (
     <div className="space-y-4">

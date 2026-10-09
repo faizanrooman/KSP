@@ -44,7 +44,7 @@ function EditProfileModal({ user, onClose }: { user: UserDetail; onClose: () => 
     },
   });
   return (
-    <Modal open onClose={onClose} title={`Edit ${user.fullName}`} size="lg" footer={<><Button variant="secondary" onClick={onClose} disabled={m.isPending}>{t('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={f.fullName.trim().length < 2}>{t('Save')}</Button></>}>
+    <Modal open onClose={onClose} title={t('Edit {fullName}', { fullName: user.fullName })} size="lg" footer={<><Button variant="secondary" onClick={onClose} disabled={m.isPending}>{t('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={f.fullName.trim().length < 2}>{t('Save')}</Button></>}>
       <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
         <ProfileFields f={f} setF={setF} idPrefix="ep" />
         {m.error ? <Alert tone="red">{errorMessage(m.error)}</Alert> : null}
@@ -78,7 +78,7 @@ function GrantRoleModal({ user, onClose }: { user: UserDetail; onClose: () => vo
         <Field label={t('Role')} htmlFor="gr-role" required>
           <Select id="gr-role" value={roleId} onChange={(e) => setRoleId(e.target.value)} disabled={roles.isLoading}>
             <option value="">{t('Select a role…')}</option>
-            {roles.data?.items.map((r) => <option key={r.id} value={r.id}>{r.name}{r.isSystem ? '' : ' (custom)'}</option>)}
+            {roles.data?.items.map((r) => <option key={r.id} value={r.id}>{r.name}{r.isSystem ? '' : t(' (custom)')}</option>)}
           </Select>
         </Field>
         {role && <p className="text-xs text-ink-600">{role.description ?? ''} {role.permissions.length}{' '}{t('permission(s).')}</p>}
@@ -89,7 +89,7 @@ function GrantRoleModal({ user, onClose }: { user: UserDetail; onClose: () => vo
           <Input id="gr-exp" type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
         </Field>
         {m.error ? (
-          <Alert tone="red" title={m.error instanceof ApiError && m.error.code === 'SOD_VIOLATION' ? 'Separation of duties' : 'Not granted'}>
+          <Alert tone="red" title={m.error instanceof ApiError && m.error.code === 'SOD_VIOLATION' ? t('Separation of duties') : t('Not granted')}>
             {errorMessage(m.error)}
             {missing.length > 0 && <p className="mt-1">{t('Permissions you do not hold at that unit:')}{' '}<span className="mono">{missing.join(', ')}</span></p>}
           </Alert>
@@ -140,15 +140,15 @@ export function UserDetailPage() {
   });
 
   if (q.isLoading) return <Spinner />;
-  if (q.error) return <ErrorState error={q.error} onRetry={() => void q.refetch()} title={q.error instanceof ApiError && q.error.status === 404 ? 'User not found' : undefined} />;
+  if (q.error) return <ErrorState error={q.error} onRetry={() => void q.refetch()} title={q.error instanceof ApiError && q.error.status === 404 ? t('User not found') : undefined} />;
   const u = q.data!;
   const manage = u.canManage && !u.isSelf;
   const manageRoles = can('roles:manage') && !u.isSelf;
 
   const roleCols: Column<RoleAssignment>[] = [
-    { key: 'role', header: t('Role'), render: (r) => (<div><p className="font-medium">{r.roleName}</p><p className="mono text-xs text-ink-500">{r.roleCode}{r.isSystemRole ? '' : ' · custom'}</p></div>) },
+    { key: 'role', header: t('Role'), render: (r) => (<div><p className="font-medium">{r.roleName}</p><p className="mono text-xs text-ink-500">{r.roleCode}{r.isSystemRole ? '' : t(' · custom')}</p></div>) },
     { key: 'org', header: t('At unit'), render: (r) => (<span>{r.orgUnitName}{!r.orgUnitActive && <Badge tone="gray" className="ml-1">{t('Inactive')}</Badge>}</span>) },
-    { key: 'granted', header: t('Granted'), render: (r) => (<div className="text-sm"><p>{formatDateTime(r.grantedAt)}</p><p className="text-xs text-ink-500">{r.grantedBy ? `by ${r.grantedBy.fullName}` : 'by system'}</p></div>) },
+    { key: 'granted', header: t('Granted'), render: (r) => (<div className="text-sm"><p>{formatDateTime(r.grantedAt)}</p><p className="text-xs text-ink-500">{r.grantedBy ? t('by {fullName}', { fullName: r.grantedBy.fullName }) : t('by system')}</p></div>) },
     { key: 'exp', header: t('Expires'), render: (r) => (r.expired ? <Badge tone="gray">{t('Expired')}{' '}{formatDateTime(r.expiresAt)}</Badge> : r.expiresAt ? formatDateTime(r.expiresAt) : 'Never') },
     ...(manageRoles ? [{ key: 'a', header: <span className="sr-only">{t('Actions')}</span>, render: (r: RoleAssignment) => <Button size="sm" variant="ghost" onClick={() => { revokeRole.reset(); setRevoke(r); }}>{t('Revoke')}</Button> }] : []),
   ];
@@ -172,7 +172,7 @@ export function UserDetailPage() {
         actions={manage ? <Button variant="secondary" icon={<Pencil className="h-4 w-4" />} onClick={() => setEdit(true)}>{t('Edit profile')}</Button> : undefined}
       />
       {u.isSelf && <Alert tone="blue">{t('This is your own account. Status, credential and role changes must be made by another administrator.')}</Alert>}
-      {u.status !== 'ACTIVE' && u.statusReason && <Alert tone="amber" title={`Account ${u.status.toLowerCase()} ${formatDateTime(u.statusChangedAt)}`}>{u.statusReason}</Alert>}
+      {u.status !== 'ACTIVE' && u.statusReason && <Alert tone="amber" title={t('Account {value} {statusChangedAt}', { value: u.status.toLowerCase(), statusChangedAt: formatDateTime(u.statusChangedAt) })}>{u.statusReason}</Alert>}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title={t('Profile')} className="lg:col-span-2">
           <KeyValue items={[

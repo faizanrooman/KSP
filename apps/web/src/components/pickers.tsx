@@ -35,7 +35,7 @@ export function OrgUnitSelect({ value, onChange, id, allowEmpty = true, emptyLab
   const items = (data?.items ?? []).filter((u) => !stationsOnly || u.unitType === 'STATION');
   return (
     <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} required={required} disabled={disabled || isLoading}>
-      {allowEmpty && <option value="">{isLoading ? 'Loading…' : emptyLabel}</option>}
+      {allowEmpty && <option value="">{isLoading ? tr('Loading…') : emptyLabel}</option>}
       {items.map((u) => (
         <option key={u.id} value={u.id}>
           {stationsOnly ? u.name : `${'  '.repeat(u.depth)}${u.name}`}

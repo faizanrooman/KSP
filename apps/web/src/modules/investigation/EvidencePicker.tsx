@@ -56,7 +56,7 @@ export function EvidencePicker({ open, onClose, onPick, exclude, loading, title 
               <li key={e.id} className="py-1.5">
                 <Checkbox
                   label={`${e.evidenceNumber ?? e.id} — ${e.title ?? 'Untitled'}`}
-                  description={already ? 'Already in this workspace' : `${e.orgUnit.name} · recorded ${formatDateTime(e.recordedAt)}`}
+                  description={already ? t('Already in this workspace') : t('{name} · recorded {recordedAt}', { name: e.orgUnit.name, recordedAt: formatDateTime(e.recordedAt) })}
                   checked={already || sel.includes(e.id)}
                   disabled={already}
                   onChange={(v) => setSel((s) => (v ? [...s, e.id] : s.filter((x) => x !== e.id)))}
