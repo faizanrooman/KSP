@@ -177,7 +177,7 @@ jobs:
         run: tests/e2e/scripts/stack.sh stop
       - name: Upload traces, screenshots, report and service logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-artifacts
           path: |
