@@ -183,7 +183,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     const file = env.KSP_ENV_FILE ?? resolve(root, env.NODE_ENV === 'test' ? '.env.test' : '.env');
     if (existsSync(file)) loadDotenv({ path: file, quiet: true } as never);
   }
-  const parsed = schema.safeParse(env.KSP_SERVICE === 'ksp-ai-worker' ? aiWorkerEnv(env) : env);
+  // `VAR=` (empty) from compose/k8s templates means "not set": otherwise optional enums reject the empty string.
+  const source = env.KSP_SERVICE === 'ksp-ai-worker' ? aiWorkerEnv(env) : env;
+  const cleaned = Object.fromEntries(Object.entries(source).filter(([, v]) => v !== '')) as NodeJS.ProcessEnv;
+  const parsed = schema.safeParse(cleaned);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     throw new Error(`Invalid configuration: ${issues}`);

@@ -61,6 +61,9 @@ BACKUP_S3_ENDPOINT=http://s3:7070
 ENV
   chmod 600 deploy/compose/.env
 fi
+# demo-only AI switches (every analytic enabled, legal gates off); idempotent for re-runs of older installs
+grep -q '^AI_TASKS_ENABLED=' deploy/compose/.env || echo 'AI_TASKS_ENABLED=all' >> deploy/compose/.env
+grep -q '^AI_LEGAL_GATES=' deploy/compose/.env || echo 'AI_LEGAL_GATES=off' >> deploy/compose/.env
 
 echo "== images"
 if [ -n "$TOKEN" ]; then
