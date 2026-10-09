@@ -69,6 +69,12 @@ docker build -f deploy/docker/Dockerfile --target api -t ksp/api .      # likewi
 
 ## Single host (compose)
 
+Demo/UAT on a Proxmox VE host (unprivileged Debian LXC with Docker + the site's reverse proxy for TLS): the
+copy‑paste procedure, sizing and reverse‑proxy configuration are in [deploy/proxmox/README.md](../deploy/proxmox/README.md)
+(`pve-create-lxc.sh` on the host, `install-in-lxc.sh` inside any Docker‑capable container/VM). It runs the stack in the
+`demo` tier (`KSP_ENVIRONMENT=demo`, `KSP_PREFLIGHT=warn`); production keeps the enforce defaults below.
+
+
 ```bash
 scripts/ops/generate-secrets.sh --out deploy/compose/secrets --format compose
 cp deploy/compose/.env.example deploy/compose/.env && cat deploy/compose/secrets/secrets.env >> deploy/compose/.env   # then edit URLs

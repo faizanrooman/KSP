@@ -24,6 +24,17 @@ x-app-env: &app-env
   CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS}
   COOKIE_SECURE: "true"
   TRUST_PROXY: "true"
+  # Deployment tier and production preflight (packages/core/src/preflight.ts). Production: leave the defaults.
+  # Demo / UAT on a single host: KSP_ENVIRONMENT=demo KSP_PREFLIGHT=warn KSP_ALLOW_NONEVIDENTIARY_SIGNING=true
+  # (self-signed signing key is stamped NON-EVIDENTIARY), DATABASE_TLS_WAIVED=true (postgres on the internal network).
+  KSP_ENVIRONMENT: ${KSP_ENVIRONMENT:-production}
+  KSP_PREFLIGHT: ${KSP_PREFLIGHT:-enforce}
+  KSP_ALLOW_NONEVIDENTIARY_SIGNING: ${KSP_ALLOW_NONEVIDENTIARY_SIGNING:-false}
+  DATABASE_TLS_WAIVED: ${DATABASE_TLS_WAIVED:-false}
+  OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE: ${OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE:-false}
+  ALLOWED_NETWORKS: ${ALLOWED_NETWORKS:-}
+  AI_TASKS_ENABLED: ${AI_TASKS_ENABLED:-}
+  AI_LEGAL_GATES: ${AI_LEGAL_GATES:-}
   DATABASE_URL: postgres://ksp_app:${KSP_APP_DB_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-ksp}
   DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
   S3_ENDPOINT: ${S3_ENDPOINT:-http://s3:7070}

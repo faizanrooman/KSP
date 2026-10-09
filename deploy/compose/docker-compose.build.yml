@@ -1,0 +1,11 @@
+# Build the images from this checkout instead of pulling them (no registry credentials needed):
+#   docker compose -f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.build.yml --env-file deploy/compose/.env build
+# Targets are the stages of deploy/docker/Dockerfile; KSP_IMAGE_REGISTRY/KSP_VERSION in .env name the resulting tags.
+services:
+  migrate:   { build: { context: ../.., dockerfile: deploy/docker/Dockerfile, target: api } }
+  api:       { build: { context: ../.., dockerfile: deploy/docker/Dockerfile, target: api } }
+  worker:    { build: { context: ../.., dockerfile: deploy/docker/Dockerfile, target: worker } }
+  models:    { build: { context: ../.., dockerfile: deploy/docker/Dockerfile, target: ai-worker } }
+  ai-worker: { build: { context: ../.., dockerfile: deploy/docker/Dockerfile, target: ai-worker } }
+  web:       { build: { context: ../.., dockerfile: deploy/docker/Dockerfile, target: web } }
+  backup:    { build: { context: ../.., dockerfile: deploy/docker/Dockerfile, target: backup } }
