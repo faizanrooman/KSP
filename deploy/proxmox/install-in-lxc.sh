@@ -140,4 +140,4 @@ echo
 "${COMPOSE[@]}" ps
 echo
 echo "web tier: http://$(hostname -I | awk '{print $1}'):8080  (put the TLS reverse proxy for https://$FQDN in front of it)"
-echo "update later: cd $DIR && git pull && ${COMPOSE[*]} pull && ${COMPOSE[*]} run --rm migrate && ${COMPOSE[*]} up -d"
+echo "update later: cd $DIR && git pull && bash deploy/proxmox/install-in-lxc.sh --fqdn $FQDN   (idempotent: rebuild/pull, migrate, restart)"

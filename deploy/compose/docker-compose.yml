@@ -250,6 +250,13 @@ services:
       S3_BUCKET_DERIVED: ${S3_BUCKET_DERIVED:-ksp-derived}
       OBJECT_LOCK_MODE: ${OBJECT_LOCK_MODE:-GOVERNANCE}
       KSP_SERVICE: ksp-ai-worker   # no JWT/signing/media/data-encryption secrets needed (OPS-9)
+      # same deployment tier / preflight switches as the application services (see x-app-env)
+      KSP_ENVIRONMENT: ${KSP_ENVIRONMENT:-production}
+      KSP_PREFLIGHT: ${KSP_PREFLIGHT:-enforce}
+      DATABASE_TLS_WAIVED: ${DATABASE_TLS_WAIVED:-false}
+      OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE: ${OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE:-false}
+      AI_TASKS_ENABLED: ${AI_TASKS_ENABLED:-}
+      AI_LEGAL_GATES: ${AI_LEGAL_GATES:-enforce}
       AI_MODELS_DIR: /models
       AI_WORKER_CONCURRENCY: ${AI_WORKER_CONCURRENCY:-1}
       METRICS_HOST: 0.0.0.0
