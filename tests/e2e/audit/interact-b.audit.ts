@@ -98,6 +98,7 @@ test('interactions B (audit A)', async ({ browser }) => {
   await check('legal hold dialog: Confirm disabled until a 5-character reason; Cancel closes without change', async () => {
     if (!target) return 'no registered evidence without hold';
     await ec.goto(`/evidence/${target.id}`);
+    await ec.getByRole('button', { name: 'More actions' }).click();
     await ec.getByRole('button', { name: 'Legal hold', exact: true }).click();
     const dlg = ec.getByRole('dialog', { name: 'Place legal hold' });
     const confirm = dlg.getByRole('button', { name: /Place|Confirm|hold/i }).last();

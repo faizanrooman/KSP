@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, X } from 'lucide-react';
+import { ExternalLink, Film, Play, X } from 'lucide-react';
 import { api, errorMessage } from '@/lib/api';
 import { formatBytes, formatDateTime, formatDuration, titleCase } from '@/lib/format';
 import type { EvidenceSummary } from '@/lib/extensions';
@@ -125,6 +125,37 @@ function TagEditor({ ev }: { ev: EvidenceDetail }) {
   );
 }
 
+/**
+ * The footage itself comes first on a video-evidence record. The thumbnail is part of the detail payload, so
+ * showing it records nothing; playing (which is audited as EVIDENCE_PLAYED) happens only on the Playback tab.
+ */
+function Footage({ ev }: { ev: EvidenceDetail }) {
+  const ready = ev.mediaStatus === 'READY';
+  const canPlay = (ev.permissions?.canPlay ?? false) && ready;
+  const facts = [formatDuration(ev.durationMs), ev.width && ev.height ? `${ev.width}×${ev.height}` : null, formatDateTime(ev.recordedAt)].filter(Boolean).join(' · ');
+  return (
+    <section className="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center" aria-label={tr('Footage')}>
+      <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded-md bg-ink-900 sm:w-80">
+        {ev.thumbnailUrl
+          ? <img src={ev.thumbnailUrl} alt={tr('Frame from {label}', { label: ev.evidenceNumber ?? ev.id })} className="h-full w-full object-cover" />
+          : <div className="flex h-full items-center justify-center text-ink-400"><Film className="h-8 w-8" aria-hidden /></div>}
+        {canPlay && (
+          <Link to={`/evidence/${ev.id}?tab=playback`} aria-label={tr('Play footage')}
+            className="absolute inset-0 flex items-center justify-center bg-ink-950/20 transition-colors hover:bg-ink-950/40 focus-visible:bg-ink-950/40">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/95 text-brand-800 shadow-lg"><Play className="ml-0.5 h-6 w-6" aria-hidden /></span>
+          </Link>
+        )}
+      </div>
+      <div className="min-w-0 space-y-1">
+        <p className="font-semibold text-ink-900 [overflow-wrap:anywhere]">{ev.title ?? tr('Untitled')}</p>
+        <p className="text-sm text-ink-600">{facts}</p>
+        {!ready && <p className="text-sm text-ink-600">{tr('Media processing:')}{' '}{titleCase(ev.mediaStatus)}</p>}
+        {canPlay && <Link to={`/evidence/${ev.id}?tab=playback`} className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"><Play className="h-4 w-4" aria-hidden />{tr('Play footage')}</Link>}
+      </div>
+    </section>
+  );
+}
+
 export function OverviewTab({ evidence }: { evidence: EvidenceSummary }) {
   const ev = evidence as EvidenceDetail;
   const [editing, setEditing] = useState(false);
@@ -133,6 +164,7 @@ export function OverviewTab({ evidence }: { evidence: EvidenceSummary }) {
   return (
     <div className="grid gap-4 xl:grid-cols-3">
       <div className="space-y-4 xl:col-span-2">
+        <Footage ev={ev} />
         <Card title={tr('Description')} actions={ev.permissions.canEdit && !editing ? <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>{tr('Edit')}</Button> : undefined}>
           {editing ? (
             <MetadataForm ev={ev} onDone={() => setEditing(false)} />
@@ -149,6 +181,12 @@ export function OverviewTab({ evidence }: { evidence: EvidenceSummary }) {
           )}
         </Card>
         <Card title={tr('Technical metadata')}>
+          <details className="group text-sm">
+            <summary className="cursor-pointer text-ink-600 hover:text-ink-900">
+              {[ev.originalFilename, formatBytes(ev.sizeBytes), ev.videoCodec, ev.frameRate ? `${ev.frameRate} fps` : null].filter(Boolean).join(' · ')}
+              <span className="ml-2 text-brand-700 group-open:hidden">{tr('Show all fields')}</span>
+            </summary>
+            <div className="mt-3">
           <KeyValue
             columns={3}
             items={[
@@ -180,6 +218,8 @@ export function OverviewTab({ evidence }: { evidence: EvidenceSummary }) {
               ev.duplicateOf && { label: tr('Duplicate of'), value: <Link className="text-brand-700 hover:underline" to={`/evidence/${ev.duplicateOf.id}`}>{ev.duplicateOf.evidenceNumber ?? ev.duplicateOf.id}</Link> },
             ]}
           />
+            </div>
+          </details>
           {Object.keys(ev.deviceMetadata ?? {}).length > 0 && (
             <details className="mt-4 text-sm">
               <summary className="cursor-pointer text-ink-600">{tr('Device / container tags')}</summary>

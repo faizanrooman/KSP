@@ -97,7 +97,7 @@ function Reprocess({ evidence }: { evidence: EvidenceSummary }) {
 }
 
 const actions: EvidenceAction[] = [
-  { id: 'download-original', order: 50, anyOf: ['evidence:download_original'], component: DownloadOriginal },
-  { id: 'reprocess-media', order: 90, anyOf: ['evidence:edit_metadata', 'system:monitor'], component: Reprocess },
+  { id: 'download-original', order: 50, more: true, anyOf: ['evidence:download_original'], component: DownloadOriginal },
+  { id: 'reprocess-media', order: 90, more: true, anyOf: ['evidence:edit_metadata', 'system:monitor'], component: Reprocess },
 ];
 export default actions;
