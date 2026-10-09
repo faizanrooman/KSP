@@ -26,6 +26,7 @@ Media is always streamed through the API with short-lived tokens; storage URLs n
 ./start.sh        # Linux / macOS — services, first-run setup (secrets, deps, migrations, demo data, AI models), app, URLs
 start.bat         # Windows — same script inside WSL2 (Ubuntu); prints setup steps if WSL2 is missing
 ./start.sh stop | restart | status | logs
+node scripts/dev/mfa.mjs code admin     # 6-digit code for the demo accounts the E2E suite enrolled (or `reset <user>` to enrol your own phone)
 ```
 
 ## Quick start (development host, no Docker)

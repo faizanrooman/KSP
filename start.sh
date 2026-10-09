@@ -85,6 +85,10 @@ do_start() {
     fo.ravi      Field officer          op.cubbon  Station upload operator
     fa.naveen    Forensic analyst       ec.latha   Evidence custodian      aud.suresh  Compliance auditor
 
+  Two-step verification: admin / sup.kavya / aud.suresh / ec.latha ask for a 6-digit code.
+    current code  →  node scripts/dev/mfa.mjs code admin
+    use your own phone instead  →  node scripts/dev/mfa.mjs reset admin   (next sign-in shows the QR code)
+
 EOF
   case "$(uname -s)" in Darwin) open "$(web_url)" >/dev/null 2>&1 || true;; esac
 }
