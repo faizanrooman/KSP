@@ -82,6 +82,26 @@ fi
 
 echo "== database + storage + application"
 "${COMPOSE[@]}" up -d postgres s3
+for _ in $(seq 1 60); do [ "$("${COMPOSE[@]}" ps postgres --format '{{.Health}}' 2>/dev/null)" = healthy ] && break; sleep 2; done
+# The role passwords are created from the secret files on the FIRST postgres start. If that start happened while the
+# files were unreadable (earlier installer versions) the roles exist with wrong passwords; on a database that holds no
+# application tables yet, reinitialise the volume instead of failing in migrate.
+owner_ok() { "${COMPOSE[@]}" exec -T -e PGPASSWORD="$(cat deploy/compose/secrets/ksp_owner_db_password)" postgres psql -h 127.0.0.1 -U ksp_owner -d "$(grep -m1 '^POSTGRES_DB=' deploy/compose/.env | cut -d= -f2-)" -tAc 'select 1' >/dev/null 2>&1; }
+if ! owner_ok; then
+  tables=$("${COMPOSE[@]}" exec -T postgres psql -U postgres -d "$(grep -m1 '^POSTGRES_DB=' deploy/compose/.env | cut -d= -f2-)" -tAc "select count(*) from pg_tables where schemaname='public'" 2>/dev/null || echo 0)
+  if [ "${tables:-0}" = 0 ]; then
+    echo "postgres roles do not match the secret files and the database is empty: reinitialising the data volume"
+    "${COMPOSE[@]}" down postgres >/dev/null
+    docker volume rm -f ksp-vms_pgdata >/dev/null
+    "${COMPOSE[@]}" up -d postgres
+    for _ in $(seq 1 60); do [ "$("${COMPOSE[@]}" ps postgres --format '{{.Health}}' 2>/dev/null)" = healthy ] && break; sleep 2; done
+    owner_ok || { echo "ksp_owner still cannot log in — check deploy/compose/postgres/10-ksp-roles.sh output: ${COMPOSE[*]} logs postgres" >&2; exit 1; }
+  else
+    echo "ksp_owner cannot log in but the database has tables — not touching it. Fix the role password manually:" >&2
+    echo "  ${COMPOSE[*]} exec postgres psql -U postgres -c \"ALTER ROLE ksp_owner PASSWORD '<deploy/compose/secrets/ksp_owner_db_password>'\"" >&2
+    exit 1
+  fi
+fi
 "${COMPOSE[@]}" run --rm migrate
 # demo organisation, users and sample evidence (the production seed is `seed.js --production`)
 "${COMPOSE[@]}" run --rm -e KSP_SEED_CLI=1 migrate node packages/core/dist/bin/seed.js
