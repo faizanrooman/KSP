@@ -86,9 +86,13 @@ for _ in $(seq 1 60); do [ "$("${COMPOSE[@]}" ps postgres --format '{{.Health}}'
 # The role passwords are created from the secret files on the FIRST postgres start. If that start happened while the
 # files were unreadable (earlier installer versions) the roles exist with wrong passwords; on a database that holds no
 # application tables yet, reinitialise the volume instead of failing in migrate.
-owner_ok() { "${COMPOSE[@]}" exec -T -e PGPASSWORD="$(cat deploy/compose/secrets/ksp_owner_db_password)" postgres psql -h 127.0.0.1 -U ksp_owner -d "$(grep -m1 '^POSTGRES_DB=' deploy/compose/.env | cut -d= -f2-)" -tAc 'select 1' >/dev/null 2>&1; }
+# Test the way the application connects (over the backend network, password auth): connections from inside the
+# postgres container itself are trusted by the image's pg_hba and would always succeed.
+PG_IMAGE=$("${COMPOSE[@]}" config --images 2>/dev/null | grep -m1 '^postgres')
+PG_DB=$(grep -m1 '^POSTGRES_DB=' deploy/compose/.env | cut -d= -f2-)
+owner_ok() { docker run --rm --network ksp-vms_backend -e PGPASSWORD="$(tr -d '\n' < deploy/compose/secrets/ksp_owner_db_password)" "$PG_IMAGE" psql -h postgres -U ksp_owner -d "$PG_DB" -tAc 'select 1' >/dev/null 2>&1; }
 if ! owner_ok; then
-  tables=$("${COMPOSE[@]}" exec -T postgres psql -U postgres -d "$(grep -m1 '^POSTGRES_DB=' deploy/compose/.env | cut -d= -f2-)" -tAc "select count(*) from pg_tables where schemaname='public'" 2>/dev/null || echo 0)
+  tables=$("${COMPOSE[@]}" exec -T postgres psql -U postgres -d "$PG_DB" -tAc "select count(*) from pg_tables where schemaname='public'" 2>/dev/null || echo 0)
   if [ "${tables:-0}" = 0 ]; then
     echo "postgres roles do not match the secret files and the database is empty: reinitialising the data volume"
     "${COMPOSE[@]}" down postgres >/dev/null
