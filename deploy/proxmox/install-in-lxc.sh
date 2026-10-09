@@ -16,11 +16,11 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$FQDN" ] || { echo "--fqdn is required" >&2; exit 2; }
-export DEBIAN_FRONTEND=noninteractive
+export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 echo "== packages"
 apt-get update -qq
-apt-get install -y -qq ca-certificates curl git gnupg openssl jq >/dev/null
+apt-get install -y -qq ca-certificates curl git gnupg openssl jq age locales-all >/dev/null   # age: backup encryption keys
 if ! command -v docker >/dev/null; then
   install -m 0755 -d /etc/apt/keyrings
   . /etc/os-release
@@ -37,8 +37,9 @@ cd "$DIR"
 COMPOSE=(docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/.env)
 
 echo "== secrets + .env"
+# idempotent: existing secret files are kept, missing ones (e.g. age keys after installing age) are added
+scripts/ops/generate-secrets.sh --out deploy/compose/secrets --format all --env-name demo --signing-cn "KSP VMS Demo Signing (NOT FOR COURT USE)" >/dev/null
 if [ ! -f deploy/compose/.env ]; then
-  scripts/ops/generate-secrets.sh --out deploy/compose/secrets --format all --env-name demo --signing-cn "KSP VMS Demo Signing (NOT FOR COURT USE)" >/dev/null
   # files consumed as Docker secrets (compose `secrets:`), values appended to .env
   grep -vE '^(APP_BASE_URL|CORS_ORIGINS|KSP_IMAGE_REGISTRY|KSP_VERSION|WEB_BIND|BACKUP_S3_ENDPOINT|LOG_LEVEL)=' deploy/compose/.env.example > deploy/compose/.env
   cat deploy/compose/secrets/secrets.env >> deploy/compose/.env
