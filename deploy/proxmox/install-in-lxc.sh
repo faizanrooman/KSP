@@ -61,6 +61,11 @@ BACKUP_S3_ENDPOINT=http://s3:7070
 ENV
   chmod 600 deploy/compose/.env
 fi
+# Compose bind-mounts the secret files as they are on disk; the services run as non-root (api/worker/ai 10001, backup
+# 10002, postgres 999), so root-only 0600 files are unreadable in the containers. Inside this dedicated demo CT the
+# mounted files are made world-readable; the backup DEcryption identity stays 0600 (move it offline — see generate-secrets).
+find deploy/compose/secrets -maxdepth 1 -type f ! -name backup_age_identity ! -name '*.csr' -exec chmod 0644 {} +
+chmod 0711 deploy/compose/secrets
 # demo-only AI switches (every analytic enabled, legal gates off); idempotent for re-runs of older installs
 grep -q '^AI_TASKS_ENABLED=' deploy/compose/.env || echo 'AI_TASKS_ENABLED=all' >> deploy/compose/.env
 grep -q '^AI_LEGAL_GATES=' deploy/compose/.env || echo 'AI_LEGAL_GATES=off' >> deploy/compose/.env
