@@ -70,7 +70,7 @@ export async function ensureImages(): Promise<Record<TestImage, string>> {
 async function download(url: string, file: string): Promise<Buffer> {
   const waits = [2_000, 5_000, 10_000, 20_000];
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(url, { headers: { 'user-agent': 'KSP-VMS-tests/1.0 (automated test fixture download; github.com/faizanrooman/KSP)' } });
+    const res = await fetch(url, { headers: { 'user-agent': 'KSP-VMS-tests/1.0 (automated test fixture download; github.com/rooman-itsd/KSP)' } });
     if (res.ok) return Buffer.from(await res.arrayBuffer());
     const retryable = res.status === 429 || res.status >= 500;
     if (!retryable || attempt >= waits.length) throw new Error(`download ${file}: HTTP ${res.status}`);

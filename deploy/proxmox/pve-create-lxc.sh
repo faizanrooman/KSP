@@ -34,7 +34,7 @@ echo "== container $CTID ($HOSTNAME_)"
 NET="name=eth0,bridge=$BRIDGE,ip=$IP"; [[ "$IP" == dhcp ]] || NET="name=eth0,bridge=$BRIDGE,ip=$IP"
 pct create "$CTID" "local:vztmpl/$TPL" --hostname "$HOSTNAME_" --unprivileged 1 --features nesting=1,keyctl=1 \
   --cores "$CORES" --memory "$MEMORY" --swap 1024 --rootfs "$STORAGE:$DISK" --net0 "$NET" --onboot 1 --start 1 \
-  --description "KSP Video Evidence Management System (demo). https://github.com/faizanrooman/KSP"
+  --description "KSP Video Evidence Management System (demo). https://github.com/rooman-itsd/KSP"
 for _ in $(seq 1 30); do pct exec "$CTID" -- getent hosts deb.debian.org >/dev/null 2>&1 && break; sleep 2; done
 
 echo "== installing inside the container"

@@ -7,12 +7,13 @@
 # Demo tier: KSP_ENVIRONMENT=demo + KSP_PREFLIGHT=warn (the production preflight logs its findings instead of refusing:
 # self-signed signing key, GOVERNANCE object lock, bundled S3 gateway, demo users). For production follow docs/GO-LIVE-CHECKLIST.md.
 set -euo pipefail
-FQDN=""; TOKEN=""; AI=1; REPO="https://github.com/faizanrooman/KSP.git"; REF="main"; DIR=/opt/ksp; SKIP_GIT=0
+FQDN=""; TOKEN=""; AI=1; REPO="https://github.com/rooman-itsd/KSP.git"; REF="main"; DIR=/opt/ksp; SKIP_GIT=0; GHCR_USER=ksp
 while [ $# -gt 0 ]; do
   case "$1" in
     --fqdn) FQDN="$2"; shift 2 ;; --ghcr-token) TOKEN="$2"; shift 2 ;; --no-ai) AI=0; shift ;;
     --repo) REPO="$2"; shift 2 ;; --ref) REF="$2"; shift 2 ;; --dir) DIR="$2"; shift 2 ;;
-    --skip-git) SKIP_GIT=1; shift ;;   # deploy the checkout exactly as it is (used by autodeploy.sh, which pins the commit)
+    --skip-git) SKIP_GIT=1; shift ;;
+    --ghcr-user) GHCR_USER="$2"; shift 2 ;;   # GitHub user that owns the --ghcr-token   # deploy the checkout exactly as it is (used by autodeploy.sh, which pins the commit)
     *) echo "unknown argument $1" >&2; exit 2 ;;
   esac
 done
@@ -34,7 +35,7 @@ docker info >/dev/null || { echo "Docker daemon not running (LXC needs features:
 
 echo "== repository"
 if [ "$SKIP_GIT" = 1 ]; then echo "using checkout $(git -C "$DIR" rev-parse --short HEAD) as is"
-elif [ -d "$DIR/.git" ]; then git -C "$DIR" fetch -q origin && git -C "$DIR" checkout -q "$REF" && git -C "$DIR" pull -q --ff-only; else git clone -q --branch "$REF" "$REPO" "$DIR"; fi
+elif [ -d "$DIR/.git" ]; then git -C "$DIR" remote set-url origin "$REPO"; git -C "$DIR" fetch -q origin && git -C "$DIR" checkout -q "$REF" && git -C "$DIR" pull -q --ff-only; else git clone -q --branch "$REF" "$REPO" "$DIR"; fi
 cd "$DIR"
 COMPOSE=(docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/.env)
 
@@ -49,7 +50,7 @@ if [ ! -f deploy/compose/.env ]; then
   cat >> deploy/compose/.env <<ENV
 
 # --- demo deployment (deploy/proxmox/install-in-lxc.sh) ---
-KSP_IMAGE_REGISTRY=ghcr.io/faizanrooman/ksp
+KSP_IMAGE_REGISTRY=ghcr.io/rooman-itsd/ksp
 KSP_VERSION=staging
 APP_BASE_URL=https://$FQDN
 CORS_ORIGINS=https://$FQDN
@@ -80,7 +81,7 @@ grep -q '^AI_LEGAL_GATES=' deploy/compose/.env || echo 'AI_LEGAL_GATES=off' >> d
 
 echo "== images"
 if [ -n "$TOKEN" ]; then
-  echo "$TOKEN" | docker login ghcr.io -u faizanrooman --password-stdin >/dev/null
+  echo "$TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
   "${COMPOSE[@]}" pull -q
 else
   echo "no --ghcr-token: building images from source (10–20 min on first run)"

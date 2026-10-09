@@ -13,7 +13,7 @@ set -euo pipefail
 main() {
   # shellcheck disable=SC1091
   [ -f /etc/ksp-autodeploy.env ] && . /etc/ksp-autodeploy.env
-  local DIR="${KSP_DIR:-/opt/ksp}" BRANCH="${KSP_BRANCH:-main}" REPO="${KSP_GITHUB_REPO:-faizanrooman/KSP}"
+  local DIR="${KSP_DIR:-/opt/ksp}" BRANCH="${KSP_BRANCH:-main}" REPO="${KSP_GITHUB_REPO:-rooman-itsd/KSP}"
   local WORKFLOW="${KSP_REQUIRED_WORKFLOW:-ci}" FQDN="${KSP_FQDN:?KSP_FQDN not set in /etc/ksp-autodeploy.env}"
   local STATE=/var/lib/ksp-autodeploy
   mkdir -p "$STATE"
@@ -31,7 +31,7 @@ main() {
   # --- CI gate (public repository: unauthenticated API, called only when there is a new commit) -------------------
   local auth=() runs result
   [ -n "${KSP_GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $KSP_GITHUB_TOKEN")
-  runs=$(curl -fsS -m 30 "${auth[@]}" -H "Accept: application/vnd.github+json" \
+  runs=$(curl -fsSL -m 30 "${auth[@]}" -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/$REPO/actions/runs?head_sha=$target&event=push&per_page=50") \
     || { echo "GitHub API not reachable — will retry"; return 0; }
   result=$(jq -r --arg wf "$WORKFLOW" '[.workflow_runs[] | select(.name == $wf)] | sort_by(.run_attempt) | last | if . == null then "none" else "\(.status)/\(.conclusion)" end' <<<"$runs")

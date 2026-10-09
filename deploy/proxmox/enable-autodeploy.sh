@@ -28,7 +28,7 @@ cat > /etc/ksp-autodeploy.env <<ENV
 KSP_DIR=$DIR
 KSP_FQDN=$FQDN
 KSP_BRANCH=$BRANCH
-KSP_GITHUB_REPO=faizanrooman/KSP
+KSP_GITHUB_REPO=rooman-itsd/KSP
 KSP_REQUIRED_WORKFLOW=ci
 # KSP_GITHUB_TOKEN=   # optional (higher API rate limit / private repository): fine-grained token, Actions: read
 ENV

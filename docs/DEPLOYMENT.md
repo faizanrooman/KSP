@@ -21,7 +21,7 @@ including a full DR drill (docs/DISASTER-RECOVERY.md).
 | `.github/workflows/ci.yml`, `release.yml` | CI (lint/typecheck/build/tests/security) and CD (images, staging, approved production) |
 
 Release pipeline: every push to `main` builds, Trivy-scans (fixable HIGH/CRITICAL fail), SBOMs and attests the five
-images (`ghcr.io/faizanrooman/ksp/<target>:sha-<commit>` and `:staging`). The deploy stages are **off until a target
+images (`ghcr.io/rooman-itsd/ksp/<target>:sha-<commit>` and `:staging`). The deploy stages are **off until a target
 cluster exists**: set repository variable `DEPLOY_STAGING=true` plus the `staging` environment secret
 `STAGING_KUBECONFIG_B64`, then `DEPLOY_PRODUCTION=true` plus `PRODUCTION_KUBECONFIG_B64` with required reviewers on the
 `production` environment (manual approval gate). Deploy runs `scripts/ops/k8s-deploy.sh <overlay> sha-<commit>`.

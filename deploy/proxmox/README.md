@@ -8,7 +8,7 @@ machine.
 ## 1. Create the container and install (on the Proxmox host shell, as root)
 
 ```bash
-git clone https://github.com/faizanrooman/KSP.git /root/ksp-src        # only the deploy scripts are needed
+git clone https://github.com/rooman-itsd/KSP.git /root/ksp-src        # only the deploy scripts are needed
 bash /root/ksp-src/deploy/proxmox/pve-create-lxc.sh --hostname ksp-vms --fqdn ksp.lan \
      --ip 192.168.1.60/24,gw=192.168.1.1          # or --ip dhcp
 #   --ghcr-token <GitHub PAT with read:packages>  pulls the images built by the release workflow (fast)
