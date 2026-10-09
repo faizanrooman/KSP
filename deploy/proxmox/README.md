@@ -77,3 +77,29 @@ The bundled S3 gateway (versitygw) gets the application and AI identities create
 
 Resources: Postgres and the S3 gateway keep their data in Docker volumes (`pgdata`, `s3data`); back the CT up with
 Proxmox backups (`vzdump`) in addition to the application's own encrypted backups (`backup` profile).
+
+## Automatic deployment (push to `main` → live after CI passes)
+
+Inside the container, once:
+
+```bash
+cd /opt/ksp && git pull -q && bash deploy/proxmox/enable-autodeploy.sh --fqdn ksp.futureacad.ae
+```
+
+A systemd timer (`ksp-autodeploy.timer`, every 5 min) fetches `main`; for a new commit it asks the GitHub API whether
+the **`ci` workflow passed for exactly that commit**. Still running → it waits; failed/cancelled → that commit is
+skipped and the current version stays live; passed → it checks out that commit and runs
+`install-in-lxc.sh --skip-git` (rebuilds only changed images, applies migrations, restarts changed services), then
+waits until the web tier and both API replicas are healthy before recording it as deployed.
+
+Pull-based by design: GitHub never connects to the server (no inbound SSH, no self-hosted runner that pull requests
+from forks could run code on). Demo data is seeded only on an empty database, so automatic updates never re-create
+users you deleted or reset passwords.
+
+```bash
+systemctl list-timers ksp-autodeploy.timer         # next check
+journalctl -u ksp-autodeploy -n 50 -f              # what it did
+cat /var/lib/ksp-autodeploy/history.tsv            # deployed commits (start, end, sha)
+systemctl start ksp-autodeploy                     # check/deploy now
+bash deploy/proxmox/enable-autodeploy.sh --disable # turn off
+```

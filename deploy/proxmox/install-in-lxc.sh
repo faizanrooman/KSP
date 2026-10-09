@@ -7,11 +7,12 @@
 # Demo tier: KSP_ENVIRONMENT=demo + KSP_PREFLIGHT=warn (the production preflight logs its findings instead of refusing:
 # self-signed signing key, GOVERNANCE object lock, bundled S3 gateway, demo users). For production follow docs/GO-LIVE-CHECKLIST.md.
 set -euo pipefail
-FQDN=""; TOKEN=""; AI=1; REPO="https://github.com/faizanrooman/KSP.git"; REF="main"; DIR=/opt/ksp
+FQDN=""; TOKEN=""; AI=1; REPO="https://github.com/faizanrooman/KSP.git"; REF="main"; DIR=/opt/ksp; SKIP_GIT=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --fqdn) FQDN="$2"; shift 2 ;; --ghcr-token) TOKEN="$2"; shift 2 ;; --no-ai) AI=0; shift ;;
     --repo) REPO="$2"; shift 2 ;; --ref) REF="$2"; shift 2 ;; --dir) DIR="$2"; shift 2 ;;
+    --skip-git) SKIP_GIT=1; shift ;;   # deploy the checkout exactly as it is (used by autodeploy.sh, which pins the commit)
     *) echo "unknown argument $1" >&2; exit 2 ;;
   esac
 done
@@ -32,7 +33,8 @@ systemctl enable --now docker >/dev/null 2>&1 || true
 docker info >/dev/null || { echo "Docker daemon not running (LXC needs features: nesting=1,keyctl=1)" >&2; exit 1; }
 
 echo "== repository"
-if [ -d "$DIR/.git" ]; then git -C "$DIR" fetch -q origin && git -C "$DIR" checkout -q "$REF" && git -C "$DIR" pull -q --ff-only; else git clone -q --branch "$REF" "$REPO" "$DIR"; fi
+if [ "$SKIP_GIT" = 1 ]; then echo "using checkout $(git -C "$DIR" rev-parse --short HEAD) as is"
+elif [ -d "$DIR/.git" ]; then git -C "$DIR" fetch -q origin && git -C "$DIR" checkout -q "$REF" && git -C "$DIR" pull -q --ff-only; else git clone -q --branch "$REF" "$REPO" "$DIR"; fi
 cd "$DIR"
 COMPOSE=(docker compose -f deploy/compose/docker-compose.yml --env-file deploy/compose/.env)
 
@@ -125,8 +127,11 @@ for id in "$(envv S3_ACCESS_KEY):$(envv S3_SECRET_KEY)" "$(envv S3_AI_ACCESS_KEY
   else vgw_admin create-user -a "${id%%:*}" -s "${id#*:}" -r admin >/dev/null && echo "s3 identity ${id%%:*}: created"; fi
 done
 "${COMPOSE[@]}" run --rm migrate
-# demo organisation, users and sample evidence (the production seed is `seed.js --production`)
-"${COMPOSE[@]}" run --rm -e KSP_SEED_CLI=1 migrate node packages/core/dist/bin/seed.js
+# demo organisation, users and sample evidence (the production seed is `seed.js --production`) — FIRST install only:
+# re-seeding on later runs would re-create demo users an administrator deliberately deleted, with the public password.
+users=$("${COMPOSE[@]}" exec -T postgres psql -U postgres -d "$PG_DB" -tAc "select count(*) from users" 2>/dev/null | tr -d '[:space:]' || true)
+if [ "${users:-0}" = 0 ]; then "${COMPOSE[@]}" run --rm -e KSP_SEED_CLI=1 migrate node packages/core/dist/bin/seed.js
+else echo "demo data present ($users users): seed skipped"; fi
 "${COMPOSE[@]}" up -d api worker web
 if [ "$AI" = 1 ]; then
   "${COMPOSE[@]}" --profile ai up -d models   # one-shot download + SHA-256 verification of the pinned models
