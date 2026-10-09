@@ -163,7 +163,8 @@ export function EvidenceDetailPage() {
   const { canAny } = useAuth();
   const [url, setUrl] = useUrlState(TAB_DEFAULTS);
   const q = useEvidenceDetail(id);
-  const custodyVerdict = useCustodyVerdict(id, canAny('custody:read'));
+  // Only once the item itself has loaded: an out-of-scope id must stay a single 404 (no further requests).
+  const custodyVerdict = useCustodyVerdict(id, canAny('custody:read') && !!q.data);
 
   if (q.isLoading) return <Spinner label={tr('Loading evidence…')} />;
   if (q.error) {
