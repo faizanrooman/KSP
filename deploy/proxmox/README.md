@@ -71,5 +71,9 @@ lock, bundled S3 gateway, demo users — instead of refusing to start), `KSP_ALL
 `DATABASE_TLS_WAIVED=true`. For production follow `docs/GO-LIVE-CHECKLIST.md` (HSM key, COMPLIANCE lock, real S3,
 `ops:purge-demo-data`, `KSP_ENVIRONMENT=production`).
 
+The bundled S3 gateway (versitygw) gets the application and AI identities created in its IAM store by the installer
+(both with the `admin` role — a production S3 store restricts the AI identity to the derived bucket by policy,
+`deploy/s3/policies/`).
+
 Resources: Postgres and the S3 gateway keep their data in Docker volumes (`pgdata`, `s3data`); back the CT up with
 Proxmox backups (`vzdump`) in addition to the application's own encrypted backups (`backup` profile).
