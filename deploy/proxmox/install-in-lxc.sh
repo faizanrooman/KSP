@@ -81,7 +81,9 @@ else
 fi
 
 echo "== database + storage + application"
-"${COMPOSE[@]}" up -d postgres s3
+# s3 (versitygw) is stateless apart from its volume: recreate it so it is always attached to the current networks
+# (a `compose down <other service>` removes and recreates the project networks, leaving a running container detached).
+"${COMPOSE[@]}" up -d postgres && "${COMPOSE[@]}" up -d --force-recreate --no-deps s3
 for _ in $(seq 1 60); do [ "$("${COMPOSE[@]}" ps postgres --format '{{.Health}}' 2>/dev/null)" = healthy ] && break; sleep 2; done
 # The role passwords are created from the secret files on the FIRST postgres start. If that start happened while the
 # files were unreadable (earlier installer versions) the roles exist with wrong passwords; on a database that holds no
