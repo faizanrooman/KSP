@@ -26,8 +26,16 @@
   "Open the review queue": "ಪರಿಶೀಲನಾ ಸರತಿ ತೆರೆಯಿರಿ",
   "Play footage": "ದೃಶ್ಯಾವಳಿ ಪ್ಲೇ ಮಾಡಿ",
   "Re-verification in progress": "ಮರು-ಪರಿಶೀಲನೆ ನಡೆಯುತ್ತಿದೆ",
-  "re-verified {date}": "{date} ರಂದು ಮರು-ಪರಿಶೀಲಿಸಲಾಗಿದೆ",
   "Registered hash": "ನೋಂದಾಯಿತ ಹ್ಯಾಶ್",
   "Review {count} pending →": "ಬಾಕಿ {count} ಪರಿಶೀಲಿಸಿ →",
-  "Show all fields": "ಎಲ್ಲಾ ಕ್ಷೇತ್ರಗಳನ್ನು ತೋರಿಸಿ"
+  "Show all fields": "ಎಲ್ಲಾ ಕ್ಷೇತ್ರಗಳನ್ನು ತೋರಿಸಿ",
+  "re-checked {date} ({how})": "{date} ರಂದು ಮರು-ಪರಿಶೀಲಿಸಲಾಗಿದೆ ({how})",
+  "Hash recorded at ingest": "ಸ್ವೀಕಾರದ ವೇಳೆ ಹ್ಯಾಶ್ ದಾಖಲಾಗಿದೆ",
+  "no later re-check yet": "ನಂತರ ಇನ್ನೂ ಮರು-ಪರಿಶೀಲನೆ ಆಗಿಲ್ಲ",
+  "nightly sweep": "ರಾತ್ರಿಯ ಪರಿಶೀಲನಾ ಸುತ್ತು",
+  "on request": "ಕೋರಿಕೆಯ ಮೇರೆಗೆ",
+  "court export": "ನ್ಯಾಯಾಲಯ ರಫ್ತು",
+  "tier migration": "ಶ್ರೇಣಿ ಸ್ಥಳಾಂತರ",
+  "restore": "ಮರುಸ್ಥಾಪನೆ",
+  "check": "ಪರಿಶೀಲನೆ"
 }

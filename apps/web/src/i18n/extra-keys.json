@@ -200,5 +200,11 @@
   "Uploaded (oldest)",
   "All units",
   "API client",
-  "External recipient"
+  "External recipient",
+  "nightly sweep",
+  "on request",
+  "court export",
+  "tier migration",
+  "restore",
+  "check"
 ]

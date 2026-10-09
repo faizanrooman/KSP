@@ -51,7 +51,11 @@ interface FixityVerdict {
   lastVerifiedAt: string | null;
   lastResult: 'OK' | 'FAILED' | null;
   pendingJob: { id: string; status: string } | null;
+  items: Array<{ trigger: string; ok: boolean; checkedAt: string }>;
 }
+
+// Only a check made after ingest is a re-verification; the registration hash is the baseline it is compared with.
+const RECHECK_LABEL: Record<string, string> = { SCHEDULED: 'nightly sweep', ON_DEMAND: 'on request', EXPORT: 'court export', TIER_MIGRATION: 'tier migration', RESTORE: 'restore' };
 
 type Tone = 'good' | 'bad' | 'neutral';
 const TONE: Record<Tone, string> = {
@@ -83,15 +87,18 @@ function IntegrityVerdict({ ev, canCustody, open }: { ev: EvidenceDetail; canCus
   });
   const chain = useCustodyVerdict(ev.id, canCustody);
   const f = fixity.data;
+  const recheck = f?.items.find((i) => i.trigger !== 'REGISTRATION');
   const fix = !f
     ? { tone: 'neutral' as Tone, icon: <Shield className="h-4 w-4" />, label: fixity.error ? tr('Fixity status unavailable') : tr('Checking fixity…') }
     : f.pendingJob
       ? { tone: 'neutral' as Tone, icon: <Shield className="h-4 w-4" />, label: tr('Re-verification in progress'), detail: f.lastVerifiedAt ? tr('last verified {date}', { date: formatDateTime(f.lastVerifiedAt) }) : undefined }
-      : f.lastResult === 'OK'
-        ? { tone: 'good' as Tone, icon: <ShieldCheck className="h-4 w-4" />, label: tr('Fixity: hash matches'), detail: tr('re-verified {date}', { date: formatDateTime(f.lastVerifiedAt) }) }
-        : f.lastResult === 'FAILED'
-          ? { tone: 'bad' as Tone, icon: <ShieldX className="h-4 w-4" />, label: tr('Fixity: hash MISMATCH'), detail: tr('checked {date}', { date: formatDateTime(f.lastVerifiedAt) }) }
-          : { tone: 'neutral' as Tone, icon: <Shield className="h-4 w-4" />, label: tr('Registered hash'), detail: tr('not yet re-verified') };
+      : f.lastResult === 'FAILED'
+        ? { tone: 'bad' as Tone, icon: <ShieldX className="h-4 w-4" />, label: tr('Fixity: hash MISMATCH'), detail: tr('checked {date}', { date: formatDateTime(f.items[0]?.checkedAt ?? f.lastVerifiedAt) }) }
+        : recheck?.ok && f.lastResult === 'OK'
+          ? { tone: 'good' as Tone, icon: <ShieldCheck className="h-4 w-4" />, label: tr('Fixity: hash matches'), detail: tr('re-checked {date} ({how})', { date: formatDateTime(recheck.checkedAt), how: tr(RECHECK_LABEL[recheck.trigger] ?? 'check') }) }
+          : f.items.length
+            ? { tone: 'neutral' as Tone, icon: <ShieldCheck className="h-4 w-4" />, label: tr('Hash recorded at ingest'), detail: tr('no later re-check yet') }
+            : { tone: 'neutral' as Tone, icon: <Shield className="h-4 w-4" />, label: tr('Registered hash'), detail: tr('not yet re-verified') };
   const v = chain.data?.verification;
   return (
     <div className="flex flex-wrap gap-2" role="group" aria-label={tr('Integrity verdict')}>
