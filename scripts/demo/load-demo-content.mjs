@@ -48,7 +48,19 @@ class Api {
     if (auth && this.token) h.authorization = `Bearer ${this.token}`;
     let payload;
     if (body) { h['content-type'] = 'application/octet-stream'; payload = body; } else if (json !== undefined) { h['content-type'] = 'application/json'; payload = JSON.stringify(json); }
-    const res = await fetch(`${API}/api/v1${path}`, { method, headers: h, body: payload, signal: AbortSignal.timeout(300_000) });
+    // Retry dropped connections: a keep-alive socket idle longer than the API's keep-alive timeout (72 s — e.g. while
+    // clips are being generated on a slow host) is closed by the server and fails on reuse ("other side closed").
+    let res;
+    for (let attempt = 1; ; attempt++) {
+      try { res = await fetch(`${API}/api/v1${path}`, { method, headers: h, body: payload, signal: AbortSignal.timeout(300_000) }); break; }
+      catch (e) {
+        const code = e?.cause?.code ?? e?.code;
+        if (attempt >= 4 || !['UND_ERR_SOCKET', 'ECONNRESET', 'ECONNREFUSED', 'EPIPE', 'UND_ERR_CLOSED'].includes(code)) throw e;
+        await sleep(1000 * attempt);
+      }
+    }
+    // access tokens live 15 min; long runs simply sign in again
+    if (res.status === 401 && auth && this.token && !headers['x-retried']) { await this.login(); return this.raw(method, path, json, auth, body, { ...headers, 'x-retried': '1' }); }
     const text = await res.text();
     let data; try { data = text ? JSON.parse(text) : undefined; } catch { data = text; }
     if (!res.ok) { const e = data?.error; const err = new Error(`${method} ${path} → ${res.status} ${e?.code ?? ''} ${e?.message ?? text.slice(0, 200)}${e?.details ? ` ${JSON.stringify(e.details).slice(0, 400)}` : ''}`); err.status = res.status; err.code = e?.code; throw err; }
