@@ -70,6 +70,8 @@ chmod 0711 deploy/compose/secrets
 # .env may hold a key twice (empty template placeholder first, real value appended later). Compose uses the last
 # value; make the file unambiguous by keeping only the last occurrence of every key (comments/blank lines dropped).
 awk -F= '/^[A-Z_][A-Z0-9_]*=/ { last[$1]=NR; line[NR]=$0; order[NR]=$1 } END { for (i=1;i<=NR;i++) if (i in line && last[order[i]]==i) print line[i] }' deploy/compose/.env > deploy/compose/.env.tmp && mv deploy/compose/.env.tmp deploy/compose/.env && chmod 600 deploy/compose/.env
+# --fqdn is authoritative on every run (moving the demo to a new hostname = re-run with the new --fqdn)
+sed -i "s#^APP_BASE_URL=.*#APP_BASE_URL=https://$FQDN#; s#^CORS_ORIGINS=.*#CORS_ORIGINS=https://$FQDN#" deploy/compose/.env
 # demo-only AI switches (every analytic enabled, legal gates off); idempotent for re-runs of older installs
 grep -q '^AI_TASKS_ENABLED=' deploy/compose/.env || echo 'AI_TASKS_ENABLED=all' >> deploy/compose/.env
 grep -q '^AI_LEGAL_GATES=' deploy/compose/.env || echo 'AI_LEGAL_GATES=off' >> deploy/compose/.env
