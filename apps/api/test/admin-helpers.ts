@@ -91,3 +91,16 @@ export async function clearLoginFailures(): Promise<void> {
   const app = await getApp();
   await app.db.deleteFrom('login_attempts').where('success', '=', false).execute();
 }
+
+/**
+ * A state-level "Integration officer": a custom role holding integrations:manage AND the evidence rights an API client
+ * may be given. API clients can only receive rights their creator holds (System Administrators hold no evidence rights).
+ */
+export async function integrationOfficer(): Promise<AdminSession> {
+  const app = await getApp();
+  await app.db.insertInto('roles').values({
+    code: 'TEST_INTEGRATION_OFFICER', name: 'Integration officer (test)', description: 'integrations:manage + evidence read/download',
+    permissions: ['integrations:manage', 'evidence:read', 'evidence:download_original', 'cases:read', 'org:read'], is_system: false,
+  }).onConflict((oc) => oc.column('code').doNothing()).execute();
+  return createAdmin({ role: 'TEST_INTEGRATION_OFFICER', org: 'ksp' });
+}

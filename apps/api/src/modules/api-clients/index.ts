@@ -3,15 +3,15 @@
  * HTTP Basic `client_id:secret`. The secret is shown ONCE (create / rotate); only an argon2id hash is stored.
  * Scopes are limited to INTEGRATION_SCOPES; jurisdiction = the client's org unit subtree.
  */
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { isIP } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { appendAudit, hashSecret, randomToken } from '@ksp/core';
-import { INTEGRATION_SCOPES } from '@ksp/shared';
+import { INTEGRATION_SCOPES, type Permission } from '@ksp/shared';
 import { hasPermissionAt, type Principal } from '../../lib/principal.js';
-import { conflict, notFound, validationFailed } from '../../lib/errors.js';
+import { conflict, forbidden, notFound, validationFailed } from '../../lib/errors.js';
 import { invalidateApiClientCache } from '../../lib/api-client-auth.js';
 
 export const prefix = '/api-clients';
@@ -89,6 +89,15 @@ function dto(r: Row) {
 
 const newSecret = () => `ksps_${randomToken(32)}`;
 
+/**
+ * An API client can only hold rights its creator holds at that unit: an administrator (integrations:manage, no
+ * evidence access) must not mint a credential that reads or downloads evidence. Evidence scopes therefore need a creator
+ * who also holds evidence:read / evidence:download_original there (e.g. a custom "Integration officer" role).
+ */
+function scopesBeyondCreator(p: Principal, scopes: readonly string[], orgPath: string): string[] {
+  return scopes.filter((s) => !hasPermissionAt(p, s as Permission, orgPath));
+}
+
 export default async function apiClients(fastify: FastifyInstance) {
   const app = fastify.withTypeProvider<ZodTypeProvider>();
   const guard = app.authorize('integrations:manage');
@@ -101,6 +110,12 @@ export default async function apiClients(fastify: FastifyInstance) {
         'c.id', 'c.name', 'c.description', 'c.client_id', 'c.scopes', 'c.org_unit_id', 'o.name as org_name', 'o.path as org_path', 'c.allowed_ips',
         'c.rate_limit_per_minute', 'c.created_at', 'c.expires_at', 'c.revoked_at', 'c.revoke_reason', 'c.last_used_at', 'c.secret_rotated_at', 'u.full_name as created_by_name',
       ]);
+  const refuseScopesBeyondCreator = async (req: FastifyRequest, p: Principal, scopes: readonly string[], orgPath: string, orgUnitId: string) => {
+    const missing = scopesBeyondCreator(p, scopes, orgPath);
+    if (!missing.length) return;
+    await appendAudit(app.db, req.actor(), { action: 'ACCESS_DENIED', outcome: 'DENIED', resourceType: 'api_client', orgUnitId, details: { reason: 'scopes beyond the creator\'s own rights', scopes: missing } });
+    throw forbidden(`You can only give an API client rights you hold yourself at this unit: missing ${missing.join(', ')}`);
+  };
   const load = async (id: string, p: Principal) => {
     const r = await q().where('c.id', '=', id).executeTakeFirst();
     if (!r || !hasPermissionAt(p, 'integrations:manage', r.org_path)) throw notFound('API client');
@@ -122,6 +137,7 @@ export default async function apiClients(fastify: FastifyInstance) {
     if (!org || !hasPermissionAt(p, 'integrations:manage', org.path)) throw notFound('Org unit');
     if (!org.active) throw validationFailed('Org unit is inactive');
     if (b.expiresAt && b.expiresAt <= new Date()) throw validationFailed('expiresAt must be in the future');
+    await refuseScopesBeyondCreator(req, p, b.scopes, org.path, org.id);
     const clientId = `kspc_${randomBytes(12).toString('hex')}`;
     const secret = newSecret();
     const hash = await hashSecret(secret);
@@ -148,6 +164,7 @@ export default async function apiClients(fastify: FastifyInstance) {
     if (cur.revoked_at) throw conflict('Revoked clients cannot be changed');
     const b = req.body;
     if (!Object.keys(b).length) throw validationFailed('No changes supplied');
+    if (b.scopes) await refuseScopesBeyondCreator(req, p, b.scopes, cur.org_path, cur.org_unit_id);
     const set: Record<string, unknown> = {};
     if (b.name) set.name = b.name;
     if ('description' in b) set.description = b.description ?? null;

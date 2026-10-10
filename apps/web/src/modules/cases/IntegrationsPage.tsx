@@ -85,7 +85,7 @@ function SystemPanel({ sys, onEdit }: { sys: IntegrationSystem; onEdit: () => vo
               <>
                 <Field label={tr('Probe station code')} htmlFor="pr-st"><Input id="pr-st" value={probe.stationCode} onChange={(e) => setProbe((p) => ({ ...p, stationCode: e.target.value }))} /></Field>
                 <Field label={tr('Year')} htmlFor="pr-y"><Input id="pr-y" type="number" value={probe.year} onChange={(e) => setProbe((p) => ({ ...p, year: e.target.value }))} className="w-24" /></Field>
-                <Field label={tr('FIR number')} htmlFor="pr-no"><Input id="pr-no" value={probe.firNumber} onChange={(e) => setProbe((p) => ({ ...p, firNumber: e.target.value }))} /></Field>
+                <Field label={tr('FIR number')} htmlFor="pr-no" hint={tr('Number only, without the year (e.g. 0142)')}><Input id="pr-no" value={probe.firNumber} onChange={(e) => setProbe((p) => ({ ...p, firNumber: e.target.value }))} /></Field>
               </>
             ) : sys.systemType === 'CASE_DIARY' ? (
               <Field label={tr('Probe case reference')} htmlFor="pr-case"><Input id="pr-case" value={probe.caseRef} onChange={(e) => setProbe((p) => ({ ...p, caseRef: e.target.value }))} /></Field>
@@ -97,6 +97,7 @@ function SystemPanel({ sys, onEdit }: { sys: IntegrationSystem; onEdit: () => vo
           {test.data && (
             <Alert tone={test.data.ok ? 'green' : 'red'} title={test.data.ok ? tr('Passed ({latencyMs} ms)', { latencyMs: test.data.latencyMs }) : tr('Failed: {errorCode}', { errorCode: test.data.errorCode })}>
               <ul className="list-disc pl-5">{test.data.steps.map((s, i) => <li key={i}>{s.step}: {s.ok ? tr('ok') : tr('failed')}{s.detail ? ` — ${s.detail}` : ''}</li>)}</ul>
+              {test.data.errorCode === 'CONTRACT_MISMATCH' && <p className="mt-1">{tr('The Base URL does not answer the CCTNS interface this adapter expects (GET <base>/health and GET <base>/firs/<station>/<year>/<number>). Enter the test endpoint provided by SCRB / CCTNS, or use the fixture adapter to demonstrate the flow with synthetic FIRs.')}</p>}
               <p className="mt-1">{test.data.note}</p>
             </Alert>
           )}

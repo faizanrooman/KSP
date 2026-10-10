@@ -90,6 +90,7 @@ function CreateClientModal({ onClose, onCreated }: { onClose: () => void; onCrea
         <div className="md:col-span-2"><Field label={t('Description')} htmlFor="ac-desc"><Textarea id="ac-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></Field></div>
         <fieldset className="md:col-span-2">
           <legend className="text-sm font-medium text-ink-800">{t('Scopes')}</legend>
+          <p className="text-xs text-ink-500">{t('You can only give a client rights you hold yourself at the chosen unit (e.g. an Integration officer holding evidence access). Every client is audited.')}</p>
           <div className="mt-1 flex flex-wrap gap-4">
             {INTEGRATION_SCOPES.map((s) => <Checkbox key={s} label={s} checked={scopes.includes(s)} onChange={(v) => setScopes((x) => (v ? [...x, s] : x.filter((y) => y !== s)))} />)}
           </div>

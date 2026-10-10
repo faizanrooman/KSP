@@ -45,7 +45,7 @@ describe('custody timeline', () => {
     expect(orig.status).toBe(200);
     expect((await kavya.get(orig.body.url)).status).toBe(200); // EVIDENCE_DOWNLOADED
     const share = await meera.post('/api/v1/shares', {
-      evidenceIds: [ev.id], recipientType: 'INTERNAL_USER', recipientUserId: await userId('fa.naveen'), purpose: 'Forensic review of the clip', expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+      evidenceIds: [ev.id], recipientType: 'INTERNAL_USER', recipientUserId: await userId('io.mysuru'), purpose: 'Review by the Mysuru investigation', expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
     });
     expect(share.status).toBe(201);
     const exp = await meera.post('/api/v1/exports', { evidenceIds: [ev.id], purpose: 'Production before the magistrate', courtName: 'ACMM Court, Bengaluru', options: { includeOriginal: false, includeWatermarked: true } });

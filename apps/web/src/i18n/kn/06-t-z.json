@@ -168,5 +168,8 @@
   "Zoom in": "ಝೂಮ್ ಇನ್",
   "Zoom in (+)": "ಝೂಮ್ ಇನ್ (+)",
   "Zoom out": "ಝೂಮ್ ಔಟ್",
-  "Zoom out (−)": "ಝೂಮ್ ಔಟ್ (−)"
+  "Zoom out (−)": "ಝೂಮ್ ಔಟ್ (−)",
+  "This share does not limit the recipient’s access": "ಈ ಹಂಚಿಕೆಯು ಸ್ವೀಕರಿಸುವವರ ಪ್ರವೇಶವನ್ನು ಮಿತಿಗೊಳಿಸುವುದಿಲ್ಲ",
+  "The Base URL does not answer the CCTNS interface this adapter expects (GET <base>/health and GET <base>/firs/<station>/<year>/<number>). Enter the test endpoint provided by SCRB / CCTNS, or use the fixture adapter to demonstrate the flow with synthetic FIRs.": "Base URL ಈ ಅಡಾಪ್ಟರ್ ನಿರೀಕ್ಷಿಸುವ CCTNS ಇಂಟರ್‌ಫೇಸ್‌ಗೆ ಉತ್ತರಿಸುತ್ತಿಲ್ಲ (GET <base>/health ಮತ್ತು GET <base>/firs/<station>/<year>/<number>). SCRB / CCTNS ಒದಗಿಸಿದ ಪರೀಕ್ಷಾ ಎಂಡ್‌ಪಾಯಿಂಟ್ ನಮೂದಿಸಿ, ಅಥವಾ ಕೃತಕ ಎಫ್‌ಐಆರ್‌ಗಳೊಂದಿಗೆ ಪ್ರಕ್ರಿಯೆಯನ್ನು ಪ್ರದರ್ಶಿಸಲು fixture ಅಡಾಪ್ಟರ್ ಬಳಸಿ.",
+  "You can only give a client rights you hold yourself at the chosen unit (e.g. an Integration officer holding evidence access). Every client is audited.": "ಆಯ್ಕೆ ಮಾಡಿದ ಘಟಕದಲ್ಲಿ ನೀವೇ ಹೊಂದಿರುವ ಹಕ್ಕುಗಳನ್ನು ಮಾತ್ರ ಕ್ಲೈಂಟ್‌ಗೆ ನೀಡಬಹುದು (ಉದಾ. ಸಾಕ್ಷ್ಯ ಪ್ರವೇಶ ಹೊಂದಿರುವ ಇಂಟಿಗ್ರೇಷನ್ ಅಧಿಕಾರಿ). ಪ್ರತಿ ಕ್ಲೈಂಟ್ ಲೆಕ್ಕಪರಿಶೋಧನೆಗೆ ಒಳಪಡುತ್ತದೆ."
 }

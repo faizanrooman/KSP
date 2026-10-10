@@ -91,6 +91,27 @@ export class Storage {
   }
 
   /** Object lock parameters applied when writing originals. */
+  /** Server-side encryption for every write (S3_SSE). */
+  sseParams(): { ServerSideEncryption?: 'AES256' | 'aws:kms'; SSEKMSKeyId?: string } {
+    if (this.cfg.S3_SSE === 'AES256') return { ServerSideEncryption: 'AES256' };
+    if (this.cfg.S3_SSE === 'aws:kms') return { ServerSideEncryption: 'aws:kms', ...(this.cfg.S3_SSE_KMS_KEY_ID ? { SSEKMSKeyId: this.cfg.S3_SSE_KMS_KEY_ID } : {}) };
+    return {};
+  }
+
+  private bypass?: S3Client;
+  /** Client for governance-bypass deletes: the disposal identity when configured (required in production). */
+  private bypassClient(): S3Client {
+    if (this.cfg.S3_DISPOSAL_ACCESS_KEY && this.cfg.S3_DISPOSAL_SECRET_KEY) {
+      this.bypass ??= new S3Client({
+        region: this.cfg.S3_REGION, endpoint: this.cfg.S3_ENDPOINT, forcePathStyle: this.cfg.S3_FORCE_PATH_STYLE,
+        credentials: { accessKeyId: this.cfg.S3_DISPOSAL_ACCESS_KEY, secretAccessKey: this.cfg.S3_DISPOSAL_SECRET_KEY },
+      });
+      return this.bypass;
+    }
+    if (this.cfg.KSP_ENVIRONMENT === 'production') throw new Error('governance-bypass delete requires the disposal identity (S3_DISPOSAL_ACCESS_KEY / S3_DISPOSAL_SECRET_KEY)');
+    return this.s3;
+  }
+
   lockParams(): { ObjectLockMode?: 'GOVERNANCE' | 'COMPLIANCE'; ObjectLockRetainUntilDate?: Date } {
     if (this.cfg.OBJECT_LOCK_MODE === 'NONE') return {};
     return {
@@ -133,7 +154,7 @@ export class Storage {
     body: Buffer | string | Readable,
     opts: { contentType?: string; metadata?: Record<string, string>; lock?: boolean; ifNoneMatch?: boolean; contentLength?: number } = {},
   ): Promise<{ versionId?: string; etag?: string }> {
-    const extra = opts.lock ? this.lockParams() : {};
+    const extra = { ...this.sseParams(), ...(opts.lock ? this.lockParams() : {}) };
     if (body instanceof Readable) {
       const up = new Upload({
         client: this.s3,
@@ -166,14 +187,14 @@ export class Storage {
   ): Promise<{ versionId?: string }> {
     const source = `${src.bucket}/${encodeURIComponent(src.key).replace(/%2F/g, '/')}${src.versionId ? `?versionId=${src.versionId}` : ''}`;
     const res = await this.s3.send(
-      new CopyObjectCommand({ Bucket: dst.bucket, Key: dst.key, CopySource: source, ...(opts.lock ? this.lockParams() : {}) }),
+      new CopyObjectCommand({ Bucket: dst.bucket, Key: dst.key, CopySource: source, ...this.sseParams(), ...(opts.lock ? this.lockParams() : {}) }),
     );
     return { versionId: res.VersionId };
   }
 
   /** Delete one object (version). For WORM buckets this only succeeds with governance bypass or after retention. */
   async delete(bucket: string, key: string, opts: { versionId?: string; bypassGovernance?: boolean } = {}): Promise<void> {
-    await this.s3.send(
+    await (opts.bypassGovernance ? this.bypassClient() : this.s3).send(
       new DeleteObjectCommand({ Bucket: bucket, Key: key, VersionId: opts.versionId, BypassGovernanceRetention: opts.bypassGovernance || undefined }),
     );
   }
@@ -224,7 +245,7 @@ export class Storage {
 
   // ---- multipart (resumable chunked uploads) ---------------------------------------------------
   async createMultipart(bucket: string, key: string, contentType?: string): Promise<string> {
-    const res = await this.s3.send(new CreateMultipartUploadCommand({ Bucket: bucket, Key: key, ContentType: contentType }));
+    const res = await this.s3.send(new CreateMultipartUploadCommand({ Bucket: bucket, Key: key, ContentType: contentType, ...this.sseParams() }));
     return res.UploadId!;
   }
 

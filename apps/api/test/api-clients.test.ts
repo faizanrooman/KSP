@@ -3,8 +3,12 @@ import type { FastifyInstance } from 'fastify';
 import { Agent, closeApp, login } from './helpers.js';
 import { evidenceTestSetup, evidenceTestTeardown } from './evidence-setup.js';
 import { normaliseCidr } from '../src/modules/api-clients/index.js';
+import { integrationOfficer } from './admin-helpers.js';
 
 let app: FastifyInstance;
+// API clients can only receive rights their creator holds: evidence scopes need an Integration officer, not the admin.
+let officerAgent: Agent | undefined;
+const officer = async () => (officerAgent ??= (await integrationOfficer()).agent);
 const agents: Record<string, Agent> = {};
 const as = async (u: string) => (agents[u] ??= await login(u));
 const org: Record<string, string> = {};
@@ -21,7 +25,7 @@ afterAll(async () => {
 });
 
 const create = async (extra: Record<string, unknown> = {}) => {
-  const r = await (await as('admin')).post('/api/v1/api-clients', { name: 'CCTNS bridge', scopes: ['evidence:read'], orgUnitId: org.ps_cubbonpark, ...extra });
+  const r = await (await officer()).post('/api/v1/api-clients', { name: 'CCTNS bridge', scopes: ['evidence:read'], orgUnitId: org.ps_cubbonpark, ...extra });
   expect(r.status, r.raw).toBe(201);
   return r.body as { client: { id: string; status: string }; clientId: string; clientSecret: string };
 };
@@ -35,8 +39,20 @@ describe('API client administration', () => {
     expect((await (await as('io.meera')).post('/api/v1/api-clients', { name: 'Rogue client', scopes: ['evidence:read'], orgUnitId: org.ps_cubbonpark })).status).toBe(403);
   });
 
+  it('refuses scopes the creator does not hold: the System Administrator cannot mint evidence access (audited)', async () => {
+    const sysadmin = await as('admin');
+    const r = await sysadmin.post('/api/v1/api-clients', { name: 'Evidence via admin', scopes: ['evidence:read'], orgUnitId: org.ps_cubbonpark });
+    expect(r.status).toBe(403);
+    expect(r.body.error.message).toContain('evidence:read');
+    const denied = await app.db.selectFrom('audit_events').select('details').where('action', '=', 'ACCESS_DENIED').where('resource_type', '=', 'api_client').orderBy('seq', 'desc').limit(1).executeTakeFirstOrThrow();
+    expect(denied.details).toMatchObject({ scopes: ['evidence:read'] });
+    // Widening an existing client is refused the same way.
+    const c = await create({ scopes: ['cases:read'] });
+    expect((await sysadmin.patch(`/api/v1/api-clients/${c.client.id}`, { scopes: ['cases:read', 'evidence:download_original'] })).status).toBe(403);
+  });
+
   it('restricts scopes to integration scopes and validates IP allow-lists', async () => {
-    const admin = await as('admin');
+    const admin = await officer();
     expect((await admin.post('/api/v1/api-clients', { name: 'Too powerful', scopes: ['users:manage'], orgUnitId: org.ps_cubbonpark })).status).toBe(400);
     expect((await admin.post('/api/v1/api-clients', { name: 'Bad IPs', scopes: ['evidence:read'], orgUnitId: org.ps_cubbonpark, allowedIps: ['10.0.0.1/8'] })).status).toBe(400);
     expect((await admin.post('/api/v1/api-clients', { name: 'Past expiry', scopes: ['evidence:read'], orgUnitId: org.ps_cubbonpark, expiresAt: '2000-01-01T00:00:00Z' })).status).toBe(400);
@@ -48,7 +64,7 @@ describe('API client administration', () => {
   });
 
   it('shows the secret once, stores only a hash, authenticates, rotates and revokes', async () => {
-    const admin = await as('admin');
+    const admin = await officer();
     const c = await create();
     expect(c.clientSecret).toMatch(/^ksps_/);
     const row = await app.db.selectFrom('api_clients').select(['secret_hash']).where('id', '=', c.client.id).executeTakeFirstOrThrow();
@@ -87,7 +103,7 @@ describe('API client administration', () => {
     const e = await create();
     await app.db.updateTable('api_clients').set({ expires_at: new Date(Date.now() - 1000) }).where('id', '=', e.client.id).execute();
     expect((await ping(e.clientId, e.clientSecret)).statusCode).toBe(401);
-    expect((await (await as('admin')).get(`/api/v1/api-clients/${e.client.id}`)).body.status).toBe('EXPIRED');
+    expect((await (await officer()).get(`/api/v1/api-clients/${e.client.id}`)).body.status).toBe('EXPIRED');
   });
 
   it('limits API clients to the integration API', async () => {

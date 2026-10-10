@@ -6,6 +6,21 @@ import { Agent, closeApp, createUser, getApp, login, nextTotp } from './helpers.
 afterAll(closeApp);
 
 describe('authentication', () => {
+  it('idle timeout: background requests (x-ksp-background) do not extend the idle deadline, user requests do', async () => {
+    const app = await getApp();
+    const u = await createUser({ role: 'INVESTIGATING_OFFICER', org: 'ps_cubbonpark' });
+    const ag = await login(u.username, u.password);
+    const sid = (await ag.get('/api/v1/auth/me')).body.sessionId as string;
+    // Pretend the last activity was 5 minutes ago with 2 minutes of idle time left.
+    const deadline = new Date(Date.now() + 2 * 60_000);
+    await app.db.updateTable('sessions').set({ last_seen_at: new Date(Date.now() - 5 * 60_000), idle_expires_at: deadline }).where('id', '=', sid).execute();
+    const idleOf = async () => (await app.db.selectFrom('sessions').select('idle_expires_at').where('id', '=', sid).executeTakeFirstOrThrow()).idle_expires_at.getTime();
+    expect((await ag.get('/api/v1/notifications', { 'x-ksp-background': '1' })).status).toBe(200);
+    expect(await idleOf()).toBe(deadline.getTime());
+    expect((await ag.get('/api/v1/notifications')).status).toBe(200);
+    expect(await idleOf()).toBeGreaterThan(deadline.getTime() + 60_000);
+  });
+
   it('logs in with valid credentials and returns permissions', async () => {
     const a = await login('io.meera');
     const me = await a.get('/api/v1/auth/me');

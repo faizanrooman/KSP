@@ -16,6 +16,8 @@ export interface NavItem {
   section: NavSection;
   /** Show when the user has ANY of these permissions (omit = all authenticated users). */
   anyOf?: Permission[];
+  /** Hide when the user has ANY of these permissions (an alternative entry covers them). */
+  noneOf?: Permission[];
   order?: number;
 }
 

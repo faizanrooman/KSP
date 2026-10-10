@@ -52,6 +52,9 @@ Waivers are explicit environment variables, each logged as a preflight warning: 
 | C3 | Real organisation hierarchy and initial users loaded | Admin | Signed-off CSVs | `npm run ops:bootstrap-org -- --units units.csv --users users.csv --dry-run` validates everything first; import is one transaction, audited (`ORG_BOOTSTRAP_IMPORTED`), one-time passwords to a 0600 file | re-run with `--dry-run`: "0 to create" |
 | C4 | Backups at the DR site with Object Lock; restore drill (OPS-3) | DevOps | Drill report meeting the 2-hour RTO at representative volume | Signed backup manifests (OPS-8); verify job | [BACKUP-RESTORE-RUNBOOK.md](BACKUP-RESTORE-RUNBOOK.md), [DISASTER-RECOVERY.md](DISASTER-RECOVERY.md) |
 | C5 | PostgreSQL JIT off on the restored/production DB | DBA | — | warning `DB_JIT` | `npm run preflight` |
+| C6 | Encryption at rest of object storage (tender §6/§71) | Infra / security | `S3_SSE=AES256` or `aws:kms` + key id verified on the production store (or `STORAGE_ENCRYPTION_AT_REST=infrastructure` with the store / volume encryption evidence); database volume encryption evidence | P: preflight `STORAGE_ENCRYPTION` | `HeadObject` of a new original shows `ServerSideEncryption` |
+| C7 | Separate disposal S3 identity (evidence lock cannot be overridden by the API) | Infra / custodian | Identity with `deploy/s3/policies/disposal.json` given to the worker only; application identity with `deploy/s3/policies/app.json` (bypass denied) | P: preflight `S3_DISPOSAL_IDENTITY` | a governance-bypass delete with the application key is refused by the store |
+| C8 | Authorised networks (tender §50) | Network / security | `ALLOWED_NETWORKS` = KSP / VPN CIDRs (or recorded `ALLOWED_NETWORKS_WAIVED=perimeter` decision) | P: preflight `ALLOWED_NETWORKS` | request from an outside address → 403 `NETWORK_NOT_ALLOWED` + audit |
 
 ## D. Integrations
 

@@ -10,6 +10,7 @@ import { sql } from 'kysely';
 import { loadConfig, stopQueue } from '@ksp/core';
 import type { FastifyInstance } from 'fastify';
 import { Agent, closeApp, createUser, getApp, login } from './helpers.js';
+import { enrolMfa } from './admin-helpers.js';
 import { invalidateSettings } from '../src/lib/settings.js';
 import { runQuarantineRelease } from '../../worker/src/jobs/ingest/release.js';
 import {
@@ -29,8 +30,11 @@ beforeAll(async () => {
   cubbon = await orgId(app, 'ps_cubbonpark');
   nazarbad = await orgId(app, 'ps_nazarbad');
   await ensureRole(app, 'T_QUARANTINE_MGR', ['evidence:read', 'evidence:quarantine_manage']);
+  // evidence:quarantine_manage is a privileged right: MFA is mandatory for the custom role too.
   qm = await login((await createUser({ role: 'T_QUARANTINE_MGR', org: 'blr_central' })).username);
+  await enrolMfa(qm);
   qmMysuru = await login((await createUser({ role: 'T_QUARANTINE_MGR', org: 'mysuru_dist' })).username);
+  await enrolMfa(qmMysuru);
 }, 120_000);
 
 afterAll(async () => {
@@ -399,6 +403,7 @@ describe('quarantine review', () => {
     await ensureRole(app, 'T_UPLOADER_QM', ['evidence:upload', 'evidence:read', 'evidence:quarantine_manage']);
     const u = await createUser({ role: 'T_UPLOADER_QM', org: 'ps_cubbonpark' });
     const self = await login(u.username);
+    await enrolMfa(self); // quarantine_manage is privileged
     const path = await smallVideo('self.mp4', 1, ['-metadata', 'comment=self']);
     const data = readFileSync(path);
     const up = await uploadAll(self, writeFixture('self-corrupt.mp4', data.subarray(0, Math.floor(data.length * 0.5))), { orgUnitId: cubbon });

@@ -246,5 +246,7 @@
   "System": "ವ್ಯವಸ್ಥೆ",
   "System type": "ವ್ಯವಸ್ಥೆಯ ಪ್ರಕಾರ",
   "System-wide": "ವ್ಯವಸ್ಥೆಯಾದ್ಯಂತ",
-  "systems return synthetic data only.": "ವ್ಯವಸ್ಥೆಗಳು ಸಿಂಥೆಟಿಕ್ ದತ್ತಾಂಶವನ್ನು ಮಾತ್ರ ಹಿಂತಿರುಗಿಸುತ್ತವೆ."
+  "systems return synthetic data only.": "ವ್ಯವಸ್ಥೆಗಳು ಸಿಂಥೆಟಿಕ್ ದತ್ತಾಂಶವನ್ನು ಮಾತ್ರ ಹಿಂತಿರುಗಿಸುತ್ತವೆ.",
+  "Required when the retention period has not ended.": "ಧಾರಣ ಅವಧಿ ಮುಗಿಯದಿದ್ದಾಗ ಕಡ್ಡಾಯ.",
+  "Retention period ended": "ಧಾರಣ ಅವಧಿ ಮುಗಿದಿದೆ"
 }

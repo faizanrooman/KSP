@@ -344,7 +344,7 @@ export default async function users(fastify: FastifyInstance) {
     if (target.id === p.userId) throw await adminDenied(db, req, 'SELF_MODIFICATION', 'You cannot reset your own MFA');
     let revoked = 0;
     await db.transaction().execute(async (tx) => {
-      await tx.updateTable('users').set({ mfa_enabled: false, mfa_secret_enc: null, mfa_pending_secret_enc: null, mfa_recovery_codes: [], mfa_enrolled_at: null }).where('id', '=', target.id).execute();
+      await tx.updateTable('users').set({ mfa_enabled: false, mfa_self_enrolled: false, mfa_secret_enc: null, mfa_pending_secret_enc: null, mfa_recovery_codes: [], mfa_enrolled_at: null }).where('id', '=', target.id).execute();
       revoked = await revokeAllUserSessions(tx, target.id, 'MFA_RESET');
       await appendAudit(tx, req.actor(), { action: 'USER_MFA_RESET', resourceType: 'user', resourceId: target.id, orgUnitId: target.home_org_unit_id, details: { reason: req.body.reason, sessionsRevoked: revoked } });
     });

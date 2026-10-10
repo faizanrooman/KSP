@@ -40,12 +40,13 @@ const GROUPS: Array<{ key: SettingKey; title: string; description: string; field
     ],
   },
   {
-    key: 'sessionPolicy', title: 'Sessions & MFA', description: 'Session lifetime and roles for which MFA enrolment is mandatory.',
+    key: 'sessionPolicy', title: 'Sessions & MFA', description: 'Session lifetime and two-step sign-in. Users holding a role ticked below must enrol MFA and are asked for the code at every sign-in; other users are asked only if they turned two-step sign-in on themselves in My profile.',
     fields: [
       { name: 'idleTimeoutMinutes', label: 'Idle timeout (minutes)', kind: 'int', min: 5, max: 480 },
       { name: 'absoluteTimeoutHours', label: 'Absolute session lifetime (hours)', kind: 'int', min: 1, max: 72 },
       { name: 'maxConcurrentSessions', label: 'Maximum concurrent sessions per user', kind: 'int', min: 1, max: 20 },
       { name: 'requireMfaForRoles', label: 'MFA mandatory for roles', kind: 'roles' },
+      { name: 'mfaForPrivilegedPermissions', label: 'Also require MFA for every role holding administrative, approval or audit rights (always on in production)', kind: 'bool' },
     ],
   },
   {
@@ -81,6 +82,12 @@ const GROUPS: Array<{ key: SettingKey; title: string; description: string; field
       { name: 'emailAlertManagers', label: 'E-mail alert managers in scope', kind: 'bool' },
       { name: 'warningRecipients', label: 'Extra recipients: warning and critical', kind: 'list', hint: 'comma-separated e-mail addresses' },
       { name: 'criticalRecipients', label: 'Extra recipients: critical only', kind: 'list', hint: 'comma-separated e-mail addresses' },
+    ],
+  },
+  {
+    key: 'auditPolicy', title: 'Audit log retention', description: 'Audit records are append-only and the application never deletes them (enforced by the database). Any archival outside the system must keep them retrievable for at least this period.',
+    fields: [
+      { name: 'minimumRetentionYears', label: 'Minimum retention (years)', kind: 'int', min: 7, max: 100 },
     ],
   },
   {

@@ -93,5 +93,10 @@
   "Warning threshold (%)": "ಎಚ್ಚರಿಕೆ ಮಿತಿ (%)",
   "More filters": "ಇನ್ನಷ್ಟು ಫಿಲ್ಟರ್‌ಗಳು",
   "More filters ({count} active)": "ಇನ್ನಷ್ಟು ಫಿಲ್ಟರ್‌ಗಳು ({count} ಸಕ್ರಿಯ)",
-  "Never re-verified": "ಎಂದಿಗೂ ಮರು-ಪರಿಶೀಲಿಸಿಲ್ಲ"
+  "Never re-verified": "ಎಂದಿಗೂ ಮರು-ಪರಿಶೀಲಿಸಿಲ್ಲ",
+  "Also require MFA for every role holding administrative, approval or audit rights (always on in production)": "ಆಡಳಿತಾತ್ಮಕ, ಅನುಮೋದನೆ ಅಥವಾ ಲೆಕ್ಕಪರಿಶೋಧನಾ ಹಕ್ಕುಗಳಿರುವ ಪ್ರತಿ ಪಾತ್ರಕ್ಕೂ MFA ಕಡ್ಡಾಯಗೊಳಿಸಿ (ಉತ್ಪಾದನಾ ವ್ಯವಸ್ಥೆಯಲ್ಲಿ ಯಾವಾಗಲೂ ಸಕ್ರಿಯ)",
+  "Audit log retention": "ಲೆಕ್ಕಪರಿಶೋಧನಾ ದಾಖಲೆಗಳ ಧಾರಣ",
+  "Audit records are append-only and the application never deletes them (enforced by the database). Any archival outside the system must keep them retrievable for at least this period.": "ಲೆಕ್ಕಪರಿಶೋಧನಾ ದಾಖಲೆಗಳನ್ನು ಸೇರಿಸಲು ಮಾತ್ರ ಸಾಧ್ಯ ಮತ್ತು ಅಪ್ಲಿಕೇಶನ್ ಅವುಗಳನ್ನು ಎಂದಿಗೂ ಅಳಿಸುವುದಿಲ್ಲ (ಡೇಟಾಬೇಸ್ ಇದನ್ನು ಜಾರಿಗೊಳಿಸುತ್ತದೆ). ವ್ಯವಸ್ಥೆಯ ಹೊರಗಿನ ಯಾವುದೇ ಆರ್ಕೈವ್ ಕನಿಷ್ಠ ಈ ಅವಧಿಯವರೆಗೆ ಅವುಗಳನ್ನು ಮರುಪಡೆಯುವಂತೆ ಇರಿಸಬೇಕು.",
+  "Minimum retention (years)": "ಕನಿಷ್ಠ ಧಾರಣ (ವರ್ಷಗಳು)",
+  "Session lifetime and two-step sign-in. Users holding a role ticked below must enrol MFA and are asked for the code at every sign-in; other users are asked only if they turned two-step sign-in on themselves in My profile.": "ಸೆಷನ್ ಅವಧಿ ಮತ್ತು ಎರಡು-ಹಂತದ ಸೈನ್-ಇನ್. ಕೆಳಗೆ ಗುರುತಿಸಿದ ಪಾತ್ರ ಹೊಂದಿರುವ ಬಳಕೆದಾರರು MFA ನೋಂದಾಯಿಸಬೇಕು ಮತ್ತು ಪ್ರತಿ ಸೈನ್-ಇನ್‌ನಲ್ಲಿ ಕೋಡ್ ಕೇಳಲಾಗುತ್ತದೆ; ಇತರ ಬಳಕೆದಾರರು ನನ್ನ ಪ್ರೊಫೈಲ್‌ನಲ್ಲಿ ಎರಡು-ಹಂತದ ಸೈನ್-ಇನ್ ಸ್ವತಃ ಆನ್ ಮಾಡಿದ್ದರೆ ಮಾತ್ರ ಕೇಳಲಾಗುತ್ತದೆ."
 }

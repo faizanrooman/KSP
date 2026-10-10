@@ -78,47 +78,22 @@ test('integrations: fixture system, health + contract test, FIR import by an IO'
   await expect(admin.getByRole('status').filter({ hasText: 'System disabled' })).toBeVisible();
 });
 
-test('API clients: create → secret shown once and works → revoke → refused', async ({ as, request }) => {
+test('API clients: the System Administrator cannot mint a credential with evidence rights it does not hold (refused, explained)', async ({ as, guard }) => {
+  guard.expectFailure(/\/api-clients$/, 403, 'POST');
+  // Code audit 2026-10-10 (req 9/63): an API client only receives rights its creator holds at that unit. The create →
+  // secret-once → use → revoke flow is covered with an Integration officer in apps/api/test/api-clients.test.ts.
   const run = uid();
-  const name = `E2E client ${run}`;
   const admin = await as('admin');
   await admin.goto('/admin/api-clients');
   await admin.getByRole('button', { name: 'New client' }).click();
   const dlg = admin.getByRole('dialog', { name: 'New API client' });
-  await dlg.getByLabel('Name').fill(name);
+  await dlg.getByLabel('Name').fill(`E2E client ${run}`);
   const org = dlg.getByLabel('Jurisdiction (org unit)');
   await expect(org.locator('option', { hasText: 'Cubbon Park Police Station' })).toHaveCount(1);
   await org.selectOption((await org.locator('option', { hasText: 'Cubbon Park Police Station' }).getAttribute('value'))!);
-  await dlg.getByLabel('Description').fill('E2E: created, used once, revoked');
   await dlg.getByRole('button', { name: 'Create' }).click();
-
-  const cred = admin.getByRole('dialog', { name: 'Client credentials' });
-  await expect(cred.getByText('Shown only once')).toBeVisible();
-  const codes = cred.locator('code');
-  const clientId = (await codes.nth(0).textContent())!.trim();
-  const secret = (await codes.nth(1).textContent())!.trim();
-  expect(clientId.length).toBeGreaterThan(8);
-  expect(secret.length).toBeGreaterThanOrEqual(32);
-  const basic = { Authorization: `Basic ${Buffer.from(`${clientId}:${secret}`).toString('base64')}` };
-  const ok = await request.get('/api/v1/integration/evidence?pageSize=1', { headers: basic });
-  expect(ok.status()).toBe(200);
-
-  await cred.getByRole('button', { name: 'I have stored the secret' }).click();
-  await expect(cred).toHaveCount(0);
-  const row = admin.getByRole('table', { name: 'API clients' }).getByRole('row').filter({ hasText: name });
-  await expect(row).toContainText('Active');
-  await expect(admin.getByText(secret)).toHaveCount(0); // never displayed again
-  expect(JSON.stringify(await apiGet(admin, '/api-clients'))).not.toContain(secret); // nor returned by the API
-
-  await row.getByRole('button', { name: 'Revoke' }).click();
-  const rv = admin.getByRole('dialog', { name: 'Revoke API client' });
-  await rv.getByRole('textbox', { name: /Reason/ }).fill('E2E: end of test');
-  await rv.getByRole('button', { name: 'Revoke' }).click();
-  await expect(admin.getByRole('status').filter({ hasText: 'Client revoked' })).toBeVisible();
-  await expect(row).toContainText('Revoked');
-  await expect(row.getByRole('button', { name: 'Revoke' })).toHaveCount(0);
-  const refused = await request.get('/api/v1/integration/evidence?pageSize=1', { headers: basic });
-  expect(refused.status()).toBe(401);
+  await expect(dlg.getByRole('alert')).toContainText('rights you hold yourself');
+  await expect(admin.getByRole('dialog', { name: 'Client credentials' })).toHaveCount(0);
 });
 
 test('retention policy + disposal: create/assign policy, request, second-officer approval, DISPOSED', async ({ as }) => {
@@ -172,6 +147,9 @@ test('retention policy + disposal: create/assign policy, request, second-officer
   await ec.getByRole('button', { name: 'Request disposal' }).click();
   const rd = ec.getByRole('dialog', { name: 'Request authorised disposal' });
   await rd.getByLabel('Authority reference').fill(`E2E-ORDER-${run}`);
+  // The 30-day policy has not ended: disposal now needs a court / government order (type + date).
+  await rd.getByLabel('Order type').selectOption('COURT_ORDER');
+  await rd.getByLabel('Order date').fill(new Date().toISOString().slice(0, 10));
   await rd.getByLabel('Reason').fill('E2E: duplicate recording, retention order applies');
   await rd.getByRole('button', { name: 'Submit request' }).click();
   await expect(ec.getByRole('status').filter({ hasText: 'Disposal requested' })).toBeVisible();

@@ -20,7 +20,7 @@ export function DisposalDecision({ request }: { request: DisposalRequest }) {
     void qc.invalidateQueries({ queryKey: ['evidence'] });
   };
   const m = useMutation({
-    mutationFn: ({ d, note }: { d: Decision; note: string }) => api.post<DisposalRequest>(`/evidence/disposal-requests/${request.id}/${d}`, d === 'cancel' ? { note: note || undefined } : { note }),
+    mutationFn: ({ d, note }: { d: Decision; note: string }) => api.post<DisposalRequest>(`/evidence/disposal-requests/${request.id}/${d}`, d === 'cancel' ? { note: note || undefined } : { note, ...(d === 'approve' && request.early ? { confirmEarly: true } : {}) }),
     onSuccess: (_r, v) => {
       setOpen(null);
       toast.success(v.d === 'approve' ? 'Approved — disposal execution queued' : v.d === 'reject' ? 'Request rejected' : 'Request cancelled');
@@ -37,7 +37,12 @@ export function DisposalDecision({ request }: { request: DisposalRequest }) {
   });
   if (!request.canDecide && !request.canCancel && !request.canRetry) return null;
   const copy: Record<Decision, { title: string; label: string; message: string }> = {
-    approve: { title: t('Approve disposal'), label: t('Approve and dispose'), message: `This permanently destroys the original media and derived files of ${request.evidence.evidenceNumber ?? 'this evidence'}. The record and audit trail are kept.` },
+    approve: {
+      title: t('Approve disposal'), label: t('Approve and dispose'),
+      message: `This permanently destroys the original media and derived files of ${request.evidence.evidenceNumber ?? 'this evidence'}. The record and audit trail are kept.${request.early
+        ? ` EARLY DISPOSAL: retention ${request.retainUntilAtRequest ? `runs until ${formatDate(request.retainUntilAtRequest)}` : 'is indefinite'}; authorised by ${request.authorityType === 'GOVERNMENT_ORDER' ? 'government order' : 'court order'} ${request.authorityRef ?? ''}${request.authorityDate ? ` dated ${formatDate(request.authorityDate)}` : ''}. Approving confirms you have checked that order.`
+        : ''}`,
+    },
     reject: { title: t('Reject disposal'), label: t('Reject'), message: t('The evidence returns to the registered state.') },
     cancel: { title: t('Cancel your request'), label: t('Cancel request'), message: t('The evidence returns to the registered state.') },
   };
@@ -117,7 +122,7 @@ export function DisposalApprovalsPage() {
     { key: 'ev', header: t('Evidence'), render: (r) => (<div><Link className="text-brand-700 hover:underline" to={`/evidence/${r.evidence.id}?tab=lifecycle`}><span className="mono">{r.evidence.evidenceNumber}</span></Link><p className="text-xs text-ink-500">{r.evidence.title ?? t('Untitled')} · {r.evidence.orgUnit.name}</p>{r.evidence.legalHold && <Badge tone="red">{t('Legal hold')}</Badge>}</div>) },
     { key: 'st', header: t('Status'), render: (r) => <StatusBadge status={r.status} /> },
     { key: 'rq', header: t('Requested by'), render: (r) => (<div><p>{r.requestedBy.fullName}</p><p className="text-xs text-ink-500">{formatDateTime(r.createdAt)}</p></div>) },
-    { key: 'why', header: t('Reason / authority'), render: (r) => (<div className="max-w-sm"><p>{r.reason}</p><p className="text-xs text-ink-500">{r.authorityRef}</p></div>) },
+    { key: 'why', header: t('Reason / authority'), render: (r) => (<div className="max-w-sm"><p>{r.reason}</p><p className="text-xs text-ink-500">{r.authorityRef}{r.early && <> <Badge tone="red">{t('Before end of retention')}</Badge></>}</p></div>) },
     { key: 'dec', header: t('Decision'), render: (r) => (r.decidedBy ? <div><p>{r.decidedBy.fullName}</p><p className="text-xs text-ink-500">{formatDateTime(r.decidedAt)} — {r.decisionNote}</p></div> : '—') },
     { key: 'ex', header: t('Execution'), render: (r) => (r.executedAt ? <span>{t('Disposed')}{' '}{formatDateTime(r.executedAt)}</span> : r.executionError ? <span className="text-red-700">{t('Failed (')}{r.executionAttempts}×): {r.executionError}</span> : r.status === 'APPROVED' ? 'Queued' : '—') },
     { key: 'act', header: <span className="sr-only">{t('Actions')}</span>, render: (r) => <DisposalDecision request={r} /> },

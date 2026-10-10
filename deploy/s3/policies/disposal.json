@@ -1,0 +1,49 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "KspDisposalDeletes",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObjectVersion",
+        "s3:GetObjectRetention",
+        "s3:GetObjectLegalHold",
+        "s3:DeleteObjectVersion",
+        "s3:BypassGovernanceRetention"
+      ],
+      "Resource": [
+        "arn:aws:s3:::ksp-evidence/*",
+        "arn:aws:s3:::ksp-evidence-archive/*",
+        "arn:aws:s3:::ksp-evidence-longterm/*"
+      ]
+    },
+    {
+      "Sid": "KspDisposalList",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:ListBucketVersions"
+      ],
+      "Resource": [
+        "arn:aws:s3:::ksp-evidence",
+        "arn:aws:s3:::ksp-evidence-archive",
+        "arn:aws:s3:::ksp-evidence-longterm"
+      ]
+    },
+    {
+      "Sid": "NoWritesOrPolicyChanges",
+      "Effect": "Deny",
+      "Action": [
+        "s3:PutObject",
+        "s3:PutObjectRetention",
+        "s3:PutObjectLegalHold",
+        "s3:PutBucketPolicy",
+        "s3:DeleteBucketPolicy",
+        "s3:PutBucketObjectLockConfiguration",
+        "s3:PutBucketVersioning",
+        "s3:DeleteBucket"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

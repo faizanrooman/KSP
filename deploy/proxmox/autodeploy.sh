@@ -49,7 +49,9 @@ main() {
   local started log=$STATE/last-deploy.log
   started=$(date -u +%FT%TZ)
   git checkout -q --detach "$target"
-  if ! bash deploy/proxmox/install-in-lxc.sh --fqdn "$FQDN" --skip-git > "$log" 2>&1; then
+  # extra installer flags from /etc/ksp-autodeploy.env, e.g. KSP_INSTALL_ARGS="--ai-legal-gates off"
+  local extra=(); read -r -a extra <<< "${KSP_INSTALL_ARGS:-}"
+  if ! bash deploy/proxmox/install-in-lxc.sh --fqdn "$FQDN" --skip-git "${extra[@]}" > "$log" 2>&1; then
     echo "DEPLOY FAILED for ${target:0:7} (installer) — see $log; last lines:"; tail -n 30 "$log"
     echo "$target" > "$STATE/skipped"; return 1
   fi

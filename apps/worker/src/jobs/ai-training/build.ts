@@ -5,7 +5,8 @@
  * Embeddings are never exported.
  */
 import { sql } from 'kysely';
-import { appendAudit, sha256Hex, systemActor, type Database, type Storage } from '@ksp/core';
+import { aiTaskGates, appendAudit, loadConfig, sha256Hex, systemActor, type Database, type Storage } from '@ksp/core';
+import { DEFAULT_SETTINGS, type AiLegalApprovals, type AiTask } from '@ksp/shared';
 import type { Logger } from 'pino';
 
 export interface TrainingDeps {
@@ -38,6 +39,10 @@ export async function runTrainingExport(deps: TrainingDeps, exportId: string): P
   try {
     const f = exp.filter as { from: string; to: string; orgPaths: string[] };
     if (!f.orgPaths?.length) throw new Error('export has no jurisdiction scope');
+    // Re-check the legal gate at build time: an approval withdrawn after the request stops the export.
+    const approvals = (await db.selectFrom('system_settings').select('value').where('key', '=', 'aiLegalApprovals').executeTakeFirst())?.value as Partial<AiLegalApprovals> | undefined;
+    const gate = aiTaskGates(loadConfig(), { ...DEFAULT_SETTINGS.aiLegalApprovals, ...(approvals ?? {}) })[exp.task as AiTask];
+    if (!gate.allowed) throw new Error(`task not permitted on this deployment: ${gate.explanation}`);
     let q = db.selectFrom('ai_detections as d').innerJoin('evidence as e', 'e.id', 'd.evidence_id')
       .select(['d.id', 'd.evidence_id', 'e.org_unit_id', 'd.task', 'd.label', 'd.corrected_label', 'd.review_status', 'd.confidence', 'd.threshold', 'd.model_code', 'd.model_version',
         'd.frame_time_ms', 'd.bbox_x', 'd.bbox_y', 'd.bbox_w', 'd.bbox_h', 'd.attributes', 'd.crop_key', 'd.reviewed_at', 'd.created_at'])
@@ -64,7 +69,9 @@ export async function runTrainingExport(deps: TrainingDeps, exportId: string): P
     let positives = 0, negatives = 0, crops = 0;
     for (const [i, r] of rows.entries()) {
       const negative = r.review_status === 'REJECTED' && !r.corrected_label;
-      const label = r.corrected_label ?? r.label;
+      // Face-recognition labels are the watchlist person's name: a dataset carries no identities.
+      const identity = r.task === 'FACE_RECOGNITION';
+      const label = identity ? 'face' : (r.corrected_label ?? r.label);
       let cropName: string | null = null;
       let size: { width: number; height: number } | null = null;
       if (r.crop_key) {
@@ -78,9 +85,10 @@ export async function runTrainingExport(deps: TrainingDeps, exportId: string): P
           log.warn({ err, detectionId: r.id }, 'crop missing for training sample');
         }
       }
-      const { observations: _o, sampleIndex: _s, cocoClass: _c, ...attributes } = (r.attributes ?? {}) as Record<string, unknown>;
+      // Watchlist identities (who a face matched, list ids, similarity) are never part of a training dataset.
+      const { observations: _o, sampleIndex: _s, cocoClass: _c, watchlistId: _wl, watchlistEntryId: _we, watchlistEntryLabel: _wn, similarity: _sim, matches: _m, faceModelId: _fm, ...attributes } = (r.attributes ?? {}) as Record<string, unknown>;
       lines.push(JSON.stringify({
-        detectionId: r.id, evidenceId: r.evidence_id, task: r.task, label, originalLabel: r.label, sample: negative ? 'negative' : 'positive',
+        detectionId: r.id, evidenceId: r.evidence_id, task: r.task, label, originalLabel: identity ? null : r.label, sample: negative ? 'negative' : 'positive',
         reviewStatus: r.review_status, confidence: r.confidence, threshold: r.threshold, model: { code: r.model_code, version: r.model_version },
         frameTimeMs: Number(r.frame_time_ms), bbox: r.bbox_x === null ? null : { x: r.bbox_x, y: r.bbox_y, w: r.bbox_w, h: r.bbox_h },
         attributes, crop: cropName, reviewedAt: r.reviewed_at,

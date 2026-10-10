@@ -54,6 +54,7 @@ export const SETTING_SCHEMAS = {
     absoluteTimeoutHours: int(1, 72),
     maxConcurrentSessions: int(1, 20),
     requireMfaForRoles: z.array(z.string().regex(/^[A-Z][A-Z0-9_]{1,40}$/)).max(100).transform((v) => [...new Set(v)]),
+    mfaForPrivilegedPermissions: z.boolean().default(true),
   }).strict().refine((v) => v.idleTimeoutMinutes <= v.absoluteTimeoutHours * 60, { message: 'Idle timeout cannot exceed the absolute session lifetime', path: ['idleTimeoutMinutes'] }),
   uploadPolicy: z.object({
     maxFileSizeBytes: int(10 * MiB, 1024 * GiB),
@@ -84,6 +85,9 @@ export const SETTING_SCHEMAS = {
     minPerNight: int(1, 1_000_000),
     maxPerNight: int(1, 10_000_000),
   }).strict().refine((v) => v.maxPerNight >= v.minPerNight, { message: 'Maximum per night must be at least the minimum', path: ['maxPerNight'] }),
+  auditPolicy: z.object({
+    minimumRetentionYears: int(7, 100),
+  }).strict(),
   aiLegalApprovals: z.object({
     FACE_DETECTION: legalApproval.nullable(),
     FACE_RECOGNITION: legalApproval.nullable(),
@@ -170,6 +174,11 @@ export default async function settings(fastify: FastifyInstance) {
         const known = await db.selectFrom('roles').select('code').where('code', 'in', codes).execute();
         const unknown = codes.filter((c) => !known.some((k) => k.code === c));
         if (unknown.length) throw validationFailed(`Unknown role code(s): ${unknown.join(', ')}`, { unknown });
+      }
+      // Production baseline: administrators always enrol MFA and privileged rights always require it.
+      if (loadConfig().KSP_ENVIRONMENT === 'production') {
+        if (!codes.includes('SYSTEM_ADMINISTRATOR')) throw validationFailed('In production MFA must stay mandatory for System Administrators');
+        if (value.mfaForPrivilegedPermissions === false) throw validationFailed('In production MFA must stay mandatory for roles holding administrative or approval rights');
       }
     }
     const before = (await getSettings(db))[key];

@@ -28,7 +28,7 @@ export interface ShareSummary {
 }
 
 export interface ShareDetail extends ShareSummary {
-  items: Array<{ evidenceId: string; evidenceNumber: string | null; title: string | null; durationMs: number | null; recordedAt: string | null }>;
+  items: Array<{ evidenceId: string; evidenceNumber: string | null; title: string | null; durationMs: number | null; recordedAt: string | null; recipientHasOwnAccess?: boolean }>;
   accessLog: Array<{ id: number; evidenceId: string | null; action: string; ip: string | null; userAgent: string | null; detail: string | null; at: string }>;
 }
 

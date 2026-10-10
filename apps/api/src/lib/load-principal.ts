@@ -1,4 +1,4 @@
-import { isPermission, type Permission } from '@ksp/shared';
+import { isPermission, MFA_REQUIRED_PERMISSIONS, type Permission, type SessionPolicy } from '@ksp/shared';
 import type { Database } from '@ksp/core';
 import type { Grant, Principal } from './principal.js';
 import { getSettings } from './settings.js';
@@ -36,13 +36,31 @@ export async function loadGrants(db: Database, userId: string): Promise<Grant[]>
   }));
 }
 
+/**
+ * Whether MFA is mandatory for these role grants: the role is on the administrator's list, or (privileged-permission
+ * rule, default on) the role holds an administrative / approval / oversight permission — so a custom role cannot avoid
+ * MFA by its name.
+ */
+export function mfaMandatoryFor(grants: readonly Pick<Grant, 'roleCode' | 'permissions'>[], policy: Pick<SessionPolicy, 'requireMfaForRoles' | 'mfaForPrivilegedPermissions'>): boolean {
+  return grants.some((g) => policy.requireMfaForRoles.includes(g.roleCode)
+    || (policy.mfaForPrivilegedPermissions !== false && MFA_REQUIRED_PERMISSIONS.some((x) => g.permissions.has(x))));
+}
+
+/**
+ * Whether sign-in must ask this user for the authenticator code: MFA is mandatory for one of their roles, or they turned
+ * it on themselves. An enrolment left over from a role that is no longer on the mandatory list is not challenged.
+ */
+export function mfaChallengeRequired(user: { mfa_enabled: boolean; mfa_self_enrolled: boolean }, mandatory: boolean): boolean {
+  return user.mfa_enabled && (mandatory || user.mfa_self_enrolled);
+}
+
 export async function loadUserPrincipal(db: Database, userId: string, sessionId: string, mfaVerified: boolean): Promise<Principal | null> {
   const hit = cache.get(sessionId);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.principal;
   const user = await db
     .selectFrom('users as u')
     .innerJoin('org_units as o', 'o.id', 'u.home_org_unit_id')
-    .select(['u.id', 'u.username', 'u.full_name', 'u.status', 'u.locked_until', 'u.must_change_password', 'u.password_changed_at', 'u.mfa_enabled', 'o.id as org_id', 'o.path'])
+    .select(['u.id', 'u.username', 'u.full_name', 'u.status', 'u.locked_until', 'u.must_change_password', 'u.password_changed_at', 'u.mfa_enabled', 'u.mfa_self_enrolled', 'o.id as org_id', 'o.path'])
     .where('u.id', '=', userId)
     .executeTakeFirst();
   if (!user || user.status !== 'ACTIVE') return null;
@@ -52,7 +70,10 @@ export async function loadUserPrincipal(db: Database, userId: string, sessionId:
   for (const g of grants) for (const p of g.permissions) permissions.add(p);
   const maxAge = settings.passwordPolicy.maxAgeDays;
   const expired = maxAge > 0 && !!user.password_changed_at && Date.now() - user.password_changed_at.getTime() > maxAge * 86_400_000;
-  const mfaRequired = grants.some((g) => settings.sessionPolicy.requireMfaForRoles.includes(g.roleCode));
+  const mfaRequired = mfaMandatoryFor(grants, settings.sessionPolicy);
+  // A session that signed in without the second factor (allowed while MFA was not required for the user) ends as soon
+  // as the policy requires it again: the user signs in once more and is asked for the code.
+  if (mfaChallengeRequired(user, mfaRequired) && !mfaVerified) return null;
   const principal: Principal = {
     kind: 'USER',
     userId: user.id,
@@ -69,6 +90,28 @@ export async function loadUserPrincipal(db: Database, userId: string, sessionId:
   };
   cache.set(sessionId, { at: Date.now(), principal });
   return principal;
+}
+
+/**
+ * Another user's access as an authorisation check sees it (no session, no MFA/password restrictions): used to ask
+ * "could this user already open the evidence without the share?" before an internal share is created.
+ */
+export async function loadPrincipalForAccessCheck(db: Database, userId: string): Promise<Principal | null> {
+  const user = await db
+    .selectFrom('users as u')
+    .innerJoin('org_units as o', 'o.id', 'u.home_org_unit_id')
+    .select(['u.id', 'u.username', 'u.full_name', 'u.status', 'o.id as org_id', 'o.path'])
+    .where('u.id', '=', userId)
+    .executeTakeFirst();
+  if (!user || user.status !== 'ACTIVE') return null;
+  const grants = await loadGrants(db, userId);
+  const permissions = new Set<Permission>();
+  for (const g of grants) for (const p of g.permissions) permissions.add(p);
+  return {
+    kind: 'USER', userId: user.id, username: user.username, displayName: user.full_name, sessionId: null,
+    homeOrgUnitId: user.org_id, homeOrgPath: user.path, grants, permissions,
+    mustChangePassword: false, mfaEnrollmentRequired: false, mfaVerified: true,
+  };
 }
 
 export async function loadApiClientPrincipal(db: Database, client: { id: string; client_id: string; name: string; scopes: string[]; org_unit_id: string }): Promise<Principal> {

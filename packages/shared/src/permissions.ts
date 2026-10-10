@@ -63,6 +63,17 @@ export const PERMISSIONS = {
 export type Permission = keyof typeof PERMISSIONS;
 export const ALL_PERMISSIONS = Object.keys(PERMISSIONS) as Permission[];
 
+/**
+ * Administrative, approval and oversight rights. With sessionPolicy.mfaForPrivilegedPermissions (default true, always
+ * true in production) any role holding one of them requires MFA — whatever the role is called (custom roles included).
+ * The default roles holding them are System Administrator, Supervisor, Evidence Custodian and Compliance Auditor.
+ */
+export const MFA_REQUIRED_PERMISSIONS: readonly Permission[] = [
+  'users:manage', 'roles:manage', 'org:manage', 'devices:manage', 'settings:manage', 'integrations:manage', 'retention:manage',
+  'ai:models_manage', 'evidence:legal_hold', 'evidence:dispose_request', 'evidence:dispose_approve', 'evidence:quarantine_manage',
+  'evidence:download_original', 'export:approve', 'share:manage_all', 'alerts:manage', 'audit:read', 'audit:export', 'audit:verify',
+];
+
 export function isPermission(value: string): value is Permission {
   return Object.prototype.hasOwnProperty.call(PERMISSIONS, value);
 }

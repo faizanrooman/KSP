@@ -8,7 +8,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import { appendAudit, type Database } from '@ksp/core';
-import { FIR_STATUSES, FIR_TRANSITIONS } from '@ksp/shared';
+import { FIR_STATUSES, FIR_TRANSITIONS, firDisplayNumber, normaliseFirNumber } from '@ksp/shared';
 import { hasPermissionAt, type Principal } from '../../lib/principal.js';
 import { conflict, notFound, unprocessable, validationFailed } from '../../lib/errors.js';
 import { caseVisibleSql, firVisibleSql } from '../cases/access.js';
@@ -50,7 +50,7 @@ export function firDto(r: FirRowFull) {
     id: r.id,
     firNumber: r.fir_number,
     firYear: r.fir_year,
-    displayNumber: `${r.fir_number}/${r.fir_year}`,
+    displayNumber: firDisplayNumber(r.fir_number, r.fir_year),
     orgUnit: { id: r.org_unit_id, name: r.org_name, code: r.org_code },
     registeredAt: r.registered_at,
     actsSections: r.acts_sections,
@@ -166,9 +166,14 @@ export default async function firs(fastify: FastifyInstance) {
 
   app.post('/', { preHandler: app.authorize('cases:manage'), schema: { tags: ['cases'], summary: 'Register a FIR manually', body: firBody } }, async (req, reply) => {
     const p = req.requirePrincipal();
-    const b = req.body;
+    // The year is its own field: "0412/2026" typed as the number is stored as "0412" (shown as 0412/2026).
+    const b = { ...req.body, firNumber: normaliseFirNumber(req.body.firNumber, req.body.firYear) };
     const org = await manageableStation(app.db, p, b.orgUnitId);
     if (b.occurredFrom && b.occurredTo && b.occurredTo < b.occurredFrom) throw validationFailed('occurredTo must not be before occurredFrom');
+    // Records from before the normalisation may hold the number with its year ("0412/2026"): the same FIR.
+    const dup = await app.db.selectFrom('firs').select('id').where('org_unit_id', '=', org.id).where('fir_year', '=', b.firYear)
+      .where('fir_number', 'in', [b.firNumber, `${b.firNumber}/${b.firYear}`]).executeTakeFirst();
+    if (dup) throw conflict(`FIR ${firDisplayNumber(b.firNumber, b.firYear)} is already registered for this station`);
     try {
       const id = await app.db.transaction().execute(async (tx) => {
         const row = await tx
@@ -187,7 +192,7 @@ export default async function firs(fastify: FastifyInstance) {
       reply.status(201);
       return firDto(await loadFirFor(app.db, p, id));
     } catch (e) {
-      if (isUnique(e)) throw conflict(`FIR ${b.firNumber}/${b.firYear} is already registered for this station`);
+      if (isUnique(e)) throw conflict(`FIR ${firDisplayNumber(b.firNumber, b.firYear)} is already registered for this station`);
       throw e;
     }
   });
@@ -243,7 +248,7 @@ export default async function firs(fastify: FastifyInstance) {
     },
   }, async (req, reply) => {
     const p = req.requirePrincipal();
-    const b = req.body;
+    const b = { ...req.body, firNumber: normaliseFirNumber(req.body.firNumber, req.body.year) };
     const sys = await loadSystem(app.db, b.systemId);
     if (sys.system_type !== 'CCTNS' && sys.system_type !== 'FIR') throw unprocessable('Selected system is not a CCTNS/FIR system');
     if (!sys.enabled) throw unprocessable('Integration system is disabled');

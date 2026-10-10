@@ -10,7 +10,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { sql } from 'kysely';
 import { appendAudit } from '@ksp/core';
-import { INTEGRATION_ADAPTERS, INTEGRATION_SYSTEM_TYPES } from '@ksp/shared';
+import { INTEGRATION_ADAPTERS, INTEGRATION_SYSTEM_TYPES, firDisplayNumber, normaliseFirNumber } from '@ksp/shared';
 import { conflict, notFound, validationFailed } from '../../lib/errors.js';
 import { createAdapter, parseConfig, systemConfigSchema } from '../../integrations/adapters.js';
 import { validateBaseUrl } from '../../integrations/egress.js';
@@ -194,9 +194,9 @@ export default async function integrations(fastify: FastifyInstance) {
       if (probe) {
         if ('stationCode' in probe) {
           if (adapter.kind !== 'CCTNS') throw new IntegrationError('NOT_CONFIGURED', 'FIR probe requires a CCTNS/FIR system');
-          const f = await adapter.fetchFir(probe.stationCode, probe.year, probe.firNumber);
+          const f = await adapter.fetchFir(probe.stationCode, probe.year, normaliseFirNumber(probe.firNumber, probe.year));
           if (!f) throw new IntegrationError('NOT_FOUND', 'Probe FIR not found upstream; contract not demonstrated');
-          steps.push({ step: 'contract:fetchFir', ok: true, detail: `parsed FIR ${f.firNumber}/${f.firYear}` });
+          steps.push({ step: 'contract:fetchFir', ok: true, detail: `parsed FIR ${firDisplayNumber(f.firNumber, f.firYear)}` });
         } else if ('caseRef' in probe) {
           if (adapter.kind !== 'CASE_DIARY') throw new IntegrationError('NOT_CONFIGURED', 'caseRef probe requires a CASE_DIARY system');
           const entries = await adapter.fetchEntries(probe.caseRef);

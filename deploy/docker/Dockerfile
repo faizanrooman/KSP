@@ -13,7 +13,7 @@
 
 ARG NODE_IMAGE=node:22-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
 ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.30-alpine@sha256:15c994d10d6d78658721c3bcafff14cb281fba2a4bdf9d5ba92c416a472516e3
-ARG GOLANG_IMAGE=golang:1.27-bookworm@sha256:8d48e12ec56735e9358640898b9d9b9fcca110612ed8a5567438c0a1baa24e66
+ARG GOLANG_IMAGE=golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61
 ARG POSTGRES_IMAGE=postgres:16-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
 # Static FFmpeg 7.1.1 (GPL build: libx264, libx265, libvpx, libaom, libdav1d, libopus, libmp3lame, …) — decodes every
 # codec body-worn cameras produce (H.264/H.265/MJPEG/MPEG-4 in MP4/MOV/AVI/MKV/TS) and encodes H.264 proxies/HLS.

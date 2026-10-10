@@ -46,6 +46,22 @@ describe('FIR management', () => {
     expect((await meera.post('/api/v1/firs', firBody('bad number!'))).status).toBe(400);
   });
 
+  it('stores the number without a typed "/<year>" and never shows the year twice (also for older records)', async () => {
+    const meera = await as('io.meera');
+    const body = (n: string) => firBody(n, { actsSections: [], briefFacts: 'Year suffix normalisation' });
+    const r = await meera.post('/api/v1/firs', body(`0701/${YEAR}`));
+    expect(r.status, r.raw).toBe(201);
+    expect(r.body).toMatchObject({ firNumber: '0701', displayNumber: `0701/${YEAR}` });
+    expect((await meera.post('/api/v1/firs', body('0701'))).status).toBe(409);
+    // A record created before the normalisation holds "0702/<year>": shown once, and "0702" is the same FIR.
+    const path = (await app.db.selectFrom('org_units').select('path').where('id', '=', org.ps_cubbonpark).executeTakeFirstOrThrow()).path;
+    const legacy = await app.db.insertInto('firs').values({ fir_number: `0702/${YEAR}`, fir_year: YEAR, org_unit_id: org.ps_cubbonpark, org_path: path, registered_at: new Date(`${YEAR}-02-02T10:00:00Z`) }).returning('id').executeTakeFirstOrThrow();
+    expect((await meera.get(`/api/v1/firs/${legacy.id}`)).body.displayNumber).toBe(`0702/${YEAR}`);
+    const dup = await meera.post('/api/v1/firs', body('0702'));
+    expect(dup.status).toBe(409);
+    expect(dup.body.error.message).toContain(`0702/${YEAR}`);
+  });
+
   it('lists with filters and applies jurisdiction to detail', async () => {
     const meera = await as('io.meera');
     const l = await meera.get(`/api/v1/firs?year=${YEAR}&actSection=${encodeURIComponent('303(2)')}&q=theft`);

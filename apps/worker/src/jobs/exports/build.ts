@@ -123,7 +123,8 @@ export async function runExportBuild(deps: ExportDeps, payload: ExportBuildPaylo
     const verified = new Map<string, { sha256: string; sha512: string; size: number; at: Date }>();
     let done = 0;
     for (const it of items) {
-      if (!['REGISTERED', 'DISPOSAL_PENDING'].includes(it.status) || !it.storage_bucket || !it.storage_key || !it.sha256) return await fail(`Evidence ${it.evidence_number ?? it.evidence_id} is not available (status ${it.status})`, it);
+      // DISPOSAL_PENDING items are not packaged: an approved disposal would otherwise leave a court copy behind.
+      if (it.status !== 'REGISTERED' || !it.storage_bucket || !it.storage_key || !it.sha256) return await fail(`Evidence ${it.evidence_number ?? it.evidence_id} is not available (status ${it.status})`, it);
       let h: { sha256: string; sha512: string; size: number };
       try {
         h = await hashStream(await storage.getStream(it.storage_bucket, it.storage_key, undefined, it.storage_version_id ?? undefined));
