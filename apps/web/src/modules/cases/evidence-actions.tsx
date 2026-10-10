@@ -43,7 +43,7 @@ function LinkToCaseButton({ evidence }: { evidence: EvidenceSummary }) {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={`Link ${evidence.evidenceNumber ?? 'evidence'} to a case`}
+        title={tr('Link {value} to a case', { value: evidence.evidenceNumber ?? tr('evidence') })}
         footer={<><Button variant="secondary" onClick={() => setOpen(false)}>{tr('Cancel')}</Button><Button disabled={!picked} loading={m.isPending} onClick={() => m.mutate()}>{tr('Link')}</Button></>}
       >
         <div className="space-y-3">

@@ -39,7 +39,7 @@ export function NotificationBell() {
   return (
     <div className="relative" ref={ref}>
       <button type="button" className="relative rounded-md p-2 text-ink-700 hover:bg-ink-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-        aria-haspopup="true" aria-expanded={open} aria-label={`Notifications: ${unread} unread`} onClick={() => setOpen((o) => !o)}>
+        aria-haspopup="true" aria-expanded={open} aria-label={t('Notifications: {unread} unread', { unread })} onClick={() => setOpen((o) => !o)}>
         <Bell className="h-5 w-5" aria-hidden />
         {unread > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[1.1rem] rounded-full bg-red-700 px-1 text-center text-[10px] font-semibold leading-4 text-white" aria-hidden>{unread > 99 ? '99+' : unread}</span>}
       </button>

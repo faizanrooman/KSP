@@ -39,7 +39,7 @@ export function ApiClientsPage() {
     { key: 'name', header: t('Client'), render: (r) => <div><p className="font-medium">{r.name}</p><p className="mono text-xs text-ink-500">{r.clientId}</p></div> },
     { key: 'scopes', header: t('Scopes'), render: (r) => <div className="flex flex-wrap gap-1">{r.scopes.map((s) => <Badge key={s}>{s}</Badge>)}</div> },
     { key: 'org', header: t('Jurisdiction'), render: (r) => r.orgUnit.name },
-    { key: 'ips', header: t('Allowed IPs'), render: (r) => <span className="mono text-xs">{r.allowedIps.length ? r.allowedIps.join(', ') : 'any'}</span> },
+    { key: 'ips', header: t('Allowed IPs'), render: (r) => <span className="mono text-xs">{r.allowedIps.length ? r.allowedIps.join(', ') : t('any')}</span> },
     { key: 'rate', header: t('Rate'), render: (r) => <span className="text-xs">{r.rateLimitPerMinute}{t('/min')}</span> },
     { key: 'status', header: t('Status'), render: (r) => <StatusBadge status={r.status} /> },
     { key: 'used', header: t('Last used'), render: (r) => <span className="text-xs">{formatDateTime(r.lastUsedAt)}</span> },

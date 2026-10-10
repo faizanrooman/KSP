@@ -54,13 +54,13 @@ export function SchedulesCard({ types, formats }: { types: ReportTypeOption[]; f
     { key: 'name', header: tr('Schedule'), render: (s) => <div><div className="font-medium text-ink-900">{s.name}</div><div className="text-xs text-ink-600">{s.title} · {s.format}{s.orgUnit?.name ? ` · ${s.orgUnit.name}` : ''}</div></div> },
     { key: 'when', header: tr('When'), render: (s) => <div><div>{describe(s)}</div><div className="text-xs text-ink-600">{s.timezone}{' '}{tr('· last')}{' '}{s.lookbackDays}{' '}{tr('day(s)')}</div></div> },
     { key: 'next', header: tr('Next run'), render: (s) => (s.enabled ? (s.nextRunAt ? formatDateTime(s.nextRunAt) : '—') : <Badge>{tr('Paused')}</Badge>), className: 'whitespace-nowrap' },
-    { key: 'last', header: tr('Last run'), render: (s) => <div>{s.lastRunAt ? formatDateTime(s.lastRunAt) : 'never'}{s.lastError && <div className="text-xs text-red-700">{s.lastError}</div>}</div> },
+    { key: 'last', header: tr('Last run'), render: (s) => <div>{s.lastRunAt ? formatDateTime(s.lastRunAt) : tr('never')}{s.lastError && <div className="text-xs text-red-700">{s.lastError}</div>}</div> },
     { key: 'to', header: tr('Recipients'), render: (s) => (s.recipients.length ? s.recipients.map((r) => r.fullName ?? r.id.slice(0, 8)).join(', ') : 'only me') + (s.emailRecipients ? ' (+ e-mail)' : '') },
     {
       key: 'act', header: <span className="sr-only">{tr('Actions')}</span>,
       render: (s) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => toggle.mutate(s)} loading={toggle.isPending && toggle.variables?.id === s.id}>{s.enabled ? 'Pause' : 'Resume'}</Button>
+          <Button size="sm" variant="secondary" onClick={() => toggle.mutate(s)} loading={toggle.isPending && toggle.variables?.id === s.id}>{s.enabled ? tr('Pause') : tr('Resume')}</Button>
           <Button size="sm" variant="ghost" onClick={() => { remove.reset(); setDel(s); }}>{tr('Delete')}</Button>
         </div>
       ),
@@ -68,7 +68,7 @@ export function SchedulesCard({ types, formats }: { types: ReportTypeOption[]; f
   ];
   const selected = types.find((t) => t.code === f.reportType);
   return (
-    <Card title={tr('Scheduled reports')} actions={<Button size="sm" variant={open ? 'ghost' : 'secondary'} onClick={() => setOpen(!open)}>{open ? 'Cancel' : 'New schedule'}</Button>}>
+    <Card title={tr('Scheduled reports')} actions={<Button size="sm" variant={open ? 'ghost' : 'secondary'} onClick={() => setOpen(!open)}>{open ? tr('Cancel') : tr('New schedule')}</Button>}>
       <p className="mb-3 text-sm text-ink-600">{tr('Runs are created automatically under')}{' '}<strong>{tr('your')}</strong>{' '}{tr('jurisdiction as it is at run time. You and the recipients are notified when a run is ready; recipients must be allowed to run the same report over the same area themselves.')}</p>
       {open && (
         <form className="mb-4 space-y-3 rounded-lg border border-ink-100 p-3" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
@@ -77,7 +77,7 @@ export function SchedulesCard({ types, formats }: { types: ReportTypeOption[]; f
             <Field label={tr('Report type')} htmlFor="sch-type" required>
               <Select id="sch-type" value={f.reportType} required onChange={(e) => setF({ ...f, reportType: e.target.value })}>
                 <option value="">{tr('Choose…')}</option>
-                {types.map((t) => <option key={t.code} value={t.code} disabled={!t.available}>{t.title}{t.available ? '' : ' (not permitted)'}</option>)}
+                {types.map((t) => <option key={t.code} value={t.code} disabled={!t.available}>{t.title}{t.available ? '' : tr(' (not permitted)')}</option>)}
               </Select>
             </Field>
             <Field label={tr('Format')} htmlFor="sch-format"><Select id="sch-format" value={f.format} onChange={(e) => setF({ ...f, format: e.target.value })}>{formats.map((x) => <option key={x}>{x}</option>)}</Select></Field>
@@ -99,7 +99,7 @@ export function SchedulesCard({ types, formats }: { types: ReportTypeOption[]; f
           </div>
           {recipients.length > 0 && (
             <ul className="flex flex-wrap gap-2" aria-label={tr('Recipients')}>
-              {recipients.map((r) => <li key={r.id}><Badge tone="blue">{r.fullName} <button type="button" className="ml-1 underline" aria-label={`Remove ${r.fullName}`} onClick={() => setRecipients(recipients.filter((x) => x.id !== r.id))}>×</button></Badge></li>)}
+              {recipients.map((r) => <li key={r.id}><Badge tone="blue">{r.fullName} <button type="button" className="ml-1 underline" aria-label={tr('Remove {fullName}', { fullName: r.fullName })} onClick={() => setRecipients(recipients.filter((x) => x.id !== r.id))}>×</button></Badge></li>)}
             </ul>
           )}
           <Checkbox label={tr('Also e-mail me and the recipients a sign-in link when a run is ready')} checked={f.emailRecipients} onChange={(v) => setF({ ...f, emailRecipients: v })} />
@@ -110,7 +110,7 @@ export function SchedulesCard({ types, formats }: { types: ReportTypeOption[]; f
       )}
       <DataTable columns={cols} rows={list.data?.items} rowKey={(s) => s.id} loading={list.isLoading} error={list.error} onRetry={() => void list.refetch()} caption={tr('My scheduled reports')}
         empty={<EmptyState title={tr('No scheduled reports')} description={tr('Create a schedule to receive a report daily, weekly or monthly.')} />} />
-      <ConfirmDialog open={!!del} title={tr('Delete schedule')} message={`Delete “${del?.name ?? ''}”? Past runs are kept.`} confirmLabel={tr('Delete')} variant="danger"
+      <ConfirmDialog open={!!del} title={tr('Delete schedule')} message={tr('Delete “{value}”? Past runs are kept.', { value: del?.name ?? '' })} confirmLabel={tr('Delete')} variant="danger"
         loading={remove.isPending} error={remove.error} onConfirm={() => del && remove.mutate(del)} onCancel={() => setDel(null)} />
     </Card>
   );

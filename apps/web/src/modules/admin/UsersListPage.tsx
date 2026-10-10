@@ -96,7 +96,7 @@ export function UsersListPage() {
           sort={s.sort}
           onSort={(sort) => set({ sort })}
           onRowClick={(r) => navigate(`/admin/users/${r.id}`)}
-          empty={<EmptyState title={filtered ? 'No users match these filters' : 'No users in your jurisdiction'} action={filtered ? <Button variant="secondary" onClick={reset}>{t('Clear filters')}</Button> : undefined} />}
+          empty={<EmptyState title={filtered ? t('No users match these filters') : t('No users in your jurisdiction')} action={filtered ? <Button variant="secondary" onClick={reset}>{t('Clear filters')}</Button> : undefined} />}
         />
         {list.data && <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onPage={(p) => set({ page: String(p) })} />}
       </Card>

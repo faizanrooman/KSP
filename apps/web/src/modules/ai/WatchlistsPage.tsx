@@ -26,7 +26,7 @@ export function WatchlistsPage() {
               {q.data!.items.map((w) => (
                 <li key={w.id}>
                   <button type="button" onClick={() => setUrl({ list: w.id })} className={`w-full rounded px-2 py-1.5 text-left text-sm hover:bg-ink-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${url.list === w.id ? 'bg-brand-50 font-medium' : ''}`} aria-current={url.list === w.id || undefined}>
-                    <div className="flex items-center justify-between gap-2"><span className="truncate">{w.name}</span><Badge tone={w.kind === 'FACE' ? 'purple' : 'amber'}>{w.kind === 'FACE' ? 'Faces' : 'Vehicles'}</Badge></div>
+                    <div className="flex items-center justify-between gap-2"><span className="truncate">{w.name}</span><Badge tone={w.kind === 'FACE' ? 'purple' : 'amber'}>{w.kind === 'FACE' ? t('Faces') : t('Vehicles')}</Badge></div>
                     <div className="text-xs text-ink-500">{w.orgUnit.name} · {w.entries}{' '}{t('entries')}</div>
                   </button>
                 </li>
@@ -90,7 +90,7 @@ function ListDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
         <ul className="mt-4 divide-y divide-ink-100">
           {w.entries.map((e) => (
             <li key={e.id} className="flex items-center gap-3 py-2 text-sm">
-              {e.imageUrl && <img src={e.imageUrl} alt={`Reference image for ${e.label}`} className="h-14 w-14 rounded object-cover" />}
+              {e.imageUrl && <img src={e.imageUrl} alt={t('Reference image for {label}', { label: e.label })} className="h-14 w-14 rounded object-cover" />}
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{e.label}{e.plate && <span className="mono ml-2 text-ink-600">{e.plate}</span>}</div>
                 <div className="text-xs text-ink-500">
@@ -99,13 +99,13 @@ function ListDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
                 </div>
               </div>
               {e.embeddingStatus === 'FAILED' && <Button size="sm" variant="ghost" icon={<RefreshCw className="h-4 w-4" aria-hidden />} loading={reembed.isPending} onClick={() => reembed.mutate(e)}>{t('Retry')}</Button>}
-              <Button size="sm" variant="ghost" aria-label={`Remove ${e.label}`} onClick={() => setRemoveEntry(e)} icon={<Trash2 className="h-4 w-4" aria-hidden />} />
+              <Button size="sm" variant="ghost" aria-label={t('Remove {label}', { label: e.label })} onClick={() => setRemoveEntry(e)} icon={<Trash2 className="h-4 w-4" aria-hidden />} />
             </li>
           ))}
         </ul>
       )}
-      <ConfirmDialog open={del} title={t('Delete watchlist')} message={`Delete "${w.name}" and its ${w.entries.length} entries? Past detections keep their labels.`} confirmLabel={t('Delete')} variant="danger" loading={delList.isPending} error={delList.error} onCancel={() => setDel(false)} onConfirm={() => delList.mutate()} />
-      <ConfirmDialog open={!!removeEntry} title={t('Remove entry')} message={`Remove "${removeEntry?.label}" from the list?`} confirmLabel={t('Remove')} variant="danger" loading={delEntry.isPending} error={delEntry.error} onCancel={() => setRemoveEntry(null)} onConfirm={() => delEntry.mutate(removeEntry!)} />
+      <ConfirmDialog open={del} title={t('Delete watchlist')} message={t('Delete "{name}" and its {count} entries? Past detections keep their labels.', { name: w.name, count: w.entries.length })} confirmLabel={t('Delete')} variant="danger" loading={delList.isPending} error={delList.error} onCancel={() => setDel(false)} onConfirm={() => delList.mutate()} />
+      <ConfirmDialog open={!!removeEntry} title={t('Remove entry')} message={t('Remove "{label}" from the list?', { label: removeEntry?.label })} confirmLabel={t('Remove')} variant="danger" loading={delEntry.isPending} error={delEntry.error} onCancel={() => setRemoveEntry(null)} onConfirm={() => delEntry.mutate(removeEntry!)} />
     </Card>
   );
 }
@@ -132,7 +132,7 @@ function AddEntry({ listId, kind, onAdded }: { listId: string; kind: 'FACE' | 'V
   const ok = label.trim() && (kind === 'VEHICLE' ? plate.replace(/[^A-Za-z0-9]/g, '').length >= 2 : !!file && !fileErr);
   return (
     <form className="flex flex-wrap items-end gap-3 rounded border border-ink-200 p-3" onSubmit={(e) => { e.preventDefault(); if (ok) m.mutate(); }}>
-      <Field label={kind === 'FACE' ? 'Name / reference' : 'Label'} htmlFor="we-label" required><Input id="we-label" value={label} onChange={(e) => setLabel(e.target.value)} /></Field>
+      <Field label={kind === 'FACE' ? t('Name / reference') : t('Label')} htmlFor="we-label" required><Input id="we-label" value={label} onChange={(e) => setLabel(e.target.value)} /></Field>
       {kind === 'VEHICLE' ? (
         <Field label={t('Plate')} htmlFor="we-plate" required hint={t('Letters and digits; spaces/dashes ignored')}><Input id="we-plate" value={plate} onChange={(e) => setPlate(e.target.value)} className="w-36 font-mono" /></Field>
       ) : (

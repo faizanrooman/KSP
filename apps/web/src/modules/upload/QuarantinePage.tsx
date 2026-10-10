@@ -40,9 +40,9 @@ function PendingRelease({ requestId, filename, onDone }: { requestId: string; fi
   });
   const s = q.data;
   useEffect(() => { if (s && ['COMPLETED', 'FAILED'].includes(s.status)) onDone(s); }, [s?.status]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (s?.status === 'FAILED') return <Alert tone="red" title={`Release of ${filename} failed`}>{s.error}</Alert>;
-  if (s?.status === 'COMPLETED') return <Alert tone="green">{filename}{' '}{t('released and registered')}{' '}{s.evidenceNumber ? ` as ${s.evidenceNumber}` : ''}.</Alert>;
-  return <Alert tone="blue"><span className="inline-flex items-center gap-2"><Spinner />{' '}{t('Releasing')}{' '}{filename}: {s?.status === 'RUNNING' ? 'verifying the hash and moving it to immutable storage…' : 'queued…'}</span></Alert>;
+  if (s?.status === 'FAILED') return <Alert tone="red" title={t('Release of {filename} failed', { filename })}>{s.error}</Alert>;
+  if (s?.status === 'COMPLETED') return <Alert tone="green">{filename}{' '}{t('released and registered')}{' '}{s.evidenceNumber ? t(' as {evidenceNumber}', { evidenceNumber: s.evidenceNumber }) : ''}.</Alert>;
+  return <Alert tone="blue"><span className="inline-flex items-center gap-2"><Spinner />{' '}{t('Releasing')}{' '}{filename}: {s?.status === 'RUNNING' ? t('verifying the hash and moving it to immutable storage…') : t('queued…')}</span></Alert>;
 }
 
 export function QuarantinePage() {
@@ -78,7 +78,7 @@ export function QuarantinePage() {
       render: (r) => (
         <div>
           <div className="font-medium text-ink-900">{r.originalFilename}</div>
-          <div className="font-mono text-xs text-ink-500" title={r.sha256 ?? ''}>{r.sha256 ? `SHA-256 ${shortHash(r.sha256)}` : 'not hashed'}</div>
+          <div className="font-mono text-xs text-ink-500" title={r.sha256 ?? ''}>{r.sha256 ? t('SHA-256 {sha256}', { sha256: shortHash(r.sha256) }) : t('not hashed')}</div>
         </div>
       ),
     },
@@ -87,7 +87,7 @@ export function QuarantinePage() {
       header: t('Reason'),
       render: (r) => (
         <div className="max-w-md">
-          <Badge tone="red">{r.reasonCode ?? 'UNKNOWN'}</Badge>
+          <Badge tone="red">{r.reasonCode ?? t('UNKNOWN')}</Badge>
           <p className="mt-1 text-xs text-ink-700">{r.reasonMessage}</p>
           {r.duplicateOf && (
             <p className="mt-1 text-xs">{t('Original:')}{' '}<Link className="font-mono text-brand-700 underline" to={`/evidence/${r.duplicateOf.id}`}>{r.duplicateOf.evidenceNumber ?? r.duplicateOf.id}</Link></p>
@@ -144,7 +144,7 @@ export function QuarantinePage() {
       </Card>
       <ConfirmDialog
         open={!!action}
-        title={action?.kind === 'release' ? 'Release and register this upload?' : 'Reject this upload?'}
+        title={action?.kind === 'release' ? t('Release and register this upload?') : t('Reject this upload?')}
         message={
           action && (
             <div className="space-y-2 text-sm">
@@ -155,7 +155,7 @@ export function QuarantinePage() {
             </div>
           )
         }
-        confirmLabel={action?.kind === 'release' ? 'Release' : 'Reject'}
+        confirmLabel={action?.kind === 'release' ? t('Release') : t('Reject')}
         variant={action?.kind === 'release' ? 'success' : 'danger'}
         requireReason
         reasonLabel={t('Justification (recorded in the chain of custody)')}

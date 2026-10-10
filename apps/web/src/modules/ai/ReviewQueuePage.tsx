@@ -124,7 +124,7 @@ export function ReviewQueuePage() {
           <p className="flex items-center gap-2" id="rq-shortcuts"><Keyboard className="h-4 w-4" aria-hidden />{' '}{tr('J/K move · A approve · R reject · S second review · X select · H history')}</p>
         </div>
         <p className="sr-only" aria-live="polite" data-testid="rq-current">
-          {current ? `Item ${Math.min(cursor, items.length - 1) + 1} of ${items.length}: ${taskLabel(current.task)} ${current.correctedLabel ?? current.label}, ${Math.round(current.confidence * 100)}% confidence, ${current.reviewStatus.replace(/_/g, ' ').toLowerCase()}` : ''}
+          {current ? tr('Item {value} of {count}: {task} {value2}, {value3}% confidence, {value4}', { value: Math.min(cursor, items.length - 1) + 1, count: items.length, task: taskLabel(current.task), value2: current.correctedLabel ?? current.label, value3: Math.round(current.confidence * 100), value4: current.reviewStatus.replace(/_/g, ' ').toLowerCase() }) : ''}
         </p>
       </Card>
 
@@ -253,7 +253,7 @@ function HistoryDrawer({ id, onClose }: { id: string | null; onClose: () => void
               {q.data!.events.map((e) => (
                 <li key={e.id} className="text-sm">
                   <div className="font-medium">{e.action.replace(/_/g, ' ').toLowerCase()} — {e.reviewer.fullName}</div>
-                  <div className="text-xs text-ink-500">{formatDateTime(e.createdAt)} · {e.previousStatus} → {e.newStatus}{e.correctedLabel ? ` · label "${e.correctedLabel}"` : ''}</div>
+                  <div className="text-xs text-ink-500">{formatDateTime(e.createdAt)} · {e.previousStatus} → {e.newStatus}{e.correctedLabel ? tr(' · label "{correctedLabel}"', { correctedLabel: e.correctedLabel }) : ''}</div>
                   {e.comment && <p className="mt-1 whitespace-pre-wrap text-ink-700">{e.comment}</p>}
                 </li>
               ))}

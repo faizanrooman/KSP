@@ -27,7 +27,7 @@ export function ModelsPage() {
     { key: 'thr', header: tr('Default threshold'), render: (m) => m.defaultThreshold.toFixed(3) },
     { key: 'licence', header: tr('Licence'), render: (m) => <span className="text-xs">{String((m.config as { licence?: string }).licence ?? '—')}</span> },
     { key: 'sha', header: tr('Artefact SHA-256'), render: (m) => <code className="mono text-xs" title={m.artifactSha256 ?? ''}>{shortHash(m.artifactSha256)}</code> },
-    { key: 'metrics', header: tr('Metrics'), render: (m) => <span className="text-xs">{Object.keys(m.metrics).length ? Object.entries(m.metrics).filter(([, v]) => typeof v === 'number').map(([k, v]) => `${k} ${v}`).join(', ') || 'recorded' : 'none'}</span> },
+    { key: 'metrics', header: tr('Metrics'), render: (m) => <span className="text-xs">{Object.keys(m.metrics).length ? Object.entries(m.metrics).filter(([, v]) => typeof v === 'number').map(([k, v]) => `${k} ${v}`).join(', ') || tr('recorded') : tr('none')}</span> },
     { key: 'when', header: tr('Activated'), render: (m) => (m.activatedAt ? formatDateTime(m.activatedAt) : '—') },
     {
       key: 'actions', header: <span className="sr-only">{tr('Actions')}</span>, render: (m) => (
@@ -47,9 +47,9 @@ export function ModelsPage() {
           empty={<EmptyState title={tr('No models registered')} description={tr('Run `npm run fetch-models -w @ksp/ai-worker` on the AI host to download, verify and register the pinned models.')} />} />
       </Card>
       <TrainingExports />
-      <ConfirmDialog open={!!confirm} title={confirm?.op === 'activate' ? 'Activate model version' : 'Retire model version'}
-        message={confirm ? (confirm.op === 'activate' ? `Activate ${confirm.m.code}@${confirm.m.version}? The currently ACTIVE version of ${confirm.m.code} is retired; new jobs use this version.` : `Retire ${confirm.m.code}@${confirm.m.version}? If it is the only active model for ${taskLabel(confirm.m.task)}, that task becomes unavailable.`) : ''}
-        confirmLabel={confirm?.op === 'activate' ? 'Activate' : 'Retire'} variant={confirm?.op === 'retire' ? 'danger' : 'primary'} loading={op.isPending} error={op.error}
+      <ConfirmDialog open={!!confirm} title={confirm?.op === 'activate' ? tr('Activate model version') : tr('Retire model version')}
+        message={confirm ? (confirm.op === 'activate' ? tr('Activate {code}@{version}? The currently ACTIVE version of {code2} is retired; new jobs use this version.', { code: confirm.m.code, version: confirm.m.version, code2: confirm.m.code }) : tr('Retire {code}@{version}? If it is the only active model for {task}, that task becomes unavailable.', { code: confirm.m.code, version: confirm.m.version, task: taskLabel(confirm.m.task) })) : ''}
+        confirmLabel={confirm?.op === 'activate' ? tr('Activate') : tr('Retire')} variant={confirm?.op === 'retire' ? 'danger' : 'primary'} loading={op.isPending} error={op.error}
         onCancel={() => setConfirm(null)} onConfirm={() => op.mutate({ id: confirm!.m.id, op: confirm!.op })} />
       {edit && <EditModel m={edit} onClose={() => setEdit(null)} />}
     </div>
@@ -69,7 +69,7 @@ function EditModel({ m, onClose }: { m: AiModelDto; onClose: () => void }) {
     onSuccess: () => { void qc.invalidateQueries({ queryKey: aiKeys.models }); onClose(); },
   });
   return (
-    <Modal open size="lg" title={`Edit ${m.code}@${m.version}`} onClose={onClose}
+    <Modal open size="lg" title={tr('Edit {code}@{version}', { code: m.code, version: m.version })} onClose={onClose}
       footer={<><Button variant="secondary" onClick={onClose}>{tr('Cancel')}</Button><Button disabled={!parsed || !thrOk} loading={save.isPending} onClick={() => save.mutate()}>{tr('Save')}</Button></>}>
       <div className="space-y-3">
         <Field label={tr('Default threshold')} htmlFor="em-thr" error={thrOk ? null : 'Between 0.01 and 0.99'}><Input id="em-thr" type="number" step="0.01" value={thr} onChange={(e) => setThr(e.target.value)} className="w-28" /></Field>

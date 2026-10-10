@@ -35,7 +35,7 @@ function EvidenceGrid({ ws, items, restrictedCount, editable, onReview }: { ws: 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-ink-600">{items.length}{' '}{tr('item(s)')}{' '}{restrictedCount ? ` · ${restrictedCount} restricted` : ''}</p>
+        <p className="text-sm text-ink-600">{items.length}{' '}{tr('item(s)')}{' '}{restrictedCount ? tr(' · {restrictedCount} restricted', { restrictedCount }) : ''}</p>
         {editable && <Button icon={<Plus className="h-4 w-4" />} onClick={() => setPicker(true)}>{tr('Add evidence')}</Button>}
       </div>
       {restrictedCount > 0 && (
@@ -44,7 +44,7 @@ function EvidenceGrid({ ws, items, restrictedCount, editable, onReview }: { ws: 
         </Alert>
       )}
       {!items.length ? (
-        <EmptyState icon={<Film className="h-6 w-6" />} title={tr('No evidence yet')} description={editable ? 'Add evidence you are authorised to see.' : 'The workspace editors have not added evidence you can see.'} />
+        <EmptyState icon={<Film className="h-6 w-6" />} title={tr('No evidence yet')} description={editable ? tr('Add evidence you are authorised to see.') : tr('The workspace editors have not added evidence you can see.')} />
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {items.map((it) => (
@@ -56,7 +56,7 @@ function EvidenceGrid({ ws, items, restrictedCount, editable, onReview }: { ws: 
               )}
               <div className="flex flex-1 flex-col gap-1 p-3">
                 <Link to={`/evidence/${it.evidenceId}`} className="mono text-xs font-semibold text-brand-800 hover:underline">{it.evidence.evidenceNumber ?? it.evidenceId}</Link>
-                <p className="text-sm font-medium">{it.evidence.title ?? 'Untitled'}</p>
+                <p className="text-sm font-medium">{it.evidence.title ?? tr('Untitled')}</p>
                 <p className="text-xs text-ink-500">{it.evidence.orgUnit.name} · {formatDateTime(it.evidence.recordedAt)} · {formatDuration(it.evidence.durationMs)}</p>
                 <p className="text-xs text-ink-500">{tr('Sync offset')}{' '}{it.syncOffsetMs >= 0 ? '+' : '−'}{formatTimecode(Math.abs(it.syncOffsetMs))}{' '}{tr('· added by')}{' '}{it.addedBy.fullName}</p>
                 {notes?.id === it.id ? (
@@ -91,7 +91,7 @@ function EvidenceGrid({ ws, items, restrictedCount, editable, onReview }: { ws: 
       <ConfirmDialog
         open={!!remove}
         title={tr('Remove from workspace')}
-        message={`Remove ${remove?.evidence.evidenceNumber ?? 'this item'} from the workspace? The evidence itself is not changed; the removal is recorded in its chain of custody.`}
+        message={tr('Remove {value} from the workspace? The evidence itself is not changed; the removal is recorded in its chain of custody.', { value: remove?.evidence.evidenceNumber ?? tr('this item') })}
         confirmLabel={tr('Remove')}
         variant="danger"
         loading={del.isPending}
@@ -159,7 +159,7 @@ function CompareView({ ws, items, editable, preset }: { ws: WorkspaceDetail; ite
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button size="sm" variant="secondary" onClick={alignByClock} disabled={!chosen.length}>{tr('Align by recording time')}</Button>
           <span className="text-xs text-ink-500">
-            {editable ? (save.isPending ? 'Saving offsets…' : 'Offset changes are saved to the workspace.') : 'Read-only: offset changes are not saved.'}
+            {editable ? (save.isPending ? tr('Saving offsets…') : tr('Offset changes are saved to the workspace.')) : tr('Read-only: offset changes are not saved.')}
           </span>
         </div>
       </Card>
@@ -182,7 +182,7 @@ function RelatedPanel({ items, editable }: { items: VisibleItem[]; editable: boo
     <div className="space-y-3">
       <Field label={tr('Evidence')} htmlFor="rel-item">
         <Select id="rel-item" value={current.id} onChange={(e) => setItemId(e.target.value)}>
-          {items.map((i) => <option key={i.id} value={i.id}>{i.evidence.evidenceNumber ?? i.evidenceId} — {i.evidence.title ?? 'Untitled'}</option>)}
+          {items.map((i) => <option key={i.id} value={i.id}>{i.evidence.evidenceNumber ?? i.evidenceId} — {i.evidence.title ?? tr('Untitled')}</option>)}
         </Select>
       </Field>
       <Card title={tr('Explicit relations')}>
@@ -264,20 +264,20 @@ function MembersPanel({ ws }: { ws: WorkspaceDetail }) {
   return (
     <div className="space-y-3">
       <Alert tone="blue">{tr('Members see only the evidence their own roles and jurisdiction allow. Adding someone here never grants access to evidence.')}</Alert>
-      <Card title={`Members (${ws.members.length})`}>
+      <Card title={tr('Members ({count})', { count: ws.members.length })}>
         <ul className="divide-y divide-ink-100">
           {ws.members.map((m) => (
             <li key={m.userId} className="flex flex-wrap items-center gap-2 py-2 text-sm">
               <span className="flex-1">{m.fullName} <span className="text-ink-500">{m.badgeNumber ?? `@${m.username}`}</span></span>
               {owner && m.role !== 'OWNER' ? (
-                <Select aria-label={`Role of ${m.fullName}`} value={m.role} onChange={(e) => change.mutate({ userId: m.userId, role: e.target.value })}>
+                <Select aria-label={tr('Role of {fullName}', { fullName: m.fullName })} value={m.role} onChange={(e) => change.mutate({ userId: m.userId, role: e.target.value })}>
                   <option value="EDITOR">{tr('Editor')}</option>
                   <option value="VIEWER">{tr('Viewer')}</option>
                 </Select>
               ) : (
                 <Badge tone={m.role === 'OWNER' ? 'blue' : 'gray'}>{titleCase(m.role)}</Badge>
               )}
-              {owner && m.role !== 'OWNER' && <Button size="sm" variant="ghost" icon={<UserMinus className="h-4 w-4" />} aria-label={`Remove ${m.fullName}`} onClick={() => remove.mutate(m.userId)} />}
+              {owner && m.role !== 'OWNER' && <Button size="sm" variant="ghost" icon={<UserMinus className="h-4 w-4" />} aria-label={tr('Remove {fullName}', { fullName: m.fullName })} onClick={() => remove.mutate(m.userId)} />}
             </li>
           ))}
         </ul>
@@ -381,7 +381,7 @@ export function WorkspacePage() {
             {editable && <Button variant="secondary" icon={<Pencil className="h-4 w-4" />} onClick={() => setEdit(true)}>{tr('Edit')}</Button>}
             {role === 'OWNER' && (
               <Button variant="secondary" icon={w.status === 'ACTIVE' ? <Archive className="h-4 w-4" /> : <ArchiveRestore className="h-4 w-4" />} onClick={() => setArchive(true)}>
-                {w.status === 'ACTIVE' ? 'Archive' : 'Re-activate'}
+                {w.status === 'ACTIVE' ? tr('Archive') : tr('Re-activate')}
               </Button>
             )}
           </>
@@ -407,7 +407,7 @@ export function WorkspacePage() {
           <div className="space-y-3">
             <Field label={tr('Video')} htmlFor="review-item">
               <Select id="review-item" value={reviewItem.id} onChange={(e) => setUrl({ item: e.target.value, t: '' })}>
-                {visible.map((i) => <option key={i.id} value={i.id}>{i.evidence.evidenceNumber ?? i.evidenceId} — {i.evidence.title ?? 'Untitled'}</option>)}
+                {visible.map((i) => <option key={i.id} value={i.id}>{i.evidence.evidenceNumber ?? i.evidenceId} — {i.evidence.title ?? tr('Untitled')}</option>)}
               </Select>
             </Field>
             <AnnotationStudio key={`${reviewItem.id}:${url.t}`} evidenceId={reviewItem.evidenceId} workspaceId={w.id} editable={editable} initialTimeMs={Number.isFinite(t) && t > 0 ? t : undefined} />
@@ -432,9 +432,9 @@ export function WorkspacePage() {
       {edit && <EditModal ws={w} open={edit} onClose={() => setEdit(false)} />}
       <ConfirmDialog
         open={archive}
-        title={w.status === 'ACTIVE' ? 'Archive workspace' : 'Re-activate workspace'}
-        message={w.status === 'ACTIVE' ? 'Archived workspaces become read-only for all members. You can re-activate it later.' : 'Members with editor rights will be able to change the workspace again.'}
-        confirmLabel={w.status === 'ACTIVE' ? 'Archive' : 'Re-activate'}
+        title={w.status === 'ACTIVE' ? tr('Archive workspace') : tr('Re-activate workspace')}
+        message={w.status === 'ACTIVE' ? tr('Archived workspaces become read-only for all members. You can re-activate it later.') : tr('Members with editor rights will be able to change the workspace again.')}
+        confirmLabel={w.status === 'ACTIVE' ? tr('Archive') : tr('Re-activate')}
         loading={setStatus.isPending}
         error={setStatus.error}
         onConfirm={() => setStatus.mutate(w.status === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE', { onSuccess: () => setArchive(false) })}

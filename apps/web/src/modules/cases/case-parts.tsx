@@ -68,10 +68,10 @@ export function StatusButton({ caseItem: c }: { caseItem: CaseDetail }) {
           <p>{tr('Current status:')}{' '}<StatusBadge status={c.status} /></p>
           <Field label={tr('New status')} htmlFor="cs-to">
             <Select id="cs-to" value={to} onChange={(e) => setTo(e.target.value)}>
-              {c.allowedTransitions.map((s) => <option key={s} value={s}>{reopen && s === 'UNDER_INVESTIGATION' ? 'Reopen (Under investigation)' : titleCase(s)}</option>)}
+              {c.allowedTransitions.map((s) => <option key={s} value={s}>{reopen && s === 'UNDER_INVESTIGATION' ? tr('Reopen (Under investigation)') : titleCase(s)}</option>)}
             </Select>
           </Field>
-          <Field label={needsReason ? 'Reason' : 'Reason (optional)'} required={needsReason} htmlFor="cs-reason" hint={tr('Recorded in the audit trail and case timeline.')}>
+          <Field label={needsReason ? tr('Reason') : tr('Reason (optional)')} required={needsReason} htmlFor="cs-reason" hint={tr('Recorded in the audit trail and case timeline.')}>
             <Textarea id="cs-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
           </Field>
           {m.error ? <Alert tone="red">{errorMessage(m.error)}</Alert> : null}
@@ -117,7 +117,7 @@ export function OverviewTab({ caseItem: c }: { caseItem: CaseDetail }) {
               { label: tr('Source'), value: titleCase(c.fir.source) },
             ]}
           />
-        ) : <EmptyState title={tr('No FIR linked')} description={c.permissions.canManage ? 'Use Edit to link a FIR.' : undefined} />}
+        ) : <EmptyState title={tr('No FIR linked')} description={c.permissions.canManage ? tr('Use Edit to link a FIR.') : undefined} />}
         {c.hiddenEvidenceCount > 0 && <div className="mt-3"><Alert tone="amber">{c.hiddenEvidenceCount}{' '}{tr('linked evidence item(s) are outside your access and not shown.')}</Alert></div>}
       </Card>
       {editing && <EditCaseModal caseItem={c} onClose={() => setEditing(false)} />}
@@ -155,14 +155,14 @@ function EditCaseModal({ caseItem: c, onClose }: { caseItem: CaseDetail; onClose
   });
   const upd = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [k]: e.target.value }));
   return (
-    <Modal open onClose={onClose} title={`Edit ${c.caseNumber}`} size="lg" footer={<><Button variant="secondary" onClick={onClose}>{tr('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={f.title.trim().length < 3}>{tr('Save changes')}</Button></>}>
+    <Modal open onClose={onClose} title={tr('Edit {caseNumber}', { caseNumber: c.caseNumber })} size="lg" footer={<><Button variant="secondary" onClick={onClose}>{tr('Cancel')}</Button><Button onClick={() => m.mutate()} loading={m.isPending} disabled={f.title.trim().length < 3}>{tr('Save changes')}</Button></>}>
       <div className="grid gap-3 md:grid-cols-2">
         <div className="md:col-span-2"><Field label={tr('Title')} required htmlFor="ec-title"><Input id="ec-title" value={f.title} onChange={upd('title')} /></Field></div>
         <div className="md:col-span-2"><Field label={tr('Description')} htmlFor="ec-desc"><Textarea id="ec-desc" rows={3} value={f.description} onChange={upd('description')} /></Field></div>
         <Field label={tr('Priority')} htmlFor="ec-pri"><Select id="ec-pri" value={f.priority} onChange={upd('priority')}>{CASE_PRIORITIES.map((x) => <option key={x} value={x}>{titleCase(x)}</option>)}</Select></Field>
-        <Field label={tr('Linked FIR')} htmlFor="ec-fir" hint={c.fir ? `Currently ${c.fir.displayNumber}` : 'None linked'}><FirIdPicker id="ec-fir" onChange={setFirId} /></Field>
-        <Field label={tr('Change investigating officer')} htmlFor="ec-io" hint={c.investigatingOfficer?.fullName ? `Currently ${c.investigatingOfficer.fullName}` : undefined}><UserPicker id="ec-io" value={io} onChange={setIo} /></Field>
-        <Field label={tr('Change supervisor')} htmlFor="ec-sup" hint={c.supervisor?.fullName ? `Currently ${c.supervisor.fullName}` : undefined}><UserPicker id="ec-sup" value={sup} onChange={setSup} /></Field>
+        <Field label={tr('Linked FIR')} htmlFor="ec-fir" hint={c.fir ? tr('Currently {displayNumber}', { displayNumber: c.fir.displayNumber }) : tr('None linked')}><FirIdPicker id="ec-fir" onChange={setFirId} /></Field>
+        <Field label={tr('Change investigating officer')} htmlFor="ec-io" hint={c.investigatingOfficer?.fullName ? tr('Currently {fullName}', { fullName: c.investigatingOfficer.fullName }) : undefined}><UserPicker id="ec-io" value={io} onChange={setIo} /></Field>
+        <Field label={tr('Change supervisor')} htmlFor="ec-sup" hint={c.supervisor?.fullName ? tr('Currently {fullName}', { fullName: c.supervisor.fullName }) : undefined}><UserPicker id="ec-sup" value={sup} onChange={setSup} /></Field>
         <Field label={tr('Court')} htmlFor="ec-court"><Input id="ec-court" value={f.courtName} onChange={upd('courtName')} /></Field>
         <Field label={tr('Court case number')} htmlFor="ec-ccn"><Input id="ec-ccn" value={f.courtCaseNumber} onChange={upd('courtCaseNumber')} /></Field>
         <Field label={tr('External system')} htmlFor="ec-es"><Input id="ec-es" value={f.externalSystem} onChange={upd('externalSystem')} placeholder={tr('e.g. CCTNS')} /></Field>
@@ -243,7 +243,7 @@ export function EvidenceTab({ caseItem: c }: { caseItem: CaseDetail }) {
       }
     >
       {q.data && q.data.hiddenCount > 0 && <div className="p-3"><Alert tone="amber">{q.data.hiddenCount}{' '}{tr('linked item(s) are outside your access and not listed.')}</Alert></div>}
-      <DataTable caption={tr('Linked evidence')} columns={cols} rows={q.data?.items} rowKey={(r) => r.linkId} loading={q.isFetching} error={q.error} onRetry={() => void q.refetch()} empty={<EmptyState title={tr('No evidence linked')} description={c.permissions.canLinkEvidence ? 'Use “Link evidence” to attach footage to this case.' : undefined} />} />
+      <DataTable caption={tr('Linked evidence')} columns={cols} rows={q.data?.items} rowKey={(r) => r.linkId} loading={q.isFetching} error={q.error} onRetry={() => void q.refetch()} empty={<EmptyState title={tr('No evidence linked')} description={c.permissions.canLinkEvidence ? tr('Use “Link evidence” to attach footage to this case.') : undefined} />} />
       {q.data && <Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onPage={setPage} />}
       {linking && <LinkEvidenceModal caseId={c.id} onClose={() => setLinking(false)} onDone={refresh} />}
       <ConfirmDialog
@@ -352,18 +352,18 @@ export function TeamTab({ caseItem: c }: { caseItem: CaseDetail }) {
     <div className="grid gap-4 lg:grid-cols-3">
       <Card title={tr('Case team')} className="lg:col-span-2" bodyClassName="p-0">
         <ul className="divide-y divide-ink-100 text-sm">
-          <li className="flex items-center justify-between px-4 py-3"><span><strong>{tr('Investigating officer')}</strong>: {c.investigatingOfficer?.fullName ?? 'Unassigned'}</span><Badge tone="blue">{tr('IO')}</Badge></li>
+          <li className="flex items-center justify-between px-4 py-3"><span><strong>{tr('Investigating officer')}</strong>: {c.investigatingOfficer?.fullName ?? tr('Unassigned')}</span><Badge tone="blue">{tr('IO')}</Badge></li>
           <li className="flex items-center justify-between px-4 py-3"><span><strong>{tr('Supervisor')}</strong>: {c.supervisor?.fullName ?? '—'}</span><Badge tone="purple">{tr('Supervisor')}</Badge></li>
           {c.members.map((m) => (
             <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-3">
               <span>
                 {m.fullName} <span className="text-ink-500">{m.badgeNumber ?? `@${m.username}`} · {m.orgUnitName}</span>
-                <span className="block text-xs text-ink-500">{tr('Added')}{' '}{formatDateTime(m.addedAt)}{m.addedByName ? ` by ${m.addedByName}` : ''}</span>
+                <span className="block text-xs text-ink-500">{tr('Added')}{' '}{formatDateTime(m.addedAt)}{m.addedByName ? tr(' by {addedByName}', { addedByName: m.addedByName }) : ''}</span>
               </span>
               <span className="flex items-center gap-2">
                 <Badge>{titleCase(m.role)}</Badge>
                 {m.userStatus !== 'ACTIVE' && <Badge tone="red">{titleCase(m.userStatus)}</Badge>}
-                {editable && <Button size="sm" variant="ghost" onClick={() => { rm.reset(); setRemoving(m.id); }} aria-label={`Remove ${m.fullName}`}>{tr('Remove')}</Button>}
+                {editable && <Button size="sm" variant="ghost" onClick={() => { rm.reset(); setRemoving(m.id); }} aria-label={tr('Remove {fullName}', { fullName: m.fullName })}>{tr('Remove')}</Button>}
               </span>
             </li>
           ))}

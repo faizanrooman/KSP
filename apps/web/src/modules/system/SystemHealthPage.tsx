@@ -34,8 +34,8 @@ interface MetricsSummary {
 
 const dur = (s: number | null) => (s === null ? '—' : s < 90 ? `${s}s` : s < 5400 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`);
 function Ok({ ok, text }: { ok: boolean; text?: string }) {
-  return ok ? <span className="inline-flex items-center gap-1 text-emerald-800"><CheckCircle2 className="h-4 w-4" aria-hidden />{text ?? 'OK'}</span>
-    : <span className="inline-flex items-center gap-1 font-medium text-red-800"><XCircle className="h-4 w-4" aria-hidden />{text ?? 'Failing'}</span>;
+  return ok ? <span className="inline-flex items-center gap-1 text-emerald-800"><CheckCircle2 className="h-4 w-4" aria-hidden />{text ?? t('OK')}</span>
+    : <span className="inline-flex items-center gap-1 font-medium text-red-800"><XCircle className="h-4 w-4" aria-hidden />{text ?? t('Failing')}</span>;
 }
 
 export function SystemHealthPage() {
@@ -60,43 +60,43 @@ export function SystemHealthPage() {
   ];
   return (
     <div className="space-y-5">
-      <PageHeader title={t('System health')} subtitle={h ? `Checked ${formatDateTime(h.checkedAt)} in ${h.tookMs} ms · refreshes every 30 s` : undefined}
+      <PageHeader title={t('System health')} subtitle={h ? t('Checked {checkedAt} in {tookMs} ms · refreshes every 30 s', { checkedAt: formatDateTime(h.checkedAt), tookMs: h.tookMs }) : undefined}
         actions={<Button variant="secondary" onClick={() => { void health.refetch(); void metrics.refetch(); }} loading={health.isFetching}><RefreshCw className="h-4 w-4" aria-hidden />{t('Refresh')}</Button>} />
       {health.isLoading && <Spinner />}
       {health.error && !h && <ErrorState error={health.error} onRetry={() => void health.refetch()} />}
       {h && (
         <>
           {h.status === 'ok' ? <Alert tone="green" title={t('All monitored components healthy')} /> : (
-            <Alert tone={h.status === 'down' ? 'red' : 'amber'} title={h.status === 'down' ? 'System down' : 'Degraded'}>
+            <Alert tone={h.status === 'down' ? 'red' : 'amber'} title={h.status === 'down' ? t('System down') : t('Degraded')}>
               <ul className="list-disc pl-5">{h.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
             </Alert>
           )}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat label={t('Database')} value={<Ok ok={h.database.ok} text={h.database.ok ? `${h.database.ms} ms` : 'Down'} />} sub={h.database.version ? `PostgreSQL ${h.database.version}` : h.database.error} />
-            <Stat label={t('Object storage')} value={<Ok ok={h.objectStorage.ok} text={h.objectStorage.ok ? `${h.objectStorage.ms} ms` : 'Failing'} />} sub={`${h.objectStorage.buckets.filter((b) => b.ok).length}/${h.objectStorage.buckets.length} buckets reachable`} />
-            <Stat label={t('Workers alive')} value={h.workers?.alive ?? 0} tone={h.workers && h.workers.alive === 0 ? 'red' : undefined} sub={`stale after ${h.workers?.staleAfterSeconds ?? 90}s`} />
+            <Stat label={t('Database')} value={<Ok ok={h.database.ok} text={h.database.ok ? `${h.database.ms} ms` : 'Down'} />} sub={h.database.version ? t('PostgreSQL {version}', { version: h.database.version }) : h.database.error} />
+            <Stat label={t('Object storage')} value={<Ok ok={h.objectStorage.ok} text={h.objectStorage.ok ? `${h.objectStorage.ms} ms` : 'Failing'} />} sub={t('{count}/{count2} buckets reachable', { count: h.objectStorage.buckets.filter((b) => b.ok).length, count2: h.objectStorage.buckets.length })} />
+            <Stat label={t('Workers alive')} value={h.workers?.alive ?? 0} tone={h.workers && h.workers.alive === 0 ? 'red' : undefined} sub={t('stale after {value}s', { value: h.workers?.staleAfterSeconds ?? 90 })} />
             {h.workers?.aiWorker && (
               <Stat label={t('AI workers alive')} value={h.workers.aiWorker.alive} tone={h.workers.aiWorker.alive === 0 && (h.workers.aiWorker.stale > 0 || h.workers.aiWorker.queuedJobs > 0) ? 'red' : undefined}
-                sub={`${h.workers.aiWorker.queuedJobs} AI job(s) queued${h.workers.aiWorker.oldestQueuedSeconds !== null ? `, oldest ${Math.round(h.workers.aiWorker.oldestQueuedSeconds / 60)} min` : ''}`} />
+                sub={h.workers.aiWorker.oldestQueuedSeconds !== null ? t('{count} AI job(s) queued, oldest {minutes} min', { count: h.workers.aiWorker.queuedJobs, minutes: Math.round(h.workers.aiWorker.oldestQueuedSeconds / 60) }) : t('{count} AI job(s) queued', { count: h.workers.aiWorker.queuedJobs })} />
             )}
-            <Stat label={t('Open alerts')} value={(h.openAlerts.CRITICAL ?? 0) + (h.openAlerts.WARNING ?? 0) + (h.openAlerts.INFO ?? 0)} sub={`${h.openAlerts.CRITICAL ?? 0} critical`} tone={h.openAlerts.CRITICAL ? 'red' : undefined} />
+            <Stat label={t('Open alerts')} value={(h.openAlerts.CRITICAL ?? 0) + (h.openAlerts.WARNING ?? 0) + (h.openAlerts.INFO ?? 0)} sub={t('{value} critical', { value: h.openAlerts.CRITICAL ?? 0 })} tone={h.openAlerts.CRITICAL ? 'red' : undefined} />
           </div>
 
           <Card title={t('API performance (this instance)')}>
             {metrics.isLoading ? <Spinner /> : metrics.error ? <ErrorState error={metrics.error} onRetry={() => void metrics.refetch()} /> : metrics.data && (
               <>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-                  <Stat label={`Requests (${metrics.data.window.windowMinutes} min)`} value={metrics.data.window.requests} sub={`${metrics.data.window.requestsPerMinute}/min`} />
+                  <Stat label={t('Requests ({windowMinutes} min)', { windowMinutes: metrics.data.window.windowMinutes })} value={metrics.data.window.requests} sub={t('{requestsPerMinute}/min', { requestsPerMinute: metrics.data.window.requestsPerMinute })} />
                   <Stat label={t('p50 latency')} value={metrics.data.window.latencyMs.p50 === null ? '—' : `${metrics.data.window.latencyMs.p50} ms`} />
                   <Stat label={t('p95 latency')} value={metrics.data.window.latencyMs.p95 === null ? '—' : `${metrics.data.window.latencyMs.p95} ms`} />
                   <Stat label={t('5xx error rate')} value={`${(metrics.data.window.errorRate5xx * 100).toFixed(2)}%`} tone={metrics.data.window.errorRate5xx > 0.005 ? 'red' : undefined} />
-                  <Stat label={t('Uptime')} value={dur(metrics.data.instance.uptimeSeconds)} sub={`${metrics.data.sinceStart.requests} requests since start`} />
+                  <Stat label={t('Uptime')} value={dur(metrics.data.instance.uptimeSeconds)} sub={t('{requests} requests since start', { requests: metrics.data.sinceStart.requests })} />
                 </div>
                 <p className="mt-2 text-xs text-ink-600">{t('Per-instance estimate from histogram buckets. Fleet-wide availability (99.5% target) is measured by the synthetic probe in Prometheus — see docs/MONITORING.md; it is not asserted here.')}</p>
                 {metrics.data.slowestRoutes.length > 0 && (
                   <div className="mt-3">
                     <CategoryBars title={t('Slowest routes by mean latency (ms)')} label="route" value="meanMs" rows={metrics.data.slowestRoutes.map((r) => ({ ...r, route: `${r.method} ${r.route}` }))}
-                      summary={`Slowest: ${metrics.data.slowestRoutes[0]!.method} ${metrics.data.slowestRoutes[0]!.route} at ${metrics.data.slowestRoutes[0]!.meanMs} ms mean.`} format={(v) => `${v} ms`} />
+                      summary={t('Slowest: {method} {route} at {meanMs} ms mean.', { method: metrics.data.slowestRoutes[0]!.method, route: metrics.data.slowestRoutes[0]!.route, meanMs: metrics.data.slowestRoutes[0]!.meanMs })} format={(v) => `${v} ms`} />
                   </div>
                 )}
               </>
@@ -163,7 +163,7 @@ export function SystemHealthPage() {
                 <caption className="sr-only">{t('Storage by store')}</caption>
                 <thead><tr className="text-left text-ink-600"><th scope="col">{t('Store')}</th><th scope="col">{t('Tier')}</th><th scope="col" className="text-right">{t('Objects')}</th><th scope="col" className="text-right">{t('Size')}</th><th scope="col">{t('Method')}</th><th scope="col" className="text-right">{t('DB catalogue')}</th></tr></thead>
                 <tbody>{h.storage.byBucket.map((b) => (
-                  <tr key={b.role} className="border-t border-ink-100"><td className="font-mono text-xs">{b.role}</td><td>{b.tier}</td><td className="text-right tabular-nums">{b.objects}</td><td className="text-right">{formatBytes(b.bytes)}</td><td className="text-xs">{b.source === 'S3_LIST' ? 'S3 listing' : 'DB sum'}</td><td className="text-right">{formatBytes(b.dbBytes)}</td></tr>
+                  <tr key={b.role} className="border-t border-ink-100"><td className="font-mono text-xs">{b.role}</td><td>{b.tier}</td><td className="text-right tabular-nums">{b.objects}</td><td className="text-right">{formatBytes(b.bytes)}</td><td className="text-xs">{b.source === 'S3_LIST' ? t('S3 listing') : t('DB sum')}</td><td className="text-right">{formatBytes(b.dbBytes)}</td></tr>
                 ))}</tbody>
               </table>
               {!h.storage.byBucket.length && <p className="text-sm text-ink-600">{t('No snapshot captured yet.')}</p>}
@@ -173,10 +173,10 @@ export function SystemHealthPage() {
           {h.integrity && (
             <Card title={t('Integrity (fixity) coverage')}>
               <div className="grid gap-3 sm:grid-cols-4">
-                <Stat label={t('Verified within cycle')} value={h.integrity.coveragePercent === null ? '—' : `${h.integrity.coveragePercent}%`} sub={`${h.integrity.verifiedInCycle} of ${h.integrity.total} copies · cycle ${h.integrity.policy.fullCycleDays} days`} />
+                <Stat label={t('Verified within cycle')} value={h.integrity.coveragePercent === null ? '—' : `${h.integrity.coveragePercent}%`} sub={t('{verifiedInCycle} of {total} copies · cycle {fullCycleDays} days', { verifiedInCycle: h.integrity.verifiedInCycle, total: h.integrity.total, fullCycleDays: h.integrity.policy.fullCycleDays })} />
                 <Stat label={t('Never verified')} value={h.integrity.neverVerified} tone={h.integrity.neverVerified ? 'amber' : undefined} />
-                <Stat label={t('Projected full cycle')} value={h.integrity.projectedCycleDays === null ? '—' : `${h.integrity.projectedCycleDays} days`} tone={h.integrity.projectedCycleDays && h.integrity.projectedCycleDays > h.integrity.policy.fullCycleDays ? 'red' : undefined} sub={`${h.integrity.effectiveNightly} per night (target ${h.integrity.nightlyBatch}${h.integrity.policy.maxBytesPerNight ? `, budget ${formatBytes(h.integrity.policy.maxBytesPerNight)}` : ''})`} />
-                <Stat label={t('Last nightly sweep')} value={h.integrity.lastSweep ? formatDateTime(h.integrity.lastSweep.at) : 'none in 26 h'} tone={h.integrity.lastSweep?.failed ? 'red' : undefined} sub={h.integrity.lastSweep ? `${h.integrity.lastSweep.checks} checks, ${h.integrity.lastSweep.failed} failed` : undefined} />
+                <Stat label={t('Projected full cycle')} value={h.integrity.projectedCycleDays === null ? '—' : t('{count} days', { count: h.integrity.projectedCycleDays })} tone={h.integrity.projectedCycleDays && h.integrity.projectedCycleDays > h.integrity.policy.fullCycleDays ? 'red' : undefined} sub={h.integrity.policy.maxBytesPerNight ? t('{count} per night (target {target}, budget {budget})', { count: h.integrity.effectiveNightly, target: h.integrity.nightlyBatch, budget: formatBytes(h.integrity.policy.maxBytesPerNight) }) : t('{count} per night (target {target})', { count: h.integrity.effectiveNightly, target: h.integrity.nightlyBatch })} />
+                <Stat label={t('Last nightly sweep')} value={h.integrity.lastSweep ? formatDateTime(h.integrity.lastSweep.at) : 'none in 26 h'} tone={h.integrity.lastSweep?.failed ? 'red' : undefined} sub={h.integrity.lastSweep ? t('{checks} checks, {failed} failed', { checks: h.integrity.lastSweep.checks, failed: h.integrity.lastSweep.failed }) : undefined} />
               </div>
               <KeyValue items={Object.entries(h.integrity.byKind).map(([k, v]) => ({ label: k === 'PRIMARY' ? 'Current originals' : k === 'RETAINED' ? 'Retained copies' : 'DR copies', value: `${v.verifiedInCycle}/${v.total} verified in cycle · ${v.neverVerified} never` }))} />
             </Card>

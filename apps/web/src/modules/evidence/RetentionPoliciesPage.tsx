@@ -43,7 +43,7 @@ function PolicyModal({ policy, onClose }: { policy: RetentionPolicy | 'new'; onC
     <Modal
       open
       onClose={onClose}
-      title={isNew ? 'New retention policy' : `Edit ${policy.name}`}
+      title={isNew ? t('New retention policy') : t('Edit {name}', { name: policy.name })}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={m.isPending}>{t('Cancel')}</Button>
@@ -111,7 +111,7 @@ export function RetentionPoliciesPage() {
           render: (r: RetentionPolicy) => (
             <div className="flex justify-end gap-1.5">
               <Button size="sm" variant="secondary" onClick={() => setEdit(r)}>{t('Edit')}</Button>
-              <Button size="sm" variant="ghost" disabled={r.isDefault || r.evidenceCount > 0} title={r.isDefault ? 'The default policy cannot be deleted' : r.evidenceCount > 0 ? 'Policy is in use' : undefined} onClick={() => { delM.reset(); setDel(r); }}>{t('Delete')}</Button>
+              <Button size="sm" variant="ghost" disabled={r.isDefault || r.evidenceCount > 0} title={r.isDefault ? t('The default policy cannot be deleted') : r.evidenceCount > 0 ? t('Policy is in use') : undefined} onClick={() => { delM.reset(); setDel(r); }}>{t('Delete')}</Button>
             </div>
           ),
         } satisfies Column<RetentionPolicy>]
@@ -124,7 +124,7 @@ export function RetentionPoliciesPage() {
         <DataTable caption={t('Retention policies')} columns={cols} rows={q.data?.items} rowKey={(r) => r.id} loading={q.isFetching} error={q.error} onRetry={() => void q.refetch()} empty={<EmptyState title={t('No retention policies')} />} />
       </Card>
       {edit && <PolicyModal policy={edit} onClose={() => setEdit(null)} />}
-      <ConfirmDialog open={!!del} title={t('Delete retention policy')} message={`Delete “${del?.name}”? This cannot be undone.`} confirmLabel={t('Delete')} variant="danger" loading={delM.isPending} error={delM.error} onConfirm={() => del && delM.mutate(del.id)} onCancel={() => setDel(null)} />
+      <ConfirmDialog open={!!del} title={t('Delete retention policy')} message={t('Delete “{name}”? This cannot be undone.', { name: del?.name })} confirmLabel={t('Delete')} variant="danger" loading={delM.isPending} error={delM.error} onConfirm={() => del && delM.mutate(del.id)} onCancel={() => setDel(null)} />
     </div>
   );
 }

@@ -85,7 +85,7 @@ export const EvidencePlayer = forwardRef<EvidencePlayerHandle, EvidencePlayerPro
     return box(
       <div className="w-full max-w-sm space-y-3 text-center" role="status" aria-live="polite">
         <Loader2 className="mx-auto h-6 w-6 animate-spin" aria-hidden />
-        <p className="font-medium">{d.mediaStatus === 'PENDING' ? 'Queued for processing' : 'Preparing playback'}</p>
+        <p className="font-medium">{d.mediaStatus === 'PENDING' ? tr('Queued for processing') : tr('Preparing playback')}</p>
         <ProgressBar value={d.progress} label={tr('Media processing progress')} />
         <p className="text-xs text-ink-300">{Math.round(d.progress * 100)}{tr('% — proxy, adaptive stream and thumbnails are being generated. This page updates automatically.')}</p>
       </div>,
@@ -94,8 +94,8 @@ export const EvidencePlayer = forwardRef<EvidencePlayerHandle, EvidencePlayerPro
   if (d.mediaStatus === 'FAILED' || d.mediaStatus === 'UNSUPPORTED') {
     return (
       <div className={props.className}>
-        <Alert tone={d.mediaStatus === 'FAILED' ? 'red' : 'amber'} title={d.mediaStatus === 'FAILED' ? 'Media processing failed' : 'Playback not available for this file'}>
-          <p>{d.mediaStatus === 'FAILED' ? 'Playback derivatives could not be generated. The original evidence file is unaffected; processing can be retried.' : 'The file could not be decoded as video (for example audio-only, damaged or an unsupported format). The original evidence file is preserved unchanged.'}</p>
+        <Alert tone={d.mediaStatus === 'FAILED' ? 'red' : 'amber'} title={d.mediaStatus === 'FAILED' ? tr('Media processing failed') : tr('Playback not available for this file')}>
+          <p>{d.mediaStatus === 'FAILED' ? tr('Playback derivatives could not be generated. The original evidence file is unaffected; processing can be retried.') : tr('The file could not be decoded as video (for example audio-only, damaged or an unsupported format). The original evidence file is preserved unchanged.')}</p>
           {d.mediaError && <p className="mono mt-1 break-words text-xs">{d.mediaError}</p>}
         </Alert>
       </div>
@@ -485,7 +485,7 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
       className={clsx('relative flex flex-col rounded-lg bg-ink-950 text-ink-100 outline-none focus-visible:ring-2 focus-visible:ring-brand-500', fullscreen && 'h-screen justify-center rounded-none', props.className)}
       tabIndex={0}
       role="region"
-      aria-label={props.label ? `Evidence video player: ${props.label}` : 'Evidence video player'}
+      aria-label={props.label ? tr('Evidence video player: {label}', { label: props.label }) : tr('Evidence video player')}
       aria-keyshortcuts="Space ArrowLeft ArrowRight Shift+ArrowLeft Shift+ArrowRight [ ] + - 0 s f ?"
       onKeyDown={onKeyDown}
     >
@@ -554,7 +554,7 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
                     className="pointer-events-auto absolute top-0 h-2.5 w-1.5 -translate-x-1/2 rounded-sm"
                     style={{ left: `${(Math.min(m.timeMs, durMs) / durMs) * 100}%`, backgroundColor: m.color ?? '#f59e0b' }}
                     title={`${m.label} — ${formatTimecode(m.timeMs)}`}
-                    aria-label={`Marker: ${m.label} at ${formatTimecode(m.timeMs)}`}
+                    aria-label={tr('Marker: {label} at {timeMs}', { label: m.label, timeMs: formatTimecode(m.timeMs) })}
                     onClick={() => seek(m.timeMs)}
                   />
                 ))}
@@ -573,7 +573,7 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
             />
           </div>
           <div className="flex flex-wrap items-center gap-1 text-sm">
-            <button type="button" className={btn} onClick={togglePlay} aria-label={paused ? 'Play' : 'Pause'} title={paused ? 'Play (Space)' : 'Pause (Space)'}>
+            <button type="button" className={btn} onClick={togglePlay} aria-label={paused ? tr('Play') : tr('Pause')} title={paused ? tr('Play (Space)') : tr('Pause (Space)')}>
               {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
             </button>
             <button type="button" className={btn} onClick={() => seek(time - 5000)} aria-label={tr('Back 5 seconds')} title={tr('Back 5 s (Shift+←)')}><Rewind className="h-4 w-4" /></button>
@@ -614,7 +614,7 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
               <button type="button" className={btn} onClick={() => setHelp((h) => !h)} aria-label={tr('Keyboard shortcuts')} aria-expanded={help} title={tr('Keyboard shortcuts (?)')}><Keyboard className="h-4 w-4" /></button>
               {help && <ShortcutHelp onClose={() => setHelp(false)} />}
             </div>
-            <button type="button" className={btn} onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} title={tr('Fullscreen (F)')}>
+            <button type="button" className={btn} onClick={toggleFullscreen} aria-label={fullscreen ? tr('Exit fullscreen') : tr('Fullscreen')} title={tr('Fullscreen (F)')}>
               {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
             </button>
           </div>

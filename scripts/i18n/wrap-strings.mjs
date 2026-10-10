@@ -21,7 +21,7 @@ import ts from 'typescript';
 
 const ROOT = fileURLToPath(new URL('../../apps/web/src/', import.meta.url));
 const CHECK = process.argv.includes('--check');
-const ATTRS = new Set(['label', 'placeholder', 'title', 'aria-label', 'hint', 'emptyLabel', 'confirmLabel', 'subtitle', 'description', 'reasonLabel', 'caption', 'alt', 'message', 'empty', 'nativeLabel']);
+const ATTRS = new Set(['label', 'placeholder', 'title', 'aria-label', 'hint', 'emptyLabel', 'confirmLabel', 'subtitle', 'description', 'reasonLabel', 'caption', 'alt', 'message', 'empty', 'nativeLabel', 'sub', 'summary']);
 const PROPS = new Set(['header', 'label', 'title', 'hint', 'description', 'subtitle', 'placeholder', 'emptyLabel', 'confirmLabel', 'message', 'summary', 'name']);
 const TOAST_FNS = new Set(['success', 'error', 'info', 'warning']);
 // Props that look like text but are data-field names on chart components.
@@ -31,6 +31,7 @@ const EXTRA_KEYS_FILE = join(ROOT, 'i18n', 'extra-keys.json');
 
 const keys = new Set();
 const report = [];
+const manualReport = []; // English plurals built from fragments: rewrite by hand with a {count} placeholder
 
 function walkDir(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -106,6 +107,63 @@ function processFile(file) {
     touched = true;
   };
 
+  // Text-valued expressions (attribute values and JSX children): string literals in ternary / `||` / `??` / `&&`
+  // branches are wrapped, and template literals become `t('… {name} …', { name: expr })` so each language can order
+  // the words itself. Only the outermost expression is rewritten (nested parts are emitted from `textSource`), so
+  // edits never overlap. Templates that build English plurals from fragments (`result${n === 1 ? '' : 's'}`) cannot
+  // be translated mechanically and are reported instead.
+  const manual = [];
+  const isTextLiteral = (e) => (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e)) && hasLetters(e.text) && !isJsxLike(e.text);
+  const placeholderName = (e, used) => {
+    let n = ts.isParenthesizedExpression(e) ? e.expression : e;
+    if (ts.isCallExpression(n) && n.arguments.length === 1) n = n.arguments[0];
+    if (ts.isNonNullExpression(n)) n = n.expression;
+    let name = ts.isIdentifier(n) ? n.text : ts.isPropertyAccessExpression(n) ? n.name.text : 'value';
+    if (name === 'length') name = 'count';
+    let out = name;
+    for (let i = 2; used.has(out); i++) out = `${name}${i}`;
+    used.add(out);
+    return out;
+  };
+  const textSource = (e) => {
+    // returns [source, changed]
+    if (ts.isParenthesizedExpression(e)) { const [src, ch] = textSource(e.expression); return [`(${src})`, ch]; }
+    if (ts.isConditionalExpression(e)) {
+      const [a, ca] = textSource(e.whenTrue); const [b, cb] = textSource(e.whenFalse);
+      return [`${e.condition.getText(sf)} ? ${a} : ${b}`, ca || cb];
+    }
+    if (ts.isBinaryExpression(e) && ['||', '??', '&&'].includes(e.operatorToken.getText(sf))) {
+      const and = e.operatorToken.getText(sf) === '&&';
+      const [l, cl] = and ? [e.left.getText(sf), false] : textSource(e.left); const [r, cr] = textSource(e.right);
+      return [`${l} ${e.operatorToken.getText(sf)} ${r}`, cl || cr];
+    }
+    if (isTextLiteral(e) && !isAlreadyWrapped(e)) { addKey(e.text); return [`${FN}('${escapeForSingleQuotes(e.text)}')`, true]; }
+    if (ts.isTemplateExpression(e) && !isAlreadyWrapped(e)) {
+      const literalText = e.head.text + e.templateSpans.map((sp) => sp.literal.text).join('');
+      if (!hasLetters(literalText)) return [e.getText(sf), false];
+      const fragment = e.templateSpans.some((sp) => { const x = ts.isParenthesizedExpression(sp.expression) ? sp.expression.expression : sp.expression; return ts.isConditionalExpression(x) && [x.whenTrue, x.whenFalse].some((b) => (ts.isStringLiteral(b) || ts.isNoSubstitutionTemplateLiteral(b)) && /^[a-z]{0,3}$/.test(b.text)); });
+      if (fragment) { manual.push(`${relative(ROOT, file)}:${sf.getLineAndCharacterOfPosition(e.getStart(sf)).line + 1} ${e.getText(sf).slice(0, 80)}`); return [e.getText(sf), false]; }
+      const used = new Set(); const vars = [];
+      let key = e.head.text;
+      for (const sp of e.templateSpans) {
+        const name = placeholderName(sp.expression, used);
+        const [src] = textSource(sp.expression);
+        vars.push(src === name ? name : `${name}: ${src}`);
+        key += `{${name}}` + sp.literal.text;
+      }
+      addKey(key);
+      return [`${FN}('${escapeForSingleQuotes(key)}', { ${vars.join(', ')} })`, true];
+    }
+    return [e.getText(sf), false];
+  };
+  const rewriteText = (e) => {
+    if (!e) return;
+    const [src, changed] = textSource(e);
+    if (!changed) return;
+    edits.push({ start: e.getStart(sf), end: e.getEnd(), text: src });
+    touched = true;
+  };
+
   const visit = (node) => {
     // 0. already-translated strings count as keys too (the extractor must be idempotent)
     if (ts.isCallExpression(node) && (node.expression.getText() === 't' || node.expression.getText() === 'tr') && node.arguments[0] && (ts.isStringLiteral(node.arguments[0]) || ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))) {
@@ -147,13 +205,29 @@ function processFile(file) {
       if (ts.isStringLiteral(init)) wrapLiteral(init, { asExpression: true });
       else if (ts.isJsxExpression(init) && init.expression && (ts.isStringLiteral(init.expression) || ts.isNoSubstitutionTemplateLiteral(init.expression))) {
         wrapLiteral(init.expression, { asExpression: false });
+      } else if (ts.isJsxExpression(init) && init.expression) {
+        const before = edits.length;
+        rewriteText(init.expression);
+        if (edits.length > before) return; // rewritten as a whole; nothing inside may be edited again
       }
       ts.forEachChild(node, visit);
       return;
     }
+    // 2b. JSX children that compute text: {cond ? 'A' : 'B'}, {`${n} items`}, {name || 'Unknown'}
+    if (ts.isJsxExpression(node) && node.expression && node.parent && (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent))) {
+      const e = node.expression;
+      if (ts.isConditionalExpression(e) || ts.isTemplateExpression(e) || ts.isBinaryExpression(e) || ts.isParenthesizedExpression(e)) {
+        const before = edits.length;
+        rewriteText(e);
+        if (edits.length > before) return;
+      }
+    }
     // 3. object properties inside components
     if (ts.isPropertyAssignment(node) && PROPS.has(node.name.getText()) && (ts.isStringLiteral(node.initializer) || ts.isNoSubstitutionTemplateLiteral(node.initializer))) {
       if (enclosingComponent(node)) wrapLiteral(node.initializer, { asExpression: false });
+      // Module-level registries (tabs, nav items, label maps) are translated where they are rendered (Tabs, the
+      // shell, StatusBadge); they only need to be in the key list so the dictionary check covers them.
+      else if (hasLetters(node.initializer.text) && !isJsxLike(node.initializer.text) && !/^[a-z]+[A-Z][A-Za-z0-9]*$/.test(node.initializer.text)) addKey(node.initializer.text);
       ts.forEachChild(node, visit);
       return;
     }
@@ -166,6 +240,7 @@ function processFile(file) {
   };
   visit(sf);
 
+  manualReport.push(...manual);
   if (!touched) return;
   if (CHECK) {
     report.push(`${relative(ROOT, file)}: ${edits.length} unwrapped string(s)`);
@@ -209,6 +284,10 @@ if (CHECK) {
     process.exitCode = 1;
   }
 } else writeFileSync(keysFile, keysJson);
+if (manualReport.length) {
+  console.error(`i18n: ${manualReport.length} string(s) build English plurals from fragments; rewrite them with t('{count} item(s)', { count }):\n  ${manualReport.join('\n  ')}`);
+  if (CHECK) process.exitCode = 1;
+}
 if (CHECK) {
   if (report.length) {
     console.error(`i18n: ${report.length} file(s) contain unwrapped UI strings:\n  ${report.join('\n  ')}`);

@@ -107,7 +107,7 @@ export function ExportDetailPage() {
           <p className="mt-2 text-xs text-ink-600">{t('Recipients can verify the package offline with the commands in VERIFY.txt, or upload it on')}{' '}<Link className="text-brand-700 underline" to="/exports/verify">{t('Verify package')}</Link>.</p>
         </Card>
       )}
-      <Card title={`Items (${x.items.length})`} bodyClassName="p-0">
+      <Card title={t('Items ({count})', { count: x.items.length })} bodyClassName="p-0">
         <DataTable caption={t('Export items')} columns={cols} rows={x.items} rowKey={(r) => r.evidenceId} />
       </Card>
       {open && (
@@ -118,7 +118,7 @@ export function ExportDetailPage() {
           confirmLabel={copy[open].label}
           variant={copy[open].variant}
           requireReason={copy[open].requireReason}
-          reasonLabel={open === 'revoke' ? 'Reason for revocation' : 'Reason'}
+          reasonLabel={open === 'revoke' ? t('Reason for revocation') : t('Reason')}
           loading={decide.isPending}
           error={decide.error ? new Error(`${errorMessage(decide.error)}`) : undefined}
           onConfirm={(reason) => decide.mutate({ d: open, reason })}

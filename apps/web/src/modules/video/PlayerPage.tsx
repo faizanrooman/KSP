@@ -25,7 +25,7 @@ export function PlayerPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title={ev.data?.evidenceNumber ?? 'Evidence player'}
+        title={ev.data?.evidenceNumber ?? tr('Evidence player')}
         subtitle={ev.data?.title ?? undefined}
         breadcrumb={<Link to={`/evidence/${id}`} className="text-brand-700 hover:underline">{tr('← Back to evidence')}</Link>}
         actions={

@@ -31,7 +31,7 @@ export function ConfidenceBar({ value, threshold, className }: { value: number; 
     <div className={clsx('flex items-center gap-2', className)}>
       <div className="relative h-2 w-24 overflow-hidden rounded bg-ink-100" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={tr('Confidence')}>
         <div className={clsx('h-full', tone)} style={{ width: `${pct}%` }} />
-        {threshold !== undefined && <div className="absolute inset-y-0 w-px bg-ink-900" style={{ left: `${Math.round(threshold * 100)}%` }} title={`Threshold ${Math.round(threshold * 100)}%`} />}
+        {threshold !== undefined && <div className="absolute inset-y-0 w-px bg-ink-900" style={{ left: `${Math.round(threshold * 100)}%` }} title={tr('Threshold {value}%', { value: Math.round(threshold * 100) })} />}
       </div>
       <span className="mono text-xs tabular-nums text-ink-700">{pct}%</span>
     </div>
@@ -66,7 +66,7 @@ export function Attributes({ a }: { a: Record<string, unknown> }) {
   if (typeof a.similarity === 'number') parts.push(<span key="s">{tr('similarity')}{' '}{a.similarity.toFixed(3)}</span>);
   if (a.basis && typeof a.basis === 'object') {
     const b = a.basis as Record<string, unknown>;
-    parts.push(<span key="b">{b.maxPersonsInFrame ? `${String(b.maxPersonsInFrame)} persons in one frame` : `from ${String(b.label)} (${String(b.observations)} obs.)`}</span>);
+    parts.push(<span key="b">{b.maxPersonsInFrame ? tr('{maxPersonsInFrame} persons in one frame', { maxPersonsInFrame: String(b.maxPersonsInFrame) }) : tr('from {label} ({observations} obs.)', { label: String(b.label), observations: String(b.observations) })}</span>);
   }
   if (typeof a.observations === 'number' && a.observations > 1) parts.push(<span key="o">{a.observations}{' '}{tr('frames')}</span>);
   if (!parts.length) return null;

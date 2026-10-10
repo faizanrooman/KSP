@@ -145,10 +145,10 @@ export function LoginPage() {
 
   if (mfaToken) {
     return (
-      <AuthFrame title={t('Two-step verification')} subtitle={useRecovery ? 'Enter one of your one-time recovery codes.' : 'Enter the 6-digit code from your authenticator app.'}>
+      <AuthFrame title={t('Two-step verification')} subtitle={useRecovery ? t('Enter one of your one-time recovery codes.') : t('Enter the 6-digit code from your authenticator app.')}>
         <form onSubmit={submitCode} className="space-y-4">
           {error && <Alert tone="red">{error}</Alert>}
-          <Field label={useRecovery ? 'Recovery code' : 'Verification code'} htmlFor="code" required>
+          <Field label={useRecovery ? t('Recovery code') : t('Verification code')} htmlFor="code" required>
             <Input id="code" autoFocus autoComplete="one-time-code" inputMode={useRecovery ? 'text' : 'numeric'} pattern={useRecovery ? undefined : '\\d{6}'} maxLength={useRecovery ? 32 : 6} value={code} onChange={(e) => setCode(e.target.value)} required />
           </Field>
           <Button type="submit" className="w-full" loading={busy}>
@@ -156,7 +156,7 @@ export function LoginPage() {
           </Button>
           <div className="flex justify-between text-sm">
             <button type="button" className="text-brand-700 hover:underline" onClick={() => { setUseRecovery((v) => !v); setCode(''); setError(null); }}>
-              {useRecovery ? 'Use authenticator code' : 'Use a recovery code'}
+              {useRecovery ? t('Use authenticator code') : t('Use a recovery code')}
             </button>
             <button type="button" className="text-ink-600 hover:underline" onClick={() => { setMfaToken(null); setUseRecovery(false); setCode(''); setError(null); }}>
               {t('Back')}

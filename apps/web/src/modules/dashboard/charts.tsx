@@ -33,7 +33,7 @@ function DataTableView<T extends Record<string, unknown>>({ rows, x, xLabel, ser
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-ink-100">
-                <th scope="row" className="py-1 pr-3 font-normal text-ink-800">{String(r[x])}</th>
+                <th scope="row" className="py-1 pr-3 font-normal text-ink-800">{tr(String(r[x]))}</th>
                 {series.map((s) => <td key={s.key} className="py-1 pr-3 text-right tabular-nums text-ink-800">{(s.format ?? String)(Number(r[s.key] ?? 0))}</td>)}
               </tr>
             ))}
@@ -59,7 +59,7 @@ export function TimeBars<T extends Record<string, unknown>>({ title, rows, x, se
 }) {
   return (
     <ChartFigure title={title} summary={summary}>
-      <div role="img" aria-label={`${title} bar chart. ${summary}`} style={{ height }}>
+      <div role="img" aria-label={tr('{title} bar chart. {summary}', { title, summary })} style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barGap={2} barCategoryGap="20%">
             <CartesianGrid vertical={false} stroke={GRID} />
@@ -74,7 +74,7 @@ export function TimeBars<T extends Record<string, unknown>>({ title, rows, x, se
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <DataTableView rows={rows} x={x} xLabel="Day" series={series} />
+      <DataTableView rows={rows} x={x} xLabel={tr('Day')} series={series} />
     </ChartFigure>
   );
 }
@@ -89,10 +89,10 @@ export function CategoryBars<T extends Record<string, unknown>>({ title, rows, l
   const MAX_CHARS = 42;
   const longest = rows.reduce((n, r) => Math.max(n, Math.min(MAX_CHARS, String(r[label] ?? '').length)), 0);
   const yWidth = Math.min(300, Math.max(80, Math.round(longest * 6.4) + 12));
-  const shorten = (v: unknown) => { const s = String(v ?? ''); return s.length > MAX_CHARS ? `…${s.slice(s.length - MAX_CHARS + 1)}` : s; };
+  const shorten = (v: unknown) => { const s = tr(String(v ?? '')); return s.length > MAX_CHARS ? `…${s.slice(s.length - MAX_CHARS + 1)}` : s; };
   return (
     <ChartFigure title={title} summary={summary}>
-      <div role="img" aria-label={`${title} bar chart. ${summary}`} style={{ height: h }}>
+      <div role="img" aria-label={tr('{title} bar chart. {summary}', { title, summary })} style={{ height: h }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 48, bottom: 0, left: 0 }}>
             <CartesianGrid horizontal={false} stroke={GRID} />
@@ -106,7 +106,7 @@ export function CategoryBars<T extends Record<string, unknown>>({ title, rows, l
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <DataTableView rows={rows} x={label} xLabel="Category" series={[{ key: value, label: tr('Value'), format }]} />
+      <DataTableView rows={rows} x={label} xLabel={tr('Category')} series={[{ key: value, label: tr('Value'), format }]} />
     </ChartFigure>
   );
 }
@@ -123,7 +123,7 @@ export function ThresholdMeter({ percent, warn, critical, label }: { percent: nu
         <span className="text-ink-700">{label}</span>
         <span className="font-semibold text-ink-900">{percent.toFixed(1)}% · {level}</span>
       </div>
-      <div className="relative mt-2 h-3 rounded-full bg-ink-100" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p} aria-label={`${label}: ${percent.toFixed(1)}% used, ${level}. Warning at ${warn}%, critical at ${critical}%.`}>
+      <div className="relative mt-2 h-3 rounded-full bg-ink-100" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p} aria-label={tr('{label}: {value}% used, {level}. Warning at {warn}%, critical at {critical}%.', { label, value: percent.toFixed(1), level, warn, critical })}>
         <div className="h-3 rounded-full" style={{ width: `${p}%`, background: color }} />
         {[warn, critical].map((t) => <div key={t} className="absolute -top-1 h-5 w-0.5 bg-ink-800" style={{ left: `${t}%` }} aria-hidden />)}
       </div>

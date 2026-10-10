@@ -41,7 +41,7 @@ function UnitModal({ unit, parent, onClose }: { unit: OrgUnit | null; parent: Or
   });
   const valid = f.name.trim().length >= 2 && (!isNew || /^[a-z0-9_]{2,40}$/.test(f.code.trim().toLowerCase()));
   return (
-    <Modal open onClose={onClose} title={isNew ? `New unit under ${parent?.name}` : `Edit ${unit.name}`} footer={<><Button variant="secondary" onClick={onClose} disabled={m.isPending}>{tr('Cancel')}</Button><Button onClick={() => m.mutate()} disabled={!valid} loading={m.isPending}>{tr('Save')}</Button></>}>
+    <Modal open onClose={onClose} title={isNew ? tr('New unit under {name}', { name: parent?.name }) : tr('Edit {name}', { name: unit.name })} footer={<><Button variant="secondary" onClick={onClose} disabled={m.isPending}>{tr('Cancel')}</Button><Button onClick={() => m.mutate()} disabled={!valid} loading={m.isPending}>{tr('Save')}</Button></>}>
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (valid) m.mutate(); }}>
         {isNew ? (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -114,10 +114,10 @@ export function OrgUnitsPage() {
                 <span className="mono text-xs text-ink-500">{u.code}</span>
                 <Badge>{titleCase(u.unitType)}</Badge>
                 {!u.active && <Badge tone="gray">{tr('Inactive')}</Badge>}
-                <span className="text-xs text-ink-500">{u.userCount} {u.userCount === 1 ? 'user' : 'users'} · {u.deviceCount} {u.deviceCount === 1 ? 'device' : 'devices'}</span>
+                <span className="text-xs text-ink-500">{u.userCount} {u.userCount === 1 ? tr('user') : tr('users')} · {u.deviceCount} {u.deviceCount === 1 ? tr('device') : tr('devices')}</span>
                 {manage && u.canManage && (
                   <span className="ml-auto flex gap-1">
-                    {u.active && <Button size="sm" variant="ghost" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setEdit({ unit: null, parent: u })} aria-label={`Add unit under ${u.name}`}>{tr('Add')}</Button>}
+                    {u.active && <Button size="sm" variant="ghost" icon={<Plus className="h-3.5 w-3.5" />} onClick={() => setEdit({ unit: null, parent: u })} aria-label={tr('Add unit under {name}', { name: u.name })}>{tr('Add')}</Button>}
                     <Button size="sm" variant="secondary" onClick={() => setEdit({ unit: u, parent: null })}>{tr('Edit')}</Button>
                   </span>
                 )}

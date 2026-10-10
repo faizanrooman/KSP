@@ -4,6 +4,7 @@
  */
 import { createPortal } from 'react-dom';
 import {
+  Children,
   cloneElement,
   createContext,
   isValidElement,
@@ -118,10 +119,22 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
 
 FORM_CONTROLS.add(Input).add(Textarea);
 
+// Option lists are usually built from module-level constants (statuses, priorities, sort orders) that the i18n
+// extractor cannot see, so the select translates its own plain-text options; data values without a dictionary
+// entry (unit names, role names) pass through unchanged.
+function translateOptions(children: ReactNode): ReactNode {
+  return Children.map(children, (child) => {
+    if (!isValidElement<{ children?: ReactNode; label?: string }>(child)) return child;
+    if (child.type === 'option' && typeof child.props.children === 'string') return cloneElement(child, undefined, tr(child.props.children));
+    if (child.type === 'optgroup') return cloneElement(child, { label: child.props.label && tr(child.props.label) }, translateOptions(child.props.children));
+    return child;
+  });
+}
+
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
   return (
     <select ref={ref} className={clsx('input pr-8', className)} {...rest}>
-      {children}
+      {translateOptions(children)}
     </select>
   );
 });
@@ -541,7 +554,7 @@ export function ConfirmDialog({
       <div className="space-y-3 text-sm text-ink-700">
         <div>{message}</div>
         {requireReason && (
-          <Field label={reasonLabel} required hint={`At least ${minReason} characters; recorded in the audit trail.`}>
+          <Field label={reasonLabel} required hint={tr('At least {minReason} characters; recorded in the audit trail.', { minReason })}>
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
           </Field>
         )}
@@ -630,10 +643,10 @@ export function CopyButton({ value, label = 'Copy' }: { value: string; label?: s
         setDone(true);
         setTimeout(() => setDone(false), 1500);
       }}
-      aria-label={`${label} to clipboard`}
+      aria-label={tr('{label} to clipboard', { label })}
     >
       {done ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-      {done ? 'Copied' : label}
+      {done ? tr('Copied') : label}
     </button>
   );
 }
@@ -641,7 +654,7 @@ export function CopyButton({ value, label = 'Copy' }: { value: string; label?: s
 export function ProgressBar({ value, label }: { value: number; label?: string }) {
   const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
   return (
-    <div className="w-full" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label ?? 'Progress'}>
+    <div className="w-full" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label ?? tr('Progress')}>
       <div className="h-2 w-full overflow-hidden rounded bg-ink-100">
         <div className="h-full rounded bg-brand-600 transition-all" style={{ width: `${pct}%` }} />
       </div>

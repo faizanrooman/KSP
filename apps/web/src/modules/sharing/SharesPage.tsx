@@ -32,7 +32,7 @@ export function SharesPage() {
   });
   const cols: Column<ShareSummary>[] = [
     { key: 'r', header: t('Recipient'), render: (r) => <Link className="text-brand-700 hover:underline" to={`/shares/${r.id}`}>{r.recipient.name ?? '—'}</Link> },
-    { key: 't', header: t('Type'), render: (r) => <Badge tone={r.recipientType === 'EXTERNAL' ? 'purple' : 'blue'}>{r.recipientType === 'EXTERNAL' ? 'External' : 'Internal'}</Badge> },
+    { key: 't', header: t('Type'), render: (r) => <Badge tone={r.recipientType === 'EXTERNAL' ? 'purple' : 'blue'}>{r.recipientType === 'EXTERNAL' ? t('External') : t('Internal')}</Badge> },
     { key: 's', header: t('Status'), render: (r) => <StatusBadge status={r.status} /> },
     { key: 'p', header: t('Purpose'), render: (r) => <span className="line-clamp-1">{r.purpose}</span> },
     { key: 'i', header: t('Items'), render: (r) => r.itemCount },

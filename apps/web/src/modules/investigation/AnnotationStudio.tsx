@@ -175,7 +175,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
       tabIndex={regionDraft ? 0 : undefined}
       role={regionDraft ? 'application' : undefined}
       aria-roledescription={regionDraft ? 'region editor' : undefined}
-      aria-label={regionDraft ? 'Region editor: drag to draw a region on the frame, or use arrow keys to move and Shift+arrow keys to resize; Enter sets the region, Escape stops drawing' : undefined}
+      aria-label={regionDraft ? tr('Region editor: drag to draw a region on the frame, or use arrow keys to move and Shift+arrow keys to resize; Enter sets the region, Escape stops drawing') : undefined}
       aria-keyshortcuts={regionDraft ? 'ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Enter Escape' : undefined}
     >
       {visibleRegions.map((a) => <div key={a.id}>{box(a.region!, a.color ?? '#ef4444', a.body ?? 'Region')}</div>)}
@@ -196,7 +196,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
         <EvidencePlayer ref={player} evidenceId={evidenceId} markers={markers} overlays={overlays} onTimeUpdate={setNow} initialTimeMs={initialTimeMs} />
         {editable && (
           <div className="flex flex-wrap items-end gap-2">
-            <Field label={`Bookmark at ${formatTimecode(now)}`} htmlFor="bm-label">
+            <Field label={tr('Bookmark at {now}', { now: formatTimecode(now) })} htmlFor="bm-label">
               <Input id="bm-label" value={bmLabel} onChange={(e) => setBmLabel(e.target.value)} placeholder={tr('e.g. Suspect enters frame')} maxLength={200} />
             </Field>
             <Button
@@ -215,7 +215,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
         )}
         {addBookmark.error && <Alert tone="red">{errorMessage(addBookmark.error)}</Alert>}
         {draft && (
-          <Card title={`${draft.editingId ? 'Edit' : 'New'} ${draft.kind.toLowerCase()} at ${formatTimecode(draft.startMs)}`} actions={<Button variant="ghost" size="sm" icon={<X className="h-4 w-4" />} aria-label={tr('Cancel annotation')} onClick={() => { setDraft(null); setDrawing(false); }} />}>
+          <Card title={tr('{value} {value2} at {startMs}', { value: draft.editingId ? tr('Edit') : tr('New'), value2: draft.kind.toLowerCase(), startMs: formatTimecode(draft.startMs) })} actions={<Button variant="ghost" size="sm" icon={<X className="h-4 w-4" />} aria-label={tr('Cancel annotation')} onClick={() => { setDraft(null); setDrawing(false); }} />}>
             <div className="grid gap-3 md:grid-cols-3">
               <Field label={tr('Start (s)')} htmlFor="an-start">
                 <Input id="an-start" inputMode="decimal" value={(draft.startMs / 1000).toFixed(3)} onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v >= 0) setDraft({ ...draft, startMs: Math.round(v * 1000) }); }} />
@@ -229,7 +229,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
                 </Select>
               </Field>
               <div className="md:col-span-3">
-                <Field label={draft.kind === 'NOTE' ? 'Note' : 'Description (optional)'} htmlFor="an-body" required={draft.kind === 'NOTE'}>
+                <Field label={draft.kind === 'NOTE' ? tr('Note') : tr('Description (optional)')} htmlFor="an-body" required={draft.kind === 'NOTE'}>
                   <Textarea id="an-body" rows={2} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} maxLength={5000} />
                 </Field>
               </div>
@@ -239,7 +239,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                   {draft.region ? <Badge tone="green">{tr('Region set (')}{Math.round(draft.region.w * 100)}% × {Math.round(draft.region.h * 100)}%)</Badge> : <Badge tone="amber">{tr('No region yet')}</Badge>}
                   <Button size="sm" variant="secondary" onClick={() => { player.current?.pause(); setDrawing(true); }} aria-pressed={drawing}>
-                    {drawing ? 'Drag on the frame…' : draft.region ? 'Redraw region' : 'Draw region'}
+                    {drawing ? tr('Drag on the frame…') : draft.region ? tr('Redraw region') : tr('Draw region')}
                   </Button>
                   <span className="text-xs text-ink-500">{tr('Keyboard: focus the frame, arrows move, Shift+arrows resize, Enter sets — or type the values below.')}</span>
                 </div>
@@ -264,7 +264,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
             )}
             {saveAnn.error && <div className="mt-2"><Alert tone="red">{errorMessage(saveAnn.error)}</Alert></div>}
             <div className="mt-3 flex justify-end">
-              <Button loading={saveAnn.isPending} onClick={submitDraft}>{draft.editingId ? 'Save changes' : 'Save annotation'}</Button>
+              <Button loading={saveAnn.isPending} onClick={submitDraft}>{draft.editingId ? tr('Save changes') : tr('Save annotation')}</Button>
             </div>
           </Card>
         )}
@@ -278,8 +278,8 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
               {bookmarks.data.items.map((b) => (
                 <li key={b.id} className="flex items-center gap-2 py-1.5">
                   <button type="button" className="mono text-xs text-brand-700 hover:underline" onClick={() => seek(b.timeMs)}>{formatTimecode(b.timeMs)}</button>
-                  <span className="flex-1 truncate text-sm">{b.label}<span className="block text-xs text-ink-500">{b.user.fullName}{b.workspaceId ? '' : ' · personal'}</span></span>
-                  {b.canDelete && editable && <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={`Delete bookmark ${b.label}`} onClick={() => delBookmark.mutate(b.id)} />}
+                  <span className="flex-1 truncate text-sm">{b.label}<span className="block text-xs text-ink-500">{b.user.fullName}{b.workspaceId ? '' : tr(' · personal')}</span></span>
+                  {b.canDelete && editable && <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={tr('Delete bookmark {label}', { label: b.label })} onClick={() => delBookmark.mutate(b.id)} />}
                 </li>
               ))}
             </ul>
@@ -307,7 +307,7 @@ export function AnnotationStudio({ evidenceId, workspaceId, editable, initialTim
                     )}
                   </div>
                   {a.body && <p className="mt-0.5 text-sm text-ink-700">{a.body}</p>}
-                  <p className="text-xs text-ink-500">{a.author.fullName}{a.workspaceId ? '' : ' · shared on evidence'}</p>
+                  <p className="text-xs text-ink-500">{a.author.fullName}{a.workspaceId ? '' : tr(' · shared on evidence')}</p>
                 </li>
               ))}
             </ul>

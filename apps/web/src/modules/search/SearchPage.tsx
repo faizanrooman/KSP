@@ -239,7 +239,7 @@ function ResultCard({ item }: { item: SearchItem }) {
   const m = item.matches;
   return (
     <li className="flex gap-4 rounded-lg border border-ink-200 bg-white p-3">
-      <Link to={`/evidence/${item.id}`} className="shrink-0" aria-label={`Open ${item.evidenceNumber ?? 'evidence'}`}>
+      <Link to={`/evidence/${item.id}`} className="shrink-0" aria-label={tr('Open {value}', { value: item.evidenceNumber ?? tr('evidence') })}>
         {item.thumbnailUrl ? (
           <img src={item.thumbnailUrl} alt="" className="h-20 w-32 rounded bg-ink-900 object-cover" loading="lazy" />
         ) : (
@@ -258,7 +258,7 @@ function ResultCard({ item }: { item: SearchItem }) {
         {m.snippet && <Snippet parts={m.snippet} />}
         <p className="text-xs text-ink-500">
           {item.orgUnit.name}
-          {item.recordedAt ? ` · recorded ${formatDateTime(item.recordedAt)}` : ' · recording time unknown'}
+          {item.recordedAt ? tr(' · recorded {recordedAt}', { recordedAt: formatDateTime(item.recordedAt) }) : tr(' · recording time unknown')}
           {item.durationMs ? ` · ${formatDuration(item.durationMs)}` : ''}
           {item.officer && <> · {item.officer.fullName}{item.officer.badgeNumber ? ` (${item.officer.badgeNumber})` : ''}</>}
         </p>
@@ -273,7 +273,7 @@ function ResultCard({ item }: { item: SearchItem }) {
                 key={a.detectionId}
                 to={momentLink(item.id, a.frameTimeMs)}
                 className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs hover:underline ${a.unreviewed ? 'border-amber-400 bg-amber-50 text-amber-900' : 'border-brand-200 bg-brand-50 text-brand-800'}`}
-                title={`Jump to ${formatTimecode(a.frameTimeMs)}`}
+                title={tr('Jump to {frameTimeMs}', { frameTimeMs: formatTimecode(a.frameTimeMs) })}
               >
                 {a.label}
                 {a.colorName ? ` · ${a.colorName}` : ''}
@@ -307,7 +307,7 @@ function SavedSearchesMenu({ onPick }: { onPick: (c: SearchCriteria) => void }) 
                   {s.name}
                   <span className="block text-xs font-normal text-ink-500">{countCriteria(s.criteria)}{' '}{tr('filter(s)')}{' '}{s.criteria.text ? ` · “${s.criteria.text}”` : ''}</span>
                 </button>
-                <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} aria-label={`Delete saved search ${s.name}`} loading={del.isPending && del.variables === s.id} onClick={() => del.mutate(s.id)} />
+                <Button variant="ghost" size="sm" icon={<Trash2 className="h-4 w-4" />} aria-label={tr('Delete saved search {name}', { name: s.name })} loading={del.isPending && del.variables === s.id} onClick={() => del.mutate(s.id)} />
               </li>
             ))}
           </ul>
@@ -427,14 +427,14 @@ export function SearchPage() {
         <section aria-label={tr('Results')} className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-ink-600" aria-live="polite">
-              {data ? `${data.total.toLocaleString('en-IN')}${data.totalApprox ? '+' : ''} result${data.total === 1 && !data.totalApprox ? '' : 's'}` : ' '}
+              {data ? (data.total === 1 && !data.totalApprox ? tr('1 result') : tr('{count} results', { count: `${data.total.toLocaleString('en-IN')}${data.totalApprox ? '+' : ''}` })) : ' '}
               {data && <span className="text-ink-500"> · {data.tookMs}{' '}{tr('ms')}</span>}
               {q.isFetching && !q.isLoading && <span className="ml-2 text-ink-500">{tr('Updating…')}</span>}
             </p>
             <label className="flex items-center gap-2 text-sm">
               <span className="text-ink-600">{tr('Sort')}</span>
               <Select value={sort ?? ''} onChange={(e) => setUrl({ sort: e.target.value, page: '1' })} aria-label={tr('Sort results')}>
-                <option value="">{tr('Default (')}{criteria.text ? 'relevance' : 'recorded, newest'})</option>
+                <option value="">{tr('Default (')}{criteria.text ? tr('relevance') : tr('recorded, newest')})</option>
                 {SEARCH_SORTS.map((s) => <option key={s} value={s}>{SORT_LABEL[s]}</option>)}
               </Select>
             </label>
@@ -444,7 +444,7 @@ export function SearchPage() {
           ) : q.error ? (
             <ErrorState error={q.error} onRetry={() => void q.refetch()} title={tr('Search failed')} />
           ) : !data?.items.length ? (
-            <EmptyState title={tr('No matching evidence')} description={active || criteria.text ? 'Try fewer filters or different words. Only evidence you are authorised to see is searched.' : 'No evidence is visible to you yet.'} />
+            <EmptyState title={tr('No matching evidence')} description={active || criteria.text ? tr('Try fewer filters or different words. Only evidence you are authorised to see is searched.') : tr('No evidence is visible to you yet.')} />
           ) : (
             <>
               <ul className="space-y-2">{data.items.map((it) => <ResultCard key={it.id} item={it} />)}</ul>

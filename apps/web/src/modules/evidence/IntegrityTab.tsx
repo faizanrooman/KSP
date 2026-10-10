@@ -40,7 +40,7 @@ export function IntegrityTab({ evidence }: { evidence: EvidenceSummary }) {
     { key: 'result', header: t('Result'), render: (r) => (r.ok ? <Badge tone="green">{t('Match')}</Badge> : <Badge tone="red">{t('Failed')}</Badge>) },
     { key: 'actual', header: t('Computed SHA-256'), render: (r) => <code className="mono text-xs" title={r.actualSha256 ?? ''}>{shortHash(r.actualSha256, 16)}</code> },
     { key: 'error', header: t('Detail'), render: (r) => r.error ?? '—' },
-    { key: 'by', header: t('Requested by'), render: (r) => r.requestedBy?.fullName ?? 'System' },
+    { key: 'by', header: t('Requested by'), render: (r) => r.requestedBy?.fullName ?? t('System') },
   ];
   const d = q.data;
   return (
@@ -56,9 +56,9 @@ export function IntegrityTab({ evidence }: { evidence: EvidenceSummary }) {
             { label: t('Registered SHA-256'), value: ev.sha256, mono: true },
             { label: t('Registered SHA-512'), value: ev.sha512, mono: true },
             { label: t('Size'), value: formatBytes(ev.sizeBytes) },
-            { label: t('Last verified'), value: d?.lastVerifiedAt ? formatDateTime(d.lastVerifiedAt) : 'Never re-verified' },
+            { label: t('Last verified'), value: d?.lastVerifiedAt ? formatDateTime(d.lastVerifiedAt) : t('Never re-verified') },
             { label: t('Last result'), value: d?.lastResult ? (d.lastResult === 'OK' ? <Badge tone="green">{t('Match')}</Badge> : <Badge tone="red">{t('Failed')}</Badge>) : '—' },
-            { label: t('Pending check'), value: d?.pendingJob ? titleCase(d.pendingJob.status) : 'None' },
+            { label: t('Pending check'), value: d?.pendingJob ? titleCase(d.pendingJob.status) : t('None') },
           ]}
         />
       </Card>

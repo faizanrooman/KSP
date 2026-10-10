@@ -1,4 +1,4 @@
-import { getLocale } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
 export function formatBytes(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return '—';
   const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
@@ -56,8 +56,15 @@ export function shortHash(h: string | null | undefined, n = 12): string {
 }
 
 // Acronyms stay upper-case ("CCTNS", not "Cctns"; "MFA challenge passed", "AI results viewed") — UI-B-11.
+// titleCase turns an enum code into its display label in the active UI language (statuses, tiers, priorities, …);
+// codes without a dictionary entry — e.g. audit actions, which stay English as legal records — keep the English label.
 const ACRONYMS = new Set(['AI', 'ANPR', 'API', 'BSA', 'CCTNS', 'CCTV', 'CSV', 'FIR', 'FSL', 'GPS', 'HLS', 'ID', 'IO', 'IP', 'JSON', 'KSP', 'MFA', 'OCR', 'ONNX', 'PDF', 'SHA', 'SMS', 'TOTP', 'URL', 'ZIP']);
 export function titleCase(v: string): string {
+  return t(englishLabel(v));
+}
+
+/** The English display label of an enum code (the translation key). */
+export function englishLabel(v: string): string {
   return v.toLowerCase().replace(/_/g, ' ').replace(/\b\w+/g, (w) => (ACRONYMS.has(w.toUpperCase()) ? w.toUpperCase() : w[0]!.toUpperCase() + w.slice(1)));
 }
 

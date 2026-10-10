@@ -7,6 +7,9 @@ import { AuthProvider } from '@/lib/auth';
 import { LanguageProvider } from '@/lib/i18n';
 import { ToastProvider } from '@/components/ui';
 import App from './App';
+import '@fontsource-variable/noto-sans';
+import '@fontsource-variable/noto-sans-kannada';
+import '@fontsource-variable/jetbrains-mono';
 import './index.css';
 
 const queryClient = new QueryClient({

@@ -55,16 +55,16 @@ export function LegalHoldButton({ evidence }: { evidence: EvidenceSummary }) {
   return (
     <>
       <Button variant={releasing ? 'secondary' : 'danger'} size="sm" icon={releasing ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />} onClick={() => { m.reset(); setOpen(true); }}>
-        {releasing ? 'Release hold' : 'Legal hold'}
+        {releasing ? tr('Release hold') : tr('Legal hold')}
       </Button>
       <ConfirmDialog
         open={open}
-        title={releasing ? 'Release legal hold' : 'Place legal hold'}
-        message={releasing ? 'Releasing the hold allows this evidence to be disposed of once its retention period ends.' : 'A legal hold blocks disposal of this evidence (database and object-storage lock) until it is released.'}
-        confirmLabel={releasing ? 'Release hold' : 'Place hold'}
+        title={releasing ? tr('Release legal hold') : tr('Place legal hold')}
+        message={releasing ? tr('Releasing the hold allows this evidence to be disposed of once its retention period ends.') : tr('A legal hold blocks disposal of this evidence (database and object-storage lock) until it is released.')}
+        confirmLabel={releasing ? tr('Release hold') : tr('Place hold')}
         variant={releasing ? 'primary' : 'danger'}
         requireReason
-        reasonLabel={releasing ? 'Reason for release (e.g. court order reference)' : 'Reason / court order reference'}
+        reasonLabel={releasing ? tr('Reason for release (e.g. court order reference)') : tr('Reason / court order reference')}
         minReason={5}
         loading={m.isPending}
         error={m.error}
@@ -187,10 +187,10 @@ export function RetentionAssignControl({ ev, currentId }: { ev: EvidenceDetail; 
     <div className="flex items-end gap-2">
       <Field label={tr('Assign retention policy')} htmlFor="ret-policy">
         <Select id="ret-policy" value={policyId} onChange={(e) => setPolicyId(e.target.value)} disabled={policies.isLoading}>
-          <option value="">{policies.isLoading ? 'Loading…' : 'Select policy…'}</option>
+          <option value="">{policies.isLoading ? tr('Loading…') : tr('Select policy…')}</option>
           {policies.data?.items.filter((p) => p.id !== currentId).map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name}{p.isDefault ? ' (default)' : ''}
+              {p.name}{p.isDefault ? tr(' (default)') : ''}
             </option>
           ))}
         </Select>

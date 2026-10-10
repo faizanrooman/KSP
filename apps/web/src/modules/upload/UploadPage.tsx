@@ -164,7 +164,7 @@ export function UploadPage() {
       />
 
       {pendingRemembered.length > 0 && (
-        <Alert tone="amber" title={`${pendingRemembered.length} unfinished upload(s) from an earlier session`}>
+        <Alert tone="amber" title={tr('{count} unfinished upload(s) from an earlier session', { count: pendingRemembered.length })}>
           <p>{tr('Add the same files again to resume where they stopped:')}</p>
           <ul className="mt-1 list-inside list-disc">
             {pendingRemembered.slice(0, 8).map((r) => (
@@ -217,7 +217,7 @@ export function UploadPage() {
         </div>
         {rejected.length > 0 && (
           <div className="mt-3">
-            <Alert tone="amber" title={`${rejected.length} file(s) skipped — not an accepted video type`}>
+            <Alert tone="amber" title={tr('{count} file(s) skipped — not an accepted video type', { count: rejected.length })}>
               {rejected.slice(0, 10).join(', ')}{rejected.length > 10 ? '…' : ''}
             </Alert>
           </div>
@@ -253,29 +253,29 @@ export function UploadPage() {
                         {i.metadata.title && <span className="text-xs text-ink-500">“{i.metadata.title}”</span>}
                       </div>
                       <div className="mt-1 flex items-center gap-3">
-                        <div className="w-full max-w-md"><ProgressBar value={pct} label={`Upload progress for ${i.file.name}`} /></div>
+                        <div className="w-full max-w-md"><ProgressBar value={pct} label={tr('Upload progress for {name}', { name: i.file.name })} /></div>
                         <span className="whitespace-nowrap text-xs text-ink-600">
                           {formatBytes(i.bytesDone)} / {formatBytes(i.file.size)}
-                          {i.totalChunks ? ` · ${i.doneParts}/${i.totalChunks} chunks` : ''} {speed(i.speedBps)}
-                          {i.attempts > 0 && i.state === 'uploading' ? ` · ${i.attempts} retries` : ''}
+                          {i.totalChunks ? tr(' · {doneParts}/{totalChunks} chunks', { doneParts: i.doneParts, totalChunks: i.totalChunks }) : ''} {speed(i.speedBps)}
+                          {i.attempts > 0 && i.state === 'uploading' ? tr(' · {attempts} retries', { attempts: i.attempts }) : ''}
                         </span>
                       </div>
                       {i.state === 'registered' && i.evidenceId && (
                         <p className="mt-1 text-sm text-emerald-800">{tr('Registered as')}{' '}<Link className="font-mono font-medium underline" to={`/evidence/${i.evidenceId}`}>{i.evidenceNumber ?? i.evidenceId}</Link></p>
                       )}
-                      {i.state === 'quarantined' && <p className="mt-1 text-sm text-red-800">{tr('Quarantined —')}{' '}{i.reasonCode ?? 'review'}: {i.reasonMessage}</p>}
+                      {i.state === 'quarantined' && <p className="mt-1 text-sm text-red-800">{tr('Quarantined —')}{' '}{i.reasonCode ?? tr('review')}: {i.reasonMessage}</p>}
                       {i.state === 'failed' && <p className="mt-1 text-sm text-red-800">{i.error}</p>}
                     </div>
                     <div className="flex shrink-0 gap-1.5">
                       {i.state === 'ready' && !started && (
                         <Button size="sm" variant="secondary" onClick={() => { setEditing(i); setEditMeta(i.metadata); }}>{tr('Details')}</Button>
                       )}
-                      {['uploading', 'hashing'].includes(i.state) && <Button size="sm" variant="secondary" icon={<Pause className="h-3.5 w-3.5" />} onClick={() => engine.pause(i.key)} aria-label={`Pause ${i.file.name}`}>{tr('Pause')}</Button>}
-                      {(i.state === 'paused' || i.state === 'failed') && started && <Button size="sm" variant="secondary" icon={<Play className="h-3.5 w-3.5" />} onClick={() => engine.resume(i.key)} aria-label={`Resume ${i.file.name}`}>{i.state === 'failed' ? 'Retry' : 'Resume'}</Button>}
+                      {['uploading', 'hashing'].includes(i.state) && <Button size="sm" variant="secondary" icon={<Pause className="h-3.5 w-3.5" />} onClick={() => engine.pause(i.key)} aria-label={tr('Pause {name}', { name: i.file.name })}>{tr('Pause')}</Button>}
+                      {(i.state === 'paused' || i.state === 'failed') && started && <Button size="sm" variant="secondary" icon={<Play className="h-3.5 w-3.5" />} onClick={() => engine.resume(i.key)} aria-label={tr('Resume {name}', { name: i.file.name })}>{i.state === 'failed' ? tr('Retry') : tr('Resume')}</Button>}
                       {['ready', 'uploading', 'paused', 'failed', 'hashing'].includes(i.state) && started && (
-                        <Button size="sm" variant="ghost" icon={<X className="h-3.5 w-3.5" />} onClick={() => void engine.cancel(i.key)} aria-label={`Cancel ${i.file.name}`}>{tr('Cancel')}</Button>
+                        <Button size="sm" variant="ghost" icon={<X className="h-3.5 w-3.5" />} onClick={() => void engine.cancel(i.key)} aria-label={tr('Cancel {name}', { name: i.file.name })}>{tr('Cancel')}</Button>
                       )}
-                      {!started && i.state === 'ready' && <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => engine.remove(i.key)} aria-label={`Remove ${i.file.name}`}>{tr('Remove')}</Button>}
+                      {!started && i.state === 'ready' && <Button size="sm" variant="ghost" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => engine.remove(i.key)} aria-label={tr('Remove {name}', { name: i.file.name })}>{tr('Remove')}</Button>}
                     </div>
                   </li>
                 );
@@ -288,7 +288,7 @@ export function UploadPage() {
       <Modal
         open={!!editing}
         onClose={() => setEditing(null)}
-        title={`Details — ${editing?.file.name ?? ''}`}
+        title={tr('Details — {value}', { value: editing?.file.name ?? '' })}
         size="xl"
         footer={
           <>

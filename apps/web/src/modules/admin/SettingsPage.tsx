@@ -132,7 +132,7 @@ function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: Sett
   const details = save.error instanceof ApiError && Array.isArray(save.error.details) ? (save.error.details as Array<{ path?: string; message: string }>) : [];
   return (
     <Card
-      title={<div><h2>{group.title} {meta?.overridden ? <Badge tone="blue">{t('Customised')}</Badge> : <Badge>{t('Default')}</Badge>}</h2><p className="text-xs font-normal text-ink-500">{group.description}{meta?.updatedAt ? ` Last changed ${formatDateTime(meta.updatedAt)}${meta.updatedBy ? ` by ${meta.updatedBy.fullName}` : ''}.` : ''}</p></div>}
+      title={<div><h2>{group.title} {meta?.overridden ? <Badge tone="blue">{t('Customised')}</Badge> : <Badge>{t('Default')}</Badge>}</h2><p className="text-xs font-normal text-ink-500">{group.description}{meta?.updatedAt ? ' ' + (meta.updatedBy ? t('Last changed {updatedAt} by {fullName}.', { updatedAt: formatDateTime(meta.updatedAt), fullName: meta.updatedBy.fullName }) : t('Last changed {updatedAt}.', { updatedAt: formatDateTime(meta.updatedAt) })) : ''}</p></div>}
       actions={meta?.overridden ? <Button size="sm" variant="ghost" onClick={() => { reset.reset(); setConfirmReset(true); }}>{t('Restore defaults')}</Button> : undefined}
     >
       <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
@@ -187,7 +187,7 @@ function GroupForm({ group, data }: { group: (typeof GROUPS)[number]; data: Sett
           <Button type="submit" disabled={!dirty} loading={save.isPending}>{t('Save')}</Button>
         </div>
       </form>
-      <ConfirmDialog open={confirmReset} title={`Restore ${group.title}`} message={t('Replace the customised values with the built-in defaults? The change is audited.')} confirmLabel={t('Restore defaults')} loading={reset.isPending} error={reset.error} onConfirm={() => reset.mutate()} onCancel={() => setConfirmReset(false)} />
+      <ConfirmDialog open={confirmReset} title={t('Restore {title}', { title: group.title })} message={t('Replace the customised values with the built-in defaults? The change is audited.')} confirmLabel={t('Restore defaults')} loading={reset.isPending} error={reset.error} onConfirm={() => reset.mutate()} onCancel={() => setConfirmReset(false)} />
     </Card>
   );
 }

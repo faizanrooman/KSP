@@ -87,14 +87,14 @@ export function LegalApprovalsCard({ settings, deployment, onSaved }: { settings
                 {a ? (
                   <p className="mt-1 break-words text-sm text-ink-700">
                     {a.approvedBy}{' '}{t('· ref.')}{' '}<span className="font-mono">{a.reference}</span> · {a.date}
-                    {a.recordedBy ? <span className="text-xs text-ink-500">{' '}{t('— recorded by')}{' '}{a.recordedBy}{a.recordedAt ? ` on ${formatDateTime(a.recordedAt)}` : ''}</span> : null}
+                    {a.recordedBy ? <span className="text-xs text-ink-500">{' '}{t('— recorded by')}{' '}{a.recordedBy}{a.recordedAt ? t(' on {recordedAt}', { recordedAt: formatDateTime(a.recordedAt) }) : ''}</span> : null}
                   </p>
                 ) : (
-                  <p className="mt-1 text-sm text-ink-600">{e.settingKey === 'exportLegalApproval' ? 'Fact Sheets are stamped “TEMPLATE – PENDING LEGAL APPROVAL”.' : notEnforced ? t('Not enforced on this deployment: runs without an approval.') : gate?.explanation ?? 'Disabled until approved.'}</p>
+                  <p className="mt-1 text-sm text-ink-600">{e.settingKey === 'exportLegalApproval' ? t('Fact Sheets are stamped “TEMPLATE – PENDING LEGAL APPROVAL”.') : notEnforced ? t('Not enforced on this deployment: runs without an approval.') : gate?.explanation ?? t('Disabled until approved.')}</p>
                 )}
               </div>
               <div className="flex shrink-0 gap-2">
-                <Button size="sm" variant="secondary" onClick={() => { save.reset(); setForm({ approvedBy: a?.approvedBy ?? '', reference: a?.reference ?? '', date: a?.date ?? today(), notes: a?.notes ?? '' }); setEditing(e); }}>{a ? 'Update' : 'Record approval'}</Button>
+                <Button size="sm" variant="secondary" onClick={() => { save.reset(); setForm({ approvedBy: a?.approvedBy ?? '', reference: a?.reference ?? '', date: a?.date ?? today(), notes: a?.notes ?? '' }); setEditing(e); }}>{a ? t('Update') : t('Record approval')}</Button>
                 {a && <Button size="sm" variant="ghost" onClick={() => { save.reset(); setWithdraw(e); }}>{t('Withdraw')}</Button>}
               </div>
             </li>
@@ -104,7 +104,7 @@ export function LegalApprovalsCard({ settings, deployment, onSaved }: { settings
       <Modal
         open={!!editing}
         onClose={() => setEditing(null)}
-        title={editing ? `Record approval: ${editing.title}` : 'Record approval'}
+        title={editing ? t('Record approval: {title}', { title: editing.title }) : t('Record approval')}
         footer={<>
           <Button variant="secondary" onClick={() => setEditing(null)}>{t('Cancel')}</Button>
           <Button disabled={!valid} loading={save.isPending} onClick={() => editing && save.mutate({ e: editing, value: { approvedBy: form.approvedBy.trim(), reference: form.reference.trim(), date: form.date, ...(form.notes.trim() ? { notes: form.notes.trim() } : {}) } })}>{t('Record approval')}</Button>
@@ -121,8 +121,8 @@ export function LegalApprovalsCard({ settings, deployment, onSaved }: { settings
       </Modal>
       <ConfirmDialog
         open={!!withdraw}
-        title={withdraw ? `Withdraw approval: ${withdraw.title}` : 'Withdraw approval'}
-        message={withdraw?.settingKey === 'exportLegalApproval' ? 'New Fact Sheets will be stamped “TEMPLATE – PENDING LEGAL APPROVAL” again.' : 'New analysis requests for this task will be refused and queued jobs will fail. The change is audited.'}
+        title={withdraw ? t('Withdraw approval: {title}', { title: withdraw.title }) : t('Withdraw approval')}
+        message={withdraw?.settingKey === 'exportLegalApproval' ? t('New Fact Sheets will be stamped “TEMPLATE – PENDING LEGAL APPROVAL” again.') : t('New analysis requests for this task will be refused and queued jobs will fail. The change is audited.')}
         confirmLabel={t('Withdraw')}
         variant="danger"
         loading={save.isPending}

@@ -4,11 +4,11 @@ import { Link } from 'react-router';
 import { AlertOctagon, AlertTriangle, CheckCircle2, Info, RefreshCw, XCircle } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { formatBytes, formatDateTime } from '@/lib/format';
+import { formatBytes, formatDateTime, titleCase } from '@/lib/format';
 import { useUrlState } from '@/lib/hooks';
 import { Alert, Badge, Button, Card, DataTable, EmptyState, ErrorState, Field, Input, PageHeader, Spinner, Stat, clsx, type Column } from '@/components/ui';
 import { OrgUnitSelect } from '@/components/pickers';
-import { CategoryBars, STATUS, ThresholdMeter, TimeBars } from './charts';
+import { CategoryBars, SERIES, STATUS, ThresholdMeter, TimeBars } from './charts';
 import type { DashboardSummary } from './types';
 
 import { t as tr } from '@/lib/i18n';
@@ -25,9 +25,9 @@ export function SeverityIcon({ severity, className = 'h-4 w-4' }: { severity: st
 
 function OkBadge({ ok, label }: { ok: boolean; label?: string }) {
   return ok ? (
-    <span className="inline-flex items-center gap-1 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" aria-hidden />{label ?? 'OK'}</span>
+    <span className="inline-flex items-center gap-1 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" aria-hidden />{label ?? tr('OK')}</span>
   ) : (
-    <span className="inline-flex items-center gap-1 text-sm font-medium text-red-800"><XCircle className="h-4 w-4" aria-hidden />{label ?? 'Failing'}</span>
+    <span className="inline-flex items-center gap-1 text-sm font-medium text-red-800"><XCircle className="h-4 w-4" aria-hidden />{label ?? tr('Failing')}</span>
   );
 }
 
@@ -66,7 +66,7 @@ export function DashboardPage() {
       </section>
       <PageHeader
         title={tr('Dashboard')}
-        subtitle={d ? `${d.meta.scope === 'OWN' ? 'Your own uploads and evidence' : d.meta.orgUnit ? d.meta.orgUnit.name : 'Everything within your jurisdiction'} · refreshed ${formatDateTime(d.meta.generatedAt)} (auto-refresh every 60 s)` : `Welcome, ${me?.user.fullName ?? ''}`}
+        subtitle={d ? tr('{value} · refreshed {generatedAt} (auto-refresh every 60 s)', { value: d.meta.scope === 'OWN' ? tr('Your own uploads and evidence') : d.meta.orgUnit ? d.meta.orgUnit.name : tr('Everything within your jurisdiction'), generatedAt: formatDateTime(d.meta.generatedAt) }) : tr('Welcome, {value}', { value: me?.user.fullName ?? '' })}
         actions={<Button variant="secondary" onClick={() => void query.refetch()} loading={query.isFetching}><RefreshCw className="h-4 w-4" aria-hidden />{tr('Refresh')}</Button>}
       />
       <Card>
@@ -125,15 +125,15 @@ function DashboardBody({ d }: { d: DashboardSummary }) {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
           <Stat label={tr('Evidence items')} value={fmtInt(ev.total)} sub={formatBytes(ev.totalBytes)} />
           <Stat label={tr('Registered (period)')} value={fmtInt(ev.registeredInPeriod)} />
-          <Stat label={tr('Uploads (period)')} value={fmtInt(up.total)} sub={`${fmtInt(up.inProgress)} in progress`} />
+          <Stat label={tr('Uploads (period)')} value={fmtInt(up.total)} sub={tr('{inProgress} in progress', { inProgress: fmtInt(up.inProgress) })} />
           <Stat label={tr('Failed uploads')} value={fmtInt(up.failed)} tone={up.failed ? 'red' : undefined} />
           <Stat label={tr('Quarantined')} value={fmtInt(ev.quarantined)} tone={ev.quarantined ? 'amber' : undefined} />
-          <Stat label={tr('Pending media processing')} value={fmtInt(ev.pendingMediaProcessing)} sub={ev.mediaFailed ? `${fmtInt(ev.mediaFailed)} failed` : undefined} tone={ev.mediaFailed ? 'red' : undefined} />
+          <Stat label={tr('Pending media processing')} value={fmtInt(ev.pendingMediaProcessing)} sub={ev.mediaFailed ? tr('{mediaFailed} failed', { mediaFailed: fmtInt(ev.mediaFailed) }) : undefined} tone={ev.mediaFailed ? 'red' : undefined} />
           <Stat label={tr('Legal holds')} value={fmtInt(ev.legalHolds)} />
           <Stat label={tr('Disposal pending')} value={fmtInt(ev.disposalPending)} />
           <Stat label={tr('Retention overdue')} value={fmtInt(ev.retentionOverdue)} tone={ev.retentionOverdue ? 'amber' : undefined} />
-          {d.analytics && <Stat label={tr('Review queue')} value={fmtInt(d.analytics.reviewQueue.pending + d.analytics.reviewQueue.needsSecondReview)} sub={`${fmtInt(d.analytics.reviewQueue.needsSecondReview)} need 2nd review`} />}
-          {d.alerts && <Stat label={tr('Open alerts')} value={fmtInt(d.alerts.open)} sub={`${d.alerts.bySeverity.CRITICAL} critical`} tone={d.alerts.bySeverity.CRITICAL ? 'red' : d.alerts.open ? 'amber' : undefined} />}
+          {d.analytics && <Stat label={tr('Review queue')} value={fmtInt(d.analytics.reviewQueue.pending + d.analytics.reviewQueue.needsSecondReview)} sub={tr('{needsSecondReview} need 2nd review', { needsSecondReview: fmtInt(d.analytics.reviewQueue.needsSecondReview) })} />}
+          {d.alerts && <Stat label={tr('Open alerts')} value={fmtInt(d.alerts.open)} sub={tr('{CRITICAL} critical', { CRITICAL: d.alerts.bySeverity.CRITICAL })} tone={d.alerts.bySeverity.CRITICAL ? 'red' : d.alerts.open ? 'amber' : undefined} />}
         </div>
       </section>
 
@@ -142,13 +142,13 @@ function DashboardBody({ d }: { d: DashboardSummary }) {
           {upSum === 0 ? <EmptyState title={tr('No uploads in this period')} /> : (
             <TimeBars title={tr('Uploads per day')} rows={up.perDay} x="day"
               series={[{ key: 'sessions', label: tr('Upload sessions') }, { key: 'failed', label: tr('Failed') }]}
-              summary={`${fmtInt(upSum)} upload sessions in the period, ${fmtInt(failSum)} failed.`} />
+              summary={tr('{upSum} upload sessions in the period, {failSum} failed.', { upSum: fmtInt(upSum), failSum: fmtInt(failSum) })} />
           )}
         </Card>
         <Card title={tr('Evidence registered per day')}>
           {regSum === 0 ? <EmptyState title={tr('No evidence registered in this period')} /> : (
             <TimeBars title={tr('Evidence registered per day')} rows={ev.perDay} x="day" series={[{ key: 'registered', label: tr('Registered items') }]}
-              summary={`${fmtInt(regSum)} items registered${peakDay ? `; busiest day ${peakDay.day} with ${fmtInt(peakDay.registered)}` : ''}.`} />
+              summary={peakDay ? tr('{count} items registered; busiest day {day} with {registered}.', { count: fmtInt(regSum), day: peakDay.day, registered: fmtInt(peakDay.registered) }) : tr('{count} items registered.', { count: fmtInt(regSum) })} />
           )}
         </Card>
       </div>
@@ -157,10 +157,12 @@ function DashboardBody({ d }: { d: DashboardSummary }) {
       <div className={clsx('grid gap-5', ['', '', 'xl:grid-cols-2', 'xl:grid-cols-3'][[d.analytics, d.alerts, d.storage].filter(Boolean).length])}>
         {d.analytics && (
           <Card title={tr('AI analysis & review')}>
+            {d.analytics.jobs.queued + d.analytics.jobs.running + d.analytics.jobs.completed + d.analytics.jobs.failed === 0 ? <EmptyState title={tr('No AI analysis jobs in this period')} /> : (
             <CategoryBars title={tr('AI jobs by status')} label="status" value="n"
               rows={[{ status: 'Queued', n: d.analytics.jobs.queued }, { status: 'Running', n: d.analytics.jobs.running }, { status: 'Completed', n: d.analytics.jobs.completed }, { status: 'Failed', n: d.analytics.jobs.failed }]}
-              summary={`${fmtInt(d.analytics.jobs.queued)} queued, ${fmtInt(d.analytics.jobs.running)} running, ${fmtInt(d.analytics.jobs.completed)} completed, ${fmtInt(d.analytics.jobs.failed)} failed.`}
-              colorOf={(r) => (r.status === 'Failed' ? STATUS.critical : '#2a78d6')} />
+              summary={tr('{queued} queued, {running} running, {completed} completed, {failed} failed.', { queued: fmtInt(d.analytics.jobs.queued), running: fmtInt(d.analytics.jobs.running), completed: fmtInt(d.analytics.jobs.completed), failed: fmtInt(d.analytics.jobs.failed) })}
+              colorOf={(r) => (r.status === 'Failed' ? STATUS.critical : SERIES[0])} />
+            )}
             <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
               <div><dt className="text-ink-600">{tr('Pending review')}</dt><dd className="font-semibold">{fmtInt(d.analytics.reviewQueue.pending)}</dd></div>
               <div><dt className="text-ink-600">{tr('Needs second review')}</dt><dd className="font-semibold">{fmtInt(d.analytics.reviewQueue.needsSecondReview)}</dd></div>
@@ -171,10 +173,10 @@ function DashboardBody({ d }: { d: DashboardSummary }) {
         )}
         {d.alerts && (
           <Card title={tr('Open alerts')} actions={<Link to="/alerts" className="text-sm text-brand-700 hover:underline">{tr('All alerts')}</Link>}>
-            <CategoryBars title={tr('Open alerts by severity')} label="severity" value="n"
-              rows={(['CRITICAL', 'WARNING', 'INFO'] as const).map((s) => ({ severity: s, n: d.alerts!.bySeverity[s] }))}
-              summary={`${d.alerts.bySeverity.CRITICAL} critical, ${d.alerts.bySeverity.WARNING} warning, ${d.alerts.bySeverity.INFO} info alerts open.`}
-              colorOf={(r) => (r.severity === 'CRITICAL' ? STATUS.critical : r.severity === 'WARNING' ? STATUS.warning : STATUS.info)} />
+            {d.alerts.open > 0 && <CategoryBars title={tr('Open alerts by severity')} label="severity" value="n"
+              rows={(['CRITICAL', 'WARNING', 'INFO'] as const).map((s) => ({ severity: titleCase(s), code: s, n: d.alerts!.bySeverity[s] }))}
+              summary={tr('{CRITICAL} critical, {WARNING} warning, {INFO} info alerts open.', { CRITICAL: d.alerts.bySeverity.CRITICAL, WARNING: d.alerts.bySeverity.WARNING, INFO: d.alerts.bySeverity.INFO })}
+              colorOf={(r) => (r.code === 'CRITICAL' ? STATUS.critical : r.code === 'WARNING' ? STATUS.warning : STATUS.info)} />}
             <ul className="mt-3 space-y-1 text-sm">
               {d.alerts.recent.map((a) => (
                 <li key={a.id} className="flex items-start gap-2">
@@ -203,9 +205,9 @@ function DashboardBody({ d }: { d: DashboardSummary }) {
       {d.system && (
         <Card title={tr('System health')} actions={<Link to="/system/health" className="text-sm text-brand-700 hover:underline">{tr('Details')}</Link>}>
           <div className="grid gap-3 text-sm md:grid-cols-4">
-            <div><p className="text-ink-600">{tr('Database')}</p><OkBadge ok={d.system.database.ok} label={d.system.database.ok ? `OK · ${d.system.database.ms} ms` : undefined} /></div>
-            <div><p className="text-ink-600">{tr('Object storage')}</p><OkBadge ok={d.system.objectStorage.ok} label={d.system.objectStorage.ok ? `OK · ${d.system.objectStorage.ms} ms` : undefined} /></div>
-            <div><p className="text-ink-600">{tr('Workers alive')}</p><OkBadge ok={d.system.workers.alive > 0} label={`${d.system.workers.alive} alive`} /></div>
+            <div><p className="text-ink-600">{tr('Database')}</p><OkBadge ok={d.system.database.ok} label={d.system.database.ok ? tr('OK · {ms} ms', { ms: d.system.database.ms }) : undefined} /></div>
+            <div><p className="text-ink-600">{tr('Object storage')}</p><OkBadge ok={d.system.objectStorage.ok} label={d.system.objectStorage.ok ? tr('OK · {ms} ms', { ms: d.system.objectStorage.ms }) : undefined} /></div>
+            <div><p className="text-ink-600">{tr('Workers alive')}</p><OkBadge ok={d.system.workers.alive > 0} label={tr('{alive} alive', { alive: d.system.workers.alive })} /></div>
             <div><p className="text-ink-600">{tr('Queues')}</p><span>{fmtInt(d.system.queues.summary.totalQueued)}{' '}{tr('waiting ·')}{' '}{fmtInt(d.system.queues.summary.deadLettered)}{' '}{tr('dead-lettered')}</span></div>
           </div>
         </Card>

@@ -83,14 +83,14 @@ export function CreateExportPage() {
       </ol>
 
       {step === 0 && (
-        <Card title={`Items (${items.length})`}>
+        <Card title={tr('Items ({count})', { count: items.length })}>
           <div className="space-y-4">
             {items.length === 0 ? <EmptyState title={tr('No items selected')} description={tr('Add evidence from the case list or search below.')} /> : (
               <ul className="divide-y divide-ink-100 rounded-md border border-ink-200">
                 {items.map((i) => (
                   <li key={i.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                     <span><span className="mono">{i.evidenceNumber ?? i.id}</span> {i.title && <span className="text-ink-600">— {i.title}</span>}</span>
-                    <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={`Remove ${i.evidenceNumber ?? i.id}`} onClick={() => remove(i.id)}>{tr('Remove')}</Button>
+                    <Button size="sm" variant="ghost" icon={<Trash2 className="h-4 w-4" />} aria-label={tr('Remove {value}', { value: i.evidenceNumber ?? i.id })} onClick={() => remove(i.id)}>{tr('Remove')}</Button>
                   </li>
                 ))}
               </ul>
@@ -133,7 +133,7 @@ export function CreateExportPage() {
       {step === 1 && (
         <Card title={tr('Package contents')}>
           <div className="space-y-3">
-            <Checkbox label={tr('Original files (byte-identical)')} description={can('evidence:download_original') ? 'Re-verified against the registered SHA-256/512 before packaging.' : 'Requires permission to download originals — ask a supervisor or request watermarked copies only.'} checked={opts.includeOriginal} disabled={!can('evidence:download_original')} onChange={(v) => setOpts({ ...opts, includeOriginal: v })} />
+            <Checkbox label={tr('Original files (byte-identical)')} description={can('evidence:download_original') ? tr('Re-verified against the registered SHA-256/512 before packaging.') : tr('Requires permission to download originals — ask a supervisor or request watermarked copies only.')} checked={opts.includeOriginal} disabled={!can('evidence:download_original')} onChange={(v) => setOpts({ ...opts, includeOriginal: v })} />
             <Checkbox label={tr('Watermarked viewing copies')} description={tr('MP4 with burned-in export number, recipient, date, "COPY - NOT ORIGINAL" and timecode.')} checked={opts.includeWatermarked} onChange={(v) => setOpts({ ...opts, includeWatermarked: v })} />
             {opts.includeWatermarked && <Field label={tr('Extra watermark text (optional)')} htmlFor="ce-wm"><Input id="ce-wm" maxLength={120} value={opts.watermarkText} onChange={(e) => setOpts({ ...opts, watermarkText: e.target.value })} /></Field>}
             <Checkbox label={tr('Signed chain-of-custody report per item')} checked={opts.includeCustodyReport} onChange={(v) => setOpts({ ...opts, includeCustodyReport: v })} />

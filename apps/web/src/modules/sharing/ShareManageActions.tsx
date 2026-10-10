@@ -36,9 +36,9 @@ export function ShareManageActions({ share }: { share: ShareDetail }) {
     <>
       {share.canUnlock && <Button variant="secondary" onClick={() => { unlock.reset(); setDialog('unlock'); }}>{t('Unlock')}</Button>}
       {share.canExtend && <Button variant="secondary" onClick={() => { extend.reset(); setDialog('extend'); }}>{t('Extend')}</Button>}
-      {share.canReissue && <Button variant="secondary" onClick={() => { reissue.reset(); setDialog('reissue'); }}>{opts.data?.emailConfigured ? 'Re-send link by e-mail' : 'Re-issue link'}</Button>}
+      {share.canReissue && <Button variant="secondary" onClick={() => { reissue.reset(); setDialog('reissue'); }}>{opts.data?.emailConfigured ? t('Re-send link by e-mail') : t('Re-issue link')}</Button>}
       <ConfirmDialog open={dialog === 'unlock'} title={t('Unlock share')} requireReason reasonLabel={t('Why is it safe to unlock?')} confirmLabel={t('Unlock')}
-        message={`The share was locked after ${share.failedCodeAttempts} wrong access codes. Unlock only after confirming with the recipient that the attempts were theirs.`}
+        message={t('The share was locked after {failedCodeAttempts} wrong access codes. Unlock only after confirming with the recipient that the attempts were theirs.', { failedCodeAttempts: share.failedCodeAttempts })}
         loading={unlock.isPending} error={unlock.error} onConfirm={(r) => unlock.mutate(r)} onCancel={() => setDialog(null)} />
       <Modal open={dialog === 'extend'} onClose={() => setDialog(null)} title={t('Extend share')}
         footer={<><Button variant="secondary" onClick={() => setDialog(null)}>{t('Cancel')}</Button><Button disabled={reason.trim().length < 5} loading={extend.isPending} onClick={() => extend.mutate()}>{t('Extend')}</Button></>}>
@@ -54,7 +54,7 @@ export function ShareManageActions({ share }: { share: ShareDetail }) {
         {reissue.data ? (
           <div className="space-y-3 text-sm">
             {deliveryText(reissue.data.delivery) && <Alert tone={reissue.data.delivery?.link === 'FAILED' || reissue.data.delivery?.accessCode === 'FAILED' ? 'red' : 'green'}>{deliveryText(reissue.data.delivery)}</Alert>}
-            <Alert tone="amber" title={t('Shown only once')}>{t('The previous link no longer works.')}{' '}{reissue.data.accessCode ? ' The previous access code no longer works either.' : ' The access code is unchanged.'}</Alert>
+            <Alert tone="amber" title={t('Shown only once')}>{t('The previous link no longer works.')}{' '}{reissue.data.accessCode ? t(' The previous access code no longer works either.') : t(' The access code is unchanged.')}</Alert>
             <Field label={t('New link')} htmlFor="sr-link"><div className="flex gap-2"><Input id="sr-link" readOnly value={reissue.data.link} className="mono text-xs" /><CopyButton value={reissue.data.link!} /></div></Field>
             {reissue.data.accessCode && <Field label={t('New access code')} htmlFor="sr-code"><div className="flex gap-2"><Input id="sr-code" readOnly value={reissue.data.accessCode} className="mono text-lg tracking-widest" /><CopyButton value={reissue.data.accessCode} /></div></Field>}
           </div>
@@ -63,7 +63,7 @@ export function ShareManageActions({ share }: { share: ShareDetail }) {
             <p>{t('A new link replaces the current one (the old link stops working). Use this when the recipient lost the link or it went to the wrong place.')}</p>
             <Checkbox label={t('Also issue a new access code')} description={t('The current code is stored only as a hash and cannot be shown again.')} checked={re.rotateAccessCode} onChange={(v) => setRe({ ...re, rotateAccessCode: v, emailAccessCode: v && re.emailAccessCode })} />
             {opts.data?.emailConfigured
-              ? <Checkbox label={`E-mail the new link to ${share.recipient.email}`} checked={re.emailLink} onChange={(v) => setRe({ ...re, emailLink: v, emailAccessCode: v && re.emailAccessCode })} />
+              ? <Checkbox label={t('E-mail the new link to {email}', { email: share.recipient.email })} checked={re.emailLink} onChange={(v) => setRe({ ...re, emailLink: v, emailAccessCode: v && re.emailAccessCode })} />
               : <Alert tone="blue">{t('E-mail delivery is not configured; give the recipient the new link yourself.')}</Alert>}
             {opts.data?.emailConfigured && re.emailLink && re.rotateAccessCode && (
               <Checkbox label={t('Also e-mail the new access code (separate message)')} description={t('Not recommended: anyone with access to that mailbox could then open the share. Prefer phone/SMS for the code.')} checked={re.emailAccessCode} onChange={(v) => setRe({ ...re, emailAccessCode: v })} />
