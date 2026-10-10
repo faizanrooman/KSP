@@ -3,21 +3,24 @@
 # secrets, writes deploy/compose/.env for a single-host DEMO deployment and starts the stack (compose).
 #
 #   bash install-in-lxc.sh --fqdn ksp.lan [--ghcr-token <PAT read:packages>] [--no-ai] [--repo URL] [--ref main]
+#                          [--ai-legal-gates enforce|off]
 #
 # Demo tier: KSP_ENVIRONMENT=demo + KSP_PREFLIGHT=warn (the production preflight logs its findings instead of refusing:
 # self-signed signing key, GOVERNANCE object lock, bundled S3 gateway, demo users). For production follow docs/GO-LIVE-CHECKLIST.md.
 set -euo pipefail
-FQDN=""; TOKEN=""; AI=1; REPO="https://github.com/rooman-itsd/KSP.git"; REF="main"; DIR=/opt/ksp; SKIP_GIT=0; GHCR_USER=ksp
+FQDN=""; TOKEN=""; AI=1; LEGAL_GATES=enforce; REPO="https://github.com/rooman-itsd/KSP.git"; REF="main"; DIR=/opt/ksp; SKIP_GIT=0; GHCR_USER=ksp
 while [ $# -gt 0 ]; do
   case "$1" in
     --fqdn) FQDN="$2"; shift 2 ;; --ghcr-token) TOKEN="$2"; shift 2 ;; --no-ai) AI=0; shift ;;
     --repo) REPO="$2"; shift 2 ;; --ref) REF="$2"; shift 2 ;; --dir) DIR="$2"; shift 2 ;;
-    --skip-git) SKIP_GIT=1; shift ;;
-    --ghcr-user) GHCR_USER="$2"; shift 2 ;;   # GitHub user that owns the --ghcr-token   # deploy the checkout exactly as it is (used by autodeploy.sh, which pins the commit)
+    --skip-git) SKIP_GIT=1; shift ;;   # deploy the checkout exactly as it is (used by autodeploy.sh, which pins the commit)
+    --ai-legal-gates) LEGAL_GATES="$2"; shift 2 ;;
+    --ghcr-user) GHCR_USER="$2"; shift 2 ;;   # GitHub user that owns the --ghcr-token
     *) echo "unknown argument $1" >&2; exit 2 ;;
   esac
 done
 [ -n "$FQDN" ] || { echo "--fqdn is required" >&2; exit 2; }
+case "$LEGAL_GATES" in enforce|off) ;; *) echo "--ai-legal-gates must be enforce or off" >&2; exit 2 ;; esac
 export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 echo "== packages"
@@ -75,9 +78,14 @@ chmod 0711 deploy/compose/secrets
 awk -F= '/^[A-Z_][A-Z0-9_]*=/ { last[$1]=NR; line[NR]=$0; order[NR]=$1 } END { for (i=1;i<=NR;i++) if (i in line && last[order[i]]==i) print line[i] }' deploy/compose/.env > deploy/compose/.env.tmp && mv deploy/compose/.env.tmp deploy/compose/.env && chmod 600 deploy/compose/.env
 # --fqdn is authoritative on every run (moving the demo to a new hostname = re-run with the new --fqdn)
 sed -i "s#^APP_BASE_URL=.*#APP_BASE_URL=https://$FQDN#; s#^CORS_ORIGINS=.*#CORS_ORIGINS=https://$FQDN#" deploy/compose/.env
-# demo-only AI switches (every analytic enabled, legal gates off); idempotent for re-runs of older installs
+# Demo AI switches: every analytic is installed, and the legal gates are ENFORCED (default) so Settings → Legal approvals
+# means what it says — face detection, face recognition and ANPR stay disabled until an administrator records the
+# approval. --ai-legal-gates off lets them run without an approval (Settings then shows "Not enforced"). Authoritative on
+# every run, like --fqdn: earlier installer versions wrote AI_LEGAL_GATES=off, which this replaces.
 grep -q '^AI_TASKS_ENABLED=' deploy/compose/.env || echo 'AI_TASKS_ENABLED=all' >> deploy/compose/.env
-grep -q '^AI_LEGAL_GATES=' deploy/compose/.env || echo 'AI_LEGAL_GATES=off' >> deploy/compose/.env
+if grep -q '^AI_LEGAL_GATES=' deploy/compose/.env; then sed -i "s#^AI_LEGAL_GATES=.*#AI_LEGAL_GATES=$LEGAL_GATES#" deploy/compose/.env
+else echo "AI_LEGAL_GATES=$LEGAL_GATES" >> deploy/compose/.env; fi
+echo "AI legal gates: $LEGAL_GATES"
 
 echo "== images"
 if [ -n "$TOKEN" ]; then

@@ -36,13 +36,26 @@ export async function loadGrants(db: Database, userId: string): Promise<Grant[]>
   }));
 }
 
+/** Whether the administrator's policy makes MFA mandatory for any of these role grants. */
+export function mfaMandatoryFor(grants: readonly Pick<Grant, 'roleCode'>[], requireMfaForRoles: readonly string[]): boolean {
+  return grants.some((g) => requireMfaForRoles.includes(g.roleCode));
+}
+
+/**
+ * Whether sign-in must ask this user for the authenticator code: MFA is mandatory for one of their roles, or they turned
+ * it on themselves. An enrolment left over from a role that is no longer on the mandatory list is not challenged.
+ */
+export function mfaChallengeRequired(user: { mfa_enabled: boolean; mfa_self_enrolled: boolean }, mandatory: boolean): boolean {
+  return user.mfa_enabled && (mandatory || user.mfa_self_enrolled);
+}
+
 export async function loadUserPrincipal(db: Database, userId: string, sessionId: string, mfaVerified: boolean): Promise<Principal | null> {
   const hit = cache.get(sessionId);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.principal;
   const user = await db
     .selectFrom('users as u')
     .innerJoin('org_units as o', 'o.id', 'u.home_org_unit_id')
-    .select(['u.id', 'u.username', 'u.full_name', 'u.status', 'u.locked_until', 'u.must_change_password', 'u.password_changed_at', 'u.mfa_enabled', 'o.id as org_id', 'o.path'])
+    .select(['u.id', 'u.username', 'u.full_name', 'u.status', 'u.locked_until', 'u.must_change_password', 'u.password_changed_at', 'u.mfa_enabled', 'u.mfa_self_enrolled', 'o.id as org_id', 'o.path'])
     .where('u.id', '=', userId)
     .executeTakeFirst();
   if (!user || user.status !== 'ACTIVE') return null;
@@ -52,7 +65,10 @@ export async function loadUserPrincipal(db: Database, userId: string, sessionId:
   for (const g of grants) for (const p of g.permissions) permissions.add(p);
   const maxAge = settings.passwordPolicy.maxAgeDays;
   const expired = maxAge > 0 && !!user.password_changed_at && Date.now() - user.password_changed_at.getTime() > maxAge * 86_400_000;
-  const mfaRequired = grants.some((g) => settings.sessionPolicy.requireMfaForRoles.includes(g.roleCode));
+  const mfaRequired = mfaMandatoryFor(grants, settings.sessionPolicy.requireMfaForRoles);
+  // A session that signed in without the second factor (allowed while MFA was not required for the user) ends as soon
+  // as the policy requires it again: the user signs in once more and is asked for the code.
+  if (mfaChallengeRequired(user, mfaRequired) && !mfaVerified) return null;
   const principal: Principal = {
     kind: 'USER',
     userId: user.id,

@@ -40,7 +40,7 @@ const GROUPS: Array<{ key: SettingKey; title: string; description: string; field
     ],
   },
   {
-    key: 'sessionPolicy', title: 'Sessions & MFA', description: 'Session lifetime and roles for which MFA enrolment is mandatory.',
+    key: 'sessionPolicy', title: 'Sessions & MFA', description: 'Session lifetime and two-step sign-in. Users holding a role ticked below must enrol MFA and are asked for the code at every sign-in; other users are asked only if they turned two-step sign-in on themselves in My profile.',
     fields: [
       { name: 'idleTimeoutMinutes', label: 'Idle timeout (minutes)', kind: 'int', min: 5, max: 480 },
       { name: 'absoluteTimeoutHours', label: 'Absolute session lifetime (hours)', kind: 'int', min: 1, max: 72 },

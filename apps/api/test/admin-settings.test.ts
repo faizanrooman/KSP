@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '@ksp/shared';
 import { Agent, closeApp, createUser, getApp, login } from './helpers.js';
-import { auditChainIntact, createAdmin, lastAudit, type AdminSession } from './admin-helpers.js';
+import { auditChainIntact, createAdmin, enrolMfa, lastAudit, type AdminSession } from './admin-helpers.js';
 import { clearLoginFailures } from './admin-helpers.js';
 import { invalidateSettings } from '../src/lib/settings.js';
 
@@ -86,6 +86,52 @@ describe('settings', () => {
     expect(blocked.body.error.code).toBe('MFA_ENROLLMENT_REQUIRED');
     await root.agent.delete(`${S}/sessionPolicy`);
     expect((await a.get('/api/v1/auth/sessions')).status).toBe(200);
+    expect(await auditChainIntact()).toBe(true);
+  });
+
+  it('the sign-in MFA challenge follows the role policy; self-enrolled users stay challenged; re-adding a role ends code-less sessions', async () => {
+    const app = await getApp();
+    const step1 = async (u: { username: string; password: string }) => {
+      const ag = new Agent(app);
+      const r = await ag.post('/api/v1/auth/login', { username: u.username, password: u.password });
+      expect(r.status).toBe(200);
+      return { ag, mfaRequired: !!r.body.mfaRequired };
+    };
+    const withFa = { ...DEFAULT_SETTINGS.sessionPolicy, requireMfaForRoles: [...DEFAULT_SETTINGS.sessionPolicy.requireMfaForRoles, 'FORENSIC_ANALYST'] };
+    expect((await root.agent.put(`${S}/sessionPolicy`, withFa)).status).toBe(200);
+
+    // Policy-driven enrolment: the analyst enrols because the role requires it.
+    const fa = await createUser({ role: 'FORENSIC_ANALYST', org: 'blr_city' });
+    const faAgent = await login(fa.username, fa.password);
+    await enrolMfa(faAgent);
+    expect((await app.db.selectFrom('users').select('mfa_self_enrolled').where('id', '=', fa.id).executeTakeFirstOrThrow()).mfa_self_enrolled).toBe(false);
+    expect((await step1(fa)).mfaRequired).toBe(true);
+
+    // Self-enrolment: an Investigating Officer (not on the list) turns MFA on in My profile.
+    const io = await createUser({ role: 'INVESTIGATING_OFFICER', org: 'ps_cubbonpark' });
+    await enrolMfa(await login(io.username, io.password));
+    expect((await app.db.selectFrom('users').select('mfa_self_enrolled').where('id', '=', io.id).executeTakeFirstOrThrow()).mfa_self_enrolled).toBe(true);
+
+    // The administrator removes FORENSIC_ANALYST: the analyst signs in with the password alone; the IO is still asked.
+    expect((await root.agent.delete(`${S}/sessionPolicy`)).status).toBe(200);
+    const faNoMfa = await step1(fa);
+    expect(faNoMfa.mfaRequired).toBe(false);
+    expect((await faNoMfa.ag.get('/api/v1/auth/me')).status).toBe(200);
+    expect((await step1(io)).mfaRequired).toBe(true);
+
+    // Re-adding the role ends the code-less session at once and the next sign-in asks for the code again.
+    expect((await root.agent.put(`${S}/sessionPolicy`, withFa)).status).toBe(200);
+    expect((await faNoMfa.ag.get('/api/v1/auth/me')).status).toBe(401);
+    expect((await step1(fa)).mfaRequired).toBe(true);
+    // Sessions that did pass the second factor are unaffected.
+    expect((await faAgent.get('/api/v1/auth/me')).status).toBe(200);
+
+    // An administrator's MFA reset clears the self-enrolled flag with the enrolment.
+    expect((await root.agent.post(`/api/v1/users/${io.id}/reset-mfa`, { reason: 'Lost phone, ticket 42' })).status).toBe(200);
+    expect(await app.db.selectFrom('users').select(['mfa_enabled', 'mfa_self_enrolled']).where('id', '=', io.id).executeTakeFirstOrThrow()).toEqual({ mfa_enabled: false, mfa_self_enrolled: false });
+    expect((await step1(io)).mfaRequired).toBe(false);
+
+    await root.agent.delete(`${S}/sessionPolicy`);
     expect(await auditChainIntact()).toBe(true);
   });
 });

@@ -13,7 +13,10 @@ outside your jurisdiction is simply not found.
 
 * **Sign in** — username + password. Supervisors, administrators, auditors and custodians must enrol two-step
   verification on first sign-in: scan the QR code with an authenticator app, enter the 6-digit code, and store
-  the recovery codes shown once. Five consecutive failures lock the account for 15 minutes (defaults; the administrator can change them
+  the recovery codes shown once. The 6-digit code is asked at sign-in when the administrator's policy
+  (**System settings → Sessions & MFA → MFA mandatory for roles**) covers one of your roles, or when you turned
+  two-step sign-in on yourself in **My profile**; removing a role from that list stops the code prompt for users who
+  enrolled only because of it, and adding it back asks for the code again at once. Five consecutive failures lock the account for 15 minutes (defaults; the administrator can change them
   in **System settings**). (E2E `01-auth`)
 * **My profile** — change password (history and complexity policy apply), view/enable two-step verification,
   sign out other sessions.

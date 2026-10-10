@@ -1051,6 +1051,10 @@ export interface Users {
   mfa_pending_secret_enc: string | null;
   mfa_recovery_codes: Generated<string[]>;
   mfa_secret_enc: string | null;
+  /**
+   * true = the user enabled MFA while none of their roles required it; challenged at sign-in regardless of the role policy
+   */
+  mfa_self_enrolled: Generated<boolean>;
   must_change_password: Generated<boolean>;
   password_changed_at: Timestamp | null;
   password_hash: string | null;

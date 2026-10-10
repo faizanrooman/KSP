@@ -71,6 +71,13 @@ lock, bundled S3 gateway, demo users — instead of refusing to start), `KSP_ALL
 `DATABASE_TLS_WAIVED=true`. For production follow `docs/GO-LIVE-CHECKLIST.md` (HSM key, COMPLIANCE lock, real S3,
 `ops:purge-demo-data`, `KSP_ENVIRONMENT=production`).
 
+AI: every analytic is installed (`AI_TASKS_ENABLED=all`) and the legal gates are **enforced** as in production
+(`AI_LEGAL_GATES=enforce`): face detection, face recognition (watchlists and face search) and number-plate recognition
+stay disabled until an administrator records the approval in **Settings → Legal approvals**. The installer sets the
+value on every run (installers before 2026-10-10 wrote `off`). To demonstrate those analytics without an approval,
+re-run the installer with `--ai-legal-gates off` (put `KSP_INSTALL_ARGS="--ai-legal-gates off"` in
+`/etc/ksp-autodeploy.env` when auto-deploy is enabled); Settings then marks each one **Not enforced**.
+
 The bundled S3 gateway (versitygw) gets the application and AI identities created in its IAM store by the installer
 (both with the `admin` role — a production S3 store restricts the AI identity to the derived bucket by policy,
 `deploy/s3/policies/`).

@@ -222,7 +222,14 @@ await arjun.post(`/cases/${case2.id}/notes`, { body: 'Injured shifted to Bowring
 log(`FIRs 0412/2026 (Cubbon Park) and 0377/2026 (Indiranagar) with cases, linked evidence and case diary`);
 
 // AI analyses (results stay advisory until reviewed in the AI review queue)
-for (const [title, user, tasks] of [['Traffic violation stop', 'io.meera', ['ANPR', 'OBJECT_DETECTION']], ['Chain-snatching complaint', 'io.meera', ['PERSON_DETECTION', 'FACE_DETECTION', 'OBJECT_DETECTION']], ['Witness statement', 'io.meera', ['FACE_DETECTION']], ['Brawl outside pub', 'io.arjun', ['PERSON_DETECTION', 'FACE_DETECTION']], ['Hit-and-run vehicle', 'io.arjun', ['ANPR']]]) {
+// Face detection and number plates are legally gated (Settings → Legal approvals): tasks the deployment refuses are
+// skipped here, never approved by the loader — recording an approval is a decision for the administrator.
+const allowedTasks = new Set(((await (await as('io.meera')).get('/ai/tasks')).items ?? []).filter((t) => t.allowed !== false && t.available).map((t) => t.task));
+for (const [title, user, wanted] of [['Traffic violation stop', 'io.meera', ['ANPR', 'OBJECT_DETECTION']], ['Chain-snatching complaint', 'io.meera', ['PERSON_DETECTION', 'FACE_DETECTION', 'OBJECT_DETECTION']], ['Witness statement', 'io.meera', ['FACE_DETECTION']], ['Brawl outside pub', 'io.arjun', ['PERSON_DETECTION', 'FACE_DETECTION']], ['Hit-and-run vehicle', 'io.arjun', ['ANPR']]]) {
+  const tasks = wanted.filter((t) => allowedTasks.has(t));
+  const skipped = wanted.filter((t) => !allowedTasks.has(t));
+  if (skipped.length) log(`AI tasks skipped for ${title} (disabled or awaiting legal approval): ${skipped.join(', ')}`);
+  if (!tasks.length) continue;
   try { await (await as(user)).post(`/ai/evidence/${byTitle(title).id}/jobs`, { tasks, sampleFps: 1 }); log(`AI analysis queued: ${title} (${tasks.join(', ')})`); }
   catch (e) { log(`AI analysis not queued for ${title}: ${e.message}`); }
 }

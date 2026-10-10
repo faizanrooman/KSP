@@ -63,11 +63,17 @@ export function LegalApprovalsCard({ settings, deployment, onSaved }: { settings
       {deployment?.signing?.nonEvidentiary && (
         <Alert tone="red" title={t('Non-evidentiary signing key')}>{t('Exports and custody reports are signed with a development / self-signed key (')}{deployment.signing.keyId}{t(') and are stamped “NON-EVIDENTIARY – TEST KEY”. Install the HSM / DSC key before go-live.')}</Alert>
       )}
+      {deployment && !deployment.aiLegalGatesEnforced && (
+        <Alert tone="amber" title={t('Legal approval checks are switched off on this deployment')}>
+          {t('AI_LEGAL_GATES=off: face detection, face recognition and number plate recognition run without a recorded approval. Set AI_LEGAL_GATES=enforce (the default) so these tasks stay disabled until their approval is recorded here.')}
+        </Alert>
+      )}
       <ul className="divide-y divide-ink-100">
         {ENTRIES.map((e) => {
           const a = current(settings, e);
           const gate = gateOf(e);
           const enabledHere = e.settingKey === 'exportLegalApproval' || !deployment || deployment.aiTasksEnabled.includes(e.entry);
+          const notEnforced = e.settingKey === 'aiLegalApprovals' && !!deployment && !deployment.aiLegalGatesEnforced && enabledHere;
           return (
             <li key={`${e.settingKey}.${e.entry}`} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between" data-testid={`legal-${e.entry}`}>
               <div className="min-w-0">
@@ -75,6 +81,7 @@ export function LegalApprovalsCard({ settings, deployment, onSaved }: { settings
                   {e.title}{' '}
                   {a ? <Badge tone="green">{t('Approved')}</Badge> : <Badge tone="amber">{t('Pending approval')}</Badge>}
                   {!enabledHere && <> <Badge>{t('Not enabled on this deployment')}</Badge></>}
+                  {notEnforced && !a && <> <Badge tone="red">{t('Not enforced')}</Badge></>}
                 </p>
                 <p className="text-xs text-ink-500">{e.description}</p>
                 {a ? (
@@ -83,7 +90,7 @@ export function LegalApprovalsCard({ settings, deployment, onSaved }: { settings
                     {a.recordedBy ? <span className="text-xs text-ink-500">{' '}{t('— recorded by')}{' '}{a.recordedBy}{a.recordedAt ? ` on ${formatDateTime(a.recordedAt)}` : ''}</span> : null}
                   </p>
                 ) : (
-                  <p className="mt-1 text-sm text-ink-600">{e.settingKey === 'exportLegalApproval' ? 'Fact Sheets are stamped “TEMPLATE – PENDING LEGAL APPROVAL”.' : gate?.explanation ?? 'Disabled until approved.'}</p>
+                  <p className="mt-1 text-sm text-ink-600">{e.settingKey === 'exportLegalApproval' ? 'Fact Sheets are stamped “TEMPLATE – PENDING LEGAL APPROVAL”.' : notEnforced ? t('Not enforced on this deployment: runs without an approval.') : gate?.explanation ?? 'Disabled until approved.'}</p>
                 )}
               </div>
               <div className="flex shrink-0 gap-2">
