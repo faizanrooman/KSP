@@ -8,7 +8,7 @@ import { ACCESS_COOKIE, CSRF_COOKIE, REFRESH_COOKIE, checkPasswordPolicy, type M
 import { appendAudit, decryptSecret, dummySecretHash, encryptSecret, hashSecret, randomToken, verifySecret, type AuditActor } from '@ksp/core';
 import { createSession, revokeAllUserSessions, revokeSession, rotateRefresh, signJwt, verifyJwt, type IssuedTokens } from '../../lib/session.js';
 import { getSettings } from '../../lib/settings.js';
-import { invalidatePrincipals, loadUserPrincipal } from '../../lib/load-principal.js';
+import { invalidatePrincipals, loadGrants, loadUserPrincipal, mfaChallengeRequired, mfaMandatoryFor } from '../../lib/load-principal.js';
 import { AppError, badRequest, notFound, unauthenticated, validationFailed } from '../../lib/errors.js';
 import { authFailures } from '../../plugins/metrics.js';
 
@@ -120,7 +120,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
       await appendAudit(db, anon(req, null, username), { action: 'RATE_LIMITED', outcome: 'DENIED', resourceType: 'login', details: { username, ipFailures: ipFailures.n } });
       throw new AppError(429, 'RATE_LIMITED', 'Too many failed login attempts from this address. Try again later.');
     }
-    const user = await db.selectFrom('users').select(['id', 'username', 'password_hash', 'status', 'locked_until', 'failed_login_count', 'mfa_enabled', 'home_org_unit_id'])
+    const user = await db.selectFrom('users').select(['id', 'username', 'password_hash', 'status', 'locked_until', 'failed_login_count', 'mfa_enabled', 'mfa_self_enrolled', 'home_org_unit_id'])
       .where('username', '=', username).executeTakeFirst();
     const ok = await verifySecret(user?.password_hash ?? (await dummySecretHash()), password);
     const record = (success: boolean, reason: string | null) =>
@@ -154,7 +154,8 @@ export default async function authRoutes(fastify: FastifyInstance) {
       throw new AppError(403, 'ACCOUNT_DISABLED', 'This account is not active. Contact an administrator.');
     }
     await record(true, null);
-    if (user.mfa_enabled) {
+    // The second factor is asked when the role policy requires MFA for this user or the user opted in (My profile).
+    if (mfaChallengeRequired(user, mfaMandatoryFor(await loadGrants(db, user.id), settings.sessionPolicy))) {
       const mfaToken = await signJwt({ sub: user.id, typ: 'mfa' }, 300);
       return { mfaRequired: true, mfaToken };
     }
@@ -207,7 +208,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const bodyToken = req.body?.refreshToken;
     const presented = bodyToken ?? req.cookies[REFRESH_COOKIE];
     if (!presented) throw unauthenticated('No refresh token');
-    const result = await rotateRefresh(db, presented);
+    const result = await rotateRefresh(db, presented, { slideIdle: req.headers['x-ksp-background'] !== '1' });
     if (!result.ok) {
       if (result.reason === 'REUSED') {
         invalidatePrincipals(result.userId);
@@ -315,11 +316,13 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const secret = decryptSecret(u.mfa_pending_secret_enc);
     const delta = authenticator.checkDelta(req.body.code, secret);
     if (delta === null) throw new AppError(400, 'INVALID_CODE', 'Invalid verification code');
+    // Remember whether the user chose MFA (no role required it): a chosen enrolment is challenged whatever the policy.
+    const selfEnrolled = !mfaMandatoryFor(p.grants, (await getSettings(db)).sessionPolicy);
     const codes = Array.from({ length: 10 }, () => randomToken(8).replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toLowerCase());
     const hashes = await Promise.all(codes.map((c) => hashSecret(c)));
     await db.transaction().execute(async (tx) => {
       // The enrolment code is consumed too (SEC-12): it cannot be replayed at the next login.
-      await tx.updateTable('users').set({ mfa_enabled: true, mfa_secret_enc: encryptSecret(secret), mfa_pending_secret_enc: null, mfa_recovery_codes: hashes, mfa_enrolled_at: new Date(), mfa_last_totp_step: Math.floor(Date.now() / 30_000) + delta }).where('id', '=', p.userId!).execute();
+      await tx.updateTable('users').set({ mfa_enabled: true, mfa_self_enrolled: selfEnrolled, mfa_secret_enc: encryptSecret(secret), mfa_pending_secret_enc: null, mfa_recovery_codes: hashes, mfa_enrolled_at: new Date(), mfa_last_totp_step: Math.floor(Date.now() / 30_000) + delta }).where('id', '=', p.userId!).execute();
       if (p.sessionId) await tx.updateTable('sessions').set({ mfa_verified: true }).where('id', '=', p.sessionId).execute();
       await appendAudit(tx, req.actor(), { action: 'MFA_ENROLLED', resourceType: 'user', resourceId: p.userId! });
     });
@@ -334,14 +337,14 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const p = req.requirePrincipal();
     if (!p.userId) throw badRequest('Only available to users');
     const settings = await getSettings(db);
-    if (p.grants.some((g) => settings.sessionPolicy.requireMfaForRoles.includes(g.roleCode))) throw new AppError(403, 'MFA_MANDATORY', 'MFA is mandatory for your role and cannot be disabled');
+    if (mfaMandatoryFor(p.grants, settings.sessionPolicy)) throw new AppError(403, 'MFA_MANDATORY', 'MFA is mandatory for your role and cannot be disabled');
     const u = await db.selectFrom('users').select(['password_hash', 'mfa_secret_enc']).where('id', '=', p.userId).executeTakeFirstOrThrow();
     // SEC-R5: the TOTP step is consumed exactly like at login (single use).
     if (!u.password_hash || !(await verifySecret(u.password_hash, req.body.password)) || !u.mfa_secret_enc || !(await consumeTotp(p.userId, u.mfa_secret_enc, req.body.code))) {
       await appendAudit(db, req.actor(), { action: 'MFA_CHALLENGE_FAILED', outcome: 'FAILURE', resourceType: 'user', resourceId: p.userId, details: { context: 'mfa-disable' } });
       throw new AppError(400, 'INVALID_CREDENTIALS', 'Password or code is incorrect');
     }
-    await db.updateTable('users').set({ mfa_enabled: false, mfa_secret_enc: null, mfa_recovery_codes: [], mfa_enrolled_at: null }).where('id', '=', p.userId).execute();
+    await db.updateTable('users').set({ mfa_enabled: false, mfa_self_enrolled: false, mfa_secret_enc: null, mfa_recovery_codes: [], mfa_enrolled_at: null }).where('id', '=', p.userId).execute();
     await appendAudit(db, req.actor(), { action: 'MFA_DISABLED', resourceType: 'user', resourceId: p.userId });
     invalidatePrincipals(p.userId);
     return { ok: true };

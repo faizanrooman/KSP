@@ -27,6 +27,10 @@ data:
   S3_BUCKET_EXPORTS: ksp-exports
   S3_BUCKET_REPORTS: ksp-reports
   OBJECT_LOCK_MODE: GOVERNANCE
+  # Encryption at rest of every object (tender §6/§71): the store must support SSE (MinIO: KMS configured).
+  S3_SSE: AES256
+  # Tender §50: KSP / VPN CIDRs allowed to reach the staff API — REQUIRED (preflight refuses empty in production).
+  ALLOWED_NETWORKS: ""
   OBJECT_LOCK_DAYS: "3650"
   JWT_ISSUER: ksp-vms
   JWT_PRIVATE_KEY: file:/run/secrets/ksp/jwt_private_key
@@ -56,6 +60,7 @@ data:
   S3_FORCE_PATH_STYLE: "true"
   S3_BUCKET_DERIVED: ksp-derived
   OBJECT_LOCK_MODE: GOVERNANCE
+  S3_SSE: AES256
   AI_MODELS_DIR: /models
   AI_WORKER_CONCURRENCY: "1"
   METRICS_HOST: 0.0.0.0

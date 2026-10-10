@@ -302,7 +302,12 @@ describe('training exports', () => {
     expect((await sup.post(`/api/v1/review/detections/${dets[1]!.id}`, { action: 'CORRECT_LABEL', correctedLabel: 'police officer' })).status).toBe(200);
     expect((await sup.post(`/api/v1/review/detections/${dets[2]!.id}`, { action: 'REJECT', comment: 'mannequin, not a person' })).status).toBe(200);
 
-    const admin = await as('admin');
+    // ai:models_manage alone (System Administrator) cannot extract evidence crops; a model manager with evidence access can.
+    expect((await (await as('admin')).post('/api/v1/ai/training-exports', { task: 'PERSON_DETECTION', from: '2020-01-01', to: '2100-01-01' })).status).toBe(403);
+    await app.db.insertInto('roles').values({ code: 'TEST_AI_MODEL_MANAGER', name: 'AI model manager (test)', description: 'ai:models_manage + evidence:read', permissions: ['ai:models_manage', 'evidence:read', 'ai:review', 'org:read'], is_system: false })
+      .onConflict((oc) => oc.column('code').doNothing()).execute();
+    const mm = await createUser({ role: 'TEST_AI_MODEL_MANAGER', org: 'ksp' });
+    const admin = await login(mm.username, mm.password);
     const r = await admin.post('/api/v1/ai/training-exports', { task: 'PERSON_DETECTION', from: '2020-01-01', to: '2100-01-01' });
     expect(r.status).toBe(202);
     expect(r.body.status).toBe('QUEUED');

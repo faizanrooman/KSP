@@ -71,12 +71,29 @@ lock, bundled S3 gateway, demo users — instead of refusing to start), `KSP_ALL
 `DATABASE_TLS_WAIVED=true`. For production follow `docs/GO-LIVE-CHECKLIST.md` (HSM key, COMPLIANCE lock, real S3,
 `ops:purge-demo-data`, `KSP_ENVIRONMENT=production`).
 
+AI: every analytic is installed (`AI_TASKS_ENABLED=all`) and the legal gates are **enforced** as in production
+(`AI_LEGAL_GATES=enforce`): face detection, face recognition (watchlists and face search) and number-plate recognition
+stay disabled until an administrator records the approval in **Settings → Legal approvals**. The installer sets the
+value on every run (installers before 2026-10-10 wrote `off`). To demonstrate those analytics without an approval,
+re-run the installer with `--ai-legal-gates off` (put `KSP_INSTALL_ARGS="--ai-legal-gates off"` in
+`/etc/ksp-autodeploy.env` when auto-deploy is enabled); Settings then marks each one **Not enforced**.
+
 The bundled S3 gateway (versitygw) gets the application and AI identities created in its IAM store by the installer
 (both with the `admin` role — a production S3 store restricts the AI identity to the derived bucket by policy,
 `deploy/s3/policies/`).
 
 Resources: Postgres and the S3 gateway keep their data in Docker volumes (`pgdata`, `s3data`); back the CT up with
 Proxmox backups (`vzdump`) in addition to the application's own encrypted backups (`backup` profile).
+
+Application backups: the installer installs the systemd timer **`ksp-backup.timer`** (nightly 01:30 IST) that runs the
+encrypted database backup (`docker compose --profile ops run --rm backup` → `scripts/backup/pg-backup.sh`: dump, age
+encryption, signed manifest, Object-Lock upload to `BACKUP_S3_BUCKET`), and starts a first run when no backup has
+succeeded in the last 26 h. Every run is recorded in `backup_runs` and shown under **System health → Backups** (last
+successful run, size, the ten most recent runs with errors). In this demo the backup bucket lives in the bundled S3
+gateway; production writes it to a separate site (`docs/BACKUP-RESTORE-RUNBOOK.md`). Check a run by hand:
+`systemctl start ksp-backup.service && journalctl -u ksp-backup -n 30`; schedule: `systemctl list-timers ksp-backup.timer`.
+The weekly restore test (`scripts/backup/verify-backup.sh`) needs the decryption identity, which is kept offline, so it
+is not scheduled on the demo host.
 
 ## Automatic deployment (push to `main` → live after CI passes)
 

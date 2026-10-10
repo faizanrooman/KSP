@@ -32,6 +32,8 @@ beforeAll(() => {
     CORS_ORIGINS: 'https://vms.ksp.gov.in',
     COOKIE_SECURE: 'true',
     TRUST_PROXY: 'true',
+    ALLOWED_NETWORKS: '10.0.0.0/8,192.168.0.0/16',
+    S3_SSE: 'AES256',
     OBJECT_LOCK_MODE: 'COMPLIANCE',
     S3_ACCESS_KEY: 'KSPAPPPRODIDENTITY01',
     S3_SECRET_KEY: rand(30),
@@ -48,7 +50,7 @@ beforeAll(() => {
     DATABASE_AI_URL: `${test.DATABASE_AI_URL}?sslmode=verify-full`,
     LOG_LEVEL: 'info',
   };
-  for (const k of ['KSP_PREFLIGHT', 'KSP_ALLOW_NONEVIDENTIARY_SIGNING', 'OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE', 'DATABASE_TLS_WAIVED', 'RATE_LIMIT_STORE', 'AI_LEGAL_GATES', 'AI_TASKS_ENABLED', 'SIGNING_PROVIDER']) delete goodEnv[k];
+  for (const k of ['KSP_PREFLIGHT', 'KSP_ALLOW_NONEVIDENTIARY_SIGNING', 'OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE', 'DATABASE_TLS_WAIVED', 'RATE_LIMIT_STORE', 'AI_LEGAL_GATES', 'AI_TASKS_ENABLED', 'SIGNING_PROVIDER', 'ALLOWED_NETWORKS_WAIVED', 'STORAGE_ENCRYPTION_AT_REST', 'S3_DISPOSAL_ACCESS_KEY', 'S3_DISPOSAL_SECRET_KEY', 'S3_SSE_KMS_KEY_ID']) delete goodEnv[k];
   owner = createDb(test.DATABASE_MIGRATION_URL!, 2).db;
   aiDb = createDb(test.DATABASE_AI_URL!, 2).db;
   appDb = createDb(test.DATABASE_URL, 2).db;
@@ -106,6 +108,23 @@ describe('static rules', () => {
     const accepted = rules(cfgWith({ OBJECT_LOCK_MODE: 'GOVERNANCE', OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE: 'true' }));
     expect(errorsOf(accepted)).not.toContain('OBJECT_LOCK_MODE');
     expect(warningsOf(accepted)).toContain('OBJECT_LOCK_MODE');
+  });
+
+  it('audit 2026-10-10: network allow-list, encryption at rest and a separate disposal identity are required in production', () => {
+    expect(errorsOf(rules(cfgWith({ ALLOWED_NETWORKS: '' }), 'api'))).toContain('ALLOWED_NETWORKS');
+    const waived = rules(cfgWith({ ALLOWED_NETWORKS: '', ALLOWED_NETWORKS_WAIVED: 'perimeter' }), 'api');
+    expect(errorsOf(waived)).not.toContain('ALLOWED_NETWORKS');
+    expect(warningsOf(waived)).toContain('ALLOWED_NETWORKS');
+    expect(errorsOf(rules(cfgWith({ TRUST_PROXY: 'false' }), 'api'))).toContain('ALLOWED_NETWORKS_PROXY');
+    expect(errorsOf(rules(cfgWith({ S3_SSE: undefined })))).toContain('STORAGE_ENCRYPTION');
+    expect(errorsOf(rules(cfgWith({ S3_SSE: undefined, STORAGE_ENCRYPTION_AT_REST: 'infrastructure' })))).not.toContain('STORAGE_ENCRYPTION');
+    expect(errorsOf(rules(cfgWith({ S3_SSE: 'aws:kms' })))).toContain('S3_SSE');
+    const governance = { OBJECT_LOCK_MODE: 'GOVERNANCE', OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE: 'true' };
+    expect(errorsOf(rules(cfgWith(governance), 'worker'))).toContain('S3_DISPOSAL_IDENTITY');
+    const disposal = { ...governance, S3_DISPOSAL_ACCESS_KEY: 'KSPDISPOSALIDENTITY1', S3_DISPOSAL_SECRET_KEY: rand(30) };
+    expect(errorsOf(rules(cfgWith(disposal), 'worker'))).not.toContain('S3_DISPOSAL_IDENTITY');
+    expect(errorsOf(rules(cfgWith(disposal), 'api'))).toContain('S3_DISPOSAL_IDENTITY'); // the API must not hold it
+    expect(errorsOf(rules(cfgWith({ ...disposal, S3_DISPOSAL_ACCESS_KEY: 'KSPAPPPRODIDENTITY01' }), 'worker'))).toContain('S3_DISPOSAL_IDENTITY');
   });
 
   it('https-only URLs and secure cookies', () => {

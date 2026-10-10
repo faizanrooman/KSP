@@ -26,8 +26,9 @@ import { z } from 'zod';
 import { sql, type SelectQueryBuilder } from 'kysely';
 import { appendAudit, createMailer, deleteShareVariants, hashSecret, randomDigits, randomToken, sha256Hex, type AuditActor, type Database, type Tx } from '@ksp/core';
 import { SHARE_STATUSES, type Permission } from '@ksp/shared';
-import { loadEvidenceFor, orgScopeSql } from '../../lib/access.js';
-import { badRequest, conflict, forbidden, notFound, validationFailed } from '../../lib/errors.js';
+import { evidenceVisibleSql, loadEvidenceFor, orgScopeSql } from '../../lib/access.js';
+import { loadPrincipalForAccessCheck } from '../../lib/load-principal.js';
+import { AppError, badRequest, conflict, forbidden, notFound, validationFailed } from '../../lib/errors.js';
 import { hasPermission, hasPermissionAt, type Principal } from '../../lib/principal.js';
 import { getSettings } from '../../lib/settings.js';
 
@@ -196,6 +197,18 @@ export default async function shares(fastify: FastifyInstance) {
       .orderBy('e.evidence_number')
       .execute();
 
+  /**
+   * Items an internal recipient can already open without the share (jurisdiction, own evidence, case team). A share
+   * cannot limit that access, so its expiry, view limit and download setting would not apply to those items.
+   */
+  const visibleWithoutShare = async (recipientUserId: string, evidenceIds: string[]): Promise<Set<string>> => {
+    if (!evidenceIds.length) return new Set();
+    const rp = await loadPrincipalForAccessCheck(app.db, recipientUserId);
+    if (!rp) return new Set();
+    const rows = await app.db.selectFrom('evidence').select('id').where('id', 'in', evidenceIds).where(evidenceVisibleSql(rp, 'evidence', { shares: false })).execute();
+    return new Set(rows.map((r) => r.id));
+  };
+
   // ---------------------------------------------------------------------------------------------
   app.post('/', {
     preHandler: app.authorize('share:create'),
@@ -232,6 +245,16 @@ export default async function shares(fastify: FastifyInstance) {
         throw forbidden(b.allowDownload ? 'Allowing downloads requires that you may download the original' : 'Unwatermarked external shares require that you may download the original');
       }
       items.push(ev);
+    }
+    if (b.recipientType === 'INTERNAL_USER') {
+      const already = await visibleWithoutShare(b.recipientUserId!, items.map((i) => i.id));
+      if (already.size) {
+        const who = (await app.db.selectFrom('users').select('full_name').where('id', '=', b.recipientUserId!).executeTakeFirstOrThrow()).full_name;
+        const numbers = items.filter((i) => already.has(i.id)).map((i) => i.evidence_number ?? i.id);
+        throw new AppError(409, 'RECIPIENT_ALREADY_HAS_ACCESS',
+          `${who} can already open ${numbers.join(', ')} through their own jurisdiction or case access. A share cannot limit that access, so its expiry, view limit and download setting would not apply. Remove ${numbers.length === 1 ? 'this item' : 'these items'} or choose a recipient who has no access.`,
+          { evidenceIds: [...already], evidenceNumbers: numbers });
+      }
     }
     let orgUnitId = items[0]!.org_unit_id;
     if (b.caseId) {
@@ -326,9 +349,12 @@ export default async function shares(fastify: FastifyInstance) {
     const log = manager
       ? await app.db.selectFrom('share_access_log').select(['id', 'evidence_id', 'action', sql<string | null>`host(ip)`.as('ip'), 'user_agent', 'detail', 'created_at']).where('share_id', '=', r.id).orderBy('id', 'desc').limit(500).execute()
       : [];
+    // Shares created before the recipient check (or whose recipient gained access later): flag the items the share
+    // does not actually limit, so nobody mistakes its expiry / view limit for an access restriction.
+    const own = manager && r.recipient_type === 'INTERNAL_USER' && r.recipient_user_id ? await visibleWithoutShare(r.recipient_user_id, items.map((i) => i.evidence_id)) : new Set<string>();
     return {
       ...shareDto(p, r),
-      items: items.map((i) => ({ evidenceId: i.evidence_id, evidenceNumber: i.evidence_number, title: i.title, durationMs: i.duration_ms === null ? null : Number(i.duration_ms), recordedAt: i.recorded_at?.toISOString() ?? null })),
+      items: items.map((i) => ({ evidenceId: i.evidence_id, evidenceNumber: i.evidence_number, title: i.title, durationMs: i.duration_ms === null ? null : Number(i.duration_ms), recordedAt: i.recorded_at?.toISOString() ?? null, recipientHasOwnAccess: own.has(i.evidence_id) })),
       accessLog: log.map((l) => ({ id: Number(l.id), evidenceId: l.evidence_id, action: l.action, ip: l.ip, userAgent: l.user_agent, detail: l.detail, at: l.created_at.toISOString() })),
     };
   });

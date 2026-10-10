@@ -3,21 +3,24 @@
 # secrets, writes deploy/compose/.env for a single-host DEMO deployment and starts the stack (compose).
 #
 #   bash install-in-lxc.sh --fqdn ksp.lan [--ghcr-token <PAT read:packages>] [--no-ai] [--repo URL] [--ref main]
+#                          [--ai-legal-gates enforce|off]
 #
 # Demo tier: KSP_ENVIRONMENT=demo + KSP_PREFLIGHT=warn (the production preflight logs its findings instead of refusing:
 # self-signed signing key, GOVERNANCE object lock, bundled S3 gateway, demo users). For production follow docs/GO-LIVE-CHECKLIST.md.
 set -euo pipefail
-FQDN=""; TOKEN=""; AI=1; REPO="https://github.com/rooman-itsd/KSP.git"; REF="main"; DIR=/opt/ksp; SKIP_GIT=0; GHCR_USER=ksp
+FQDN=""; TOKEN=""; AI=1; LEGAL_GATES=enforce; REPO="https://github.com/rooman-itsd/KSP.git"; REF="main"; DIR=/opt/ksp; SKIP_GIT=0; GHCR_USER=ksp
 while [ $# -gt 0 ]; do
   case "$1" in
     --fqdn) FQDN="$2"; shift 2 ;; --ghcr-token) TOKEN="$2"; shift 2 ;; --no-ai) AI=0; shift ;;
     --repo) REPO="$2"; shift 2 ;; --ref) REF="$2"; shift 2 ;; --dir) DIR="$2"; shift 2 ;;
-    --skip-git) SKIP_GIT=1; shift ;;
-    --ghcr-user) GHCR_USER="$2"; shift 2 ;;   # GitHub user that owns the --ghcr-token   # deploy the checkout exactly as it is (used by autodeploy.sh, which pins the commit)
+    --skip-git) SKIP_GIT=1; shift ;;   # deploy the checkout exactly as it is (used by autodeploy.sh, which pins the commit)
+    --ai-legal-gates) LEGAL_GATES="$2"; shift 2 ;;
+    --ghcr-user) GHCR_USER="$2"; shift 2 ;;   # GitHub user that owns the --ghcr-token
     *) echo "unknown argument $1" >&2; exit 2 ;;
   esac
 done
 [ -n "$FQDN" ] || { echo "--fqdn is required" >&2; exit 2; }
+case "$LEGAL_GATES" in enforce|off) ;; *) echo "--ai-legal-gates must be enforce or off" >&2; exit 2 ;; esac
 export DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 echo "== packages"
@@ -75,18 +78,25 @@ chmod 0711 deploy/compose/secrets
 awk -F= '/^[A-Z_][A-Z0-9_]*=/ { last[$1]=NR; line[NR]=$0; order[NR]=$1 } END { for (i=1;i<=NR;i++) if (i in line && last[order[i]]==i) print line[i] }' deploy/compose/.env > deploy/compose/.env.tmp && mv deploy/compose/.env.tmp deploy/compose/.env && chmod 600 deploy/compose/.env
 # --fqdn is authoritative on every run (moving the demo to a new hostname = re-run with the new --fqdn)
 sed -i "s#^APP_BASE_URL=.*#APP_BASE_URL=https://$FQDN#; s#^CORS_ORIGINS=.*#CORS_ORIGINS=https://$FQDN#" deploy/compose/.env
-# demo-only AI switches (every analytic enabled, legal gates off); idempotent for re-runs of older installs
+# Demo AI switches: every analytic is installed, and the legal gates are ENFORCED (default) so Settings → Legal approvals
+# means what it says — face detection, face recognition and ANPR stay disabled until an administrator records the
+# approval. --ai-legal-gates off lets them run without an approval (Settings then shows "Not enforced"). Authoritative on
+# every run, like --fqdn: earlier installer versions wrote AI_LEGAL_GATES=off, which this replaces.
 grep -q '^AI_TASKS_ENABLED=' deploy/compose/.env || echo 'AI_TASKS_ENABLED=all' >> deploy/compose/.env
-grep -q '^AI_LEGAL_GATES=' deploy/compose/.env || echo 'AI_LEGAL_GATES=off' >> deploy/compose/.env
+if grep -q '^AI_LEGAL_GATES=' deploy/compose/.env; then sed -i "s#^AI_LEGAL_GATES=.*#AI_LEGAL_GATES=$LEGAL_GATES#" deploy/compose/.env
+else echo "AI_LEGAL_GATES=$LEGAL_GATES" >> deploy/compose/.env; fi
+echo "AI legal gates: $LEGAL_GATES"
 
 echo "== images"
 if [ -n "$TOKEN" ]; then
   echo "$TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
   "${COMPOSE[@]}" pull -q
+  "${COMPOSE[@]}" --profile ops pull -q backup
 else
   echo "no --ghcr-token: building images from source (10–20 min on first run)"
   COMPOSE+=(-f deploy/compose/docker-compose.build.yml)
   "${COMPOSE[@]}" build -q
+  "${COMPOSE[@]}" --profile ops build -q backup
 fi
 
 echo "== database + storage + application"
@@ -123,7 +133,9 @@ fi
 envv() { grep "^$1=" deploy/compose/.env | tail -1 | cut -d= -f2-; }
 vgw_admin() { "${COMPOSE[@]}" run --rm --no-deps --entrypoint versitygw s3 admin -a "$(envv S3_ROOT_ACCESS_KEY)" -s "$(envv S3_ROOT_SECRET_KEY)" --er http://s3:7071 "$@"; }
 for _ in $(seq 1 30); do vgw_admin list-users >/dev/null 2>&1 && break; sleep 1; done
-for id in "$(envv S3_ACCESS_KEY):$(envv S3_SECRET_KEY)" "$(envv S3_AI_ACCESS_KEY):$(envv S3_AI_SECRET_KEY)"; do
+# The backup identity writes the encrypted database backups (bucket BACKUP_S3_BUCKET, versioned + Object Lock). In this
+# demo it lives in the same bundled store; production keeps backups on a separate site (docs/BACKUP-RESTORE-RUNBOOK.md).
+for id in "$(envv S3_ACCESS_KEY):$(envv S3_SECRET_KEY)" "$(envv S3_AI_ACCESS_KEY):$(envv S3_AI_SECRET_KEY)" "$(envv BACKUP_S3_ACCESS_KEY):$(envv BACKUP_S3_SECRET_KEY)"; do
   if vgw_admin list-users 2>/dev/null | grep -q "${id%%:*}"; then echo "s3 identity ${id%%:*}: present"
   else vgw_admin create-user -a "${id%%:*}" -s "${id#*:}" -r admin >/dev/null && echo "s3 identity ${id%%:*}: created"; fi
 done
@@ -138,6 +150,41 @@ if [ "$AI" = 1 ]; then
   "${COMPOSE[@]}" --profile ai up -d models   # one-shot download + SHA-256 verification of the pinned models
   "${COMPOSE[@]}" --profile ai up -d ai-worker
 fi
+
+echo "== backups"
+# Nightly encrypted database backup (scripts/backup/pg-backup.sh in the backup image): each run is recorded in
+# backup_runs and shown under System health → Backups. Compose has no scheduler, so a systemd timer runs it.
+cat > /etc/systemd/system/ksp-backup.service <<UNIT
+[Unit]
+Description=KSP VMS nightly encrypted database backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=$DIR
+ExecStart=/usr/bin/env ${COMPOSE[*]} --profile ops run --rm backup
+TimeoutStartSec=2h
+UNIT
+cat > /etc/systemd/system/ksp-backup.timer <<UNIT
+[Unit]
+Description=KSP VMS nightly database backup (01:30 IST)
+
+[Timer]
+OnCalendar=*-*-* 20:00:00 UTC
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now ksp-backup.timer >/dev/null
+# First run now when no backup has succeeded in the last 26 h (the System health threshold), so the status appears at once.
+ok_recent=$("${COMPOSE[@]}" exec -T postgres psql -U postgres -d "$PG_DB" -tAc "select count(*) from backup_runs where status = 'SUCCEEDED' and finished_at > now() - interval '26 hours'" 2>/dev/null | tr -d '[:space:]' || true)
+if [ "${ok_recent:-0}" = 0 ]; then systemctl start --no-block ksp-backup.service && echo "backup: first run started (journalctl -u ksp-backup)"
+else echo "backup: a successful run in the last 26 h is recorded"; fi
+echo "backup schedule: $(systemctl list-timers ksp-backup.timer --no-legend 2>/dev/null | awk '{print $1, $2, $3}')"
 
 # ready = web tier answers and the API container's own HEALTHCHECK (/health/live) reports healthy
 for _ in $(seq 1 90); do

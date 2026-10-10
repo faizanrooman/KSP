@@ -40,12 +40,29 @@ export function buildUrl(path: string, query?: Query): string {
   return url.pathname + url.search;
 }
 
+/**
+ * Idle timeout (tender req 67): only requests that follow real user activity keep the session alive. Requests made
+ * more than ACTIVE_WINDOW_MS after the last click / key / scroll / touch (dashboard auto-refresh, notification polling,
+ * job progress polling …) carry BACKGROUND_HEADER and the API does not extend the idle deadline for them.
+ * Work the user started and is waiting for (an upload in progress, a video playing) calls markUserActivity().
+ */
+export const BACKGROUND_HEADER = 'x-ksp-background';
+const ACTIVE_WINDOW_MS = 60_000;
+let lastActivity = Date.now();
+export function markUserActivity(): void {
+  lastActivity = Date.now();
+}
+if (typeof window !== 'undefined') {
+  for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const) window.addEventListener(ev, markUserActivity, { passive: true, capture: true });
+}
+const isBackground = () => Date.now() - lastActivity > ACTIVE_WINDOW_MS;
+
 let refreshing: Promise<boolean> | null = null;
 async function refreshSession(): Promise<boolean> {
   refreshing ??= fetch(`${API_PREFIX}/auth/refresh`, {
     method: 'POST',
     credentials: 'same-origin',
-    headers: { 'content-type': 'application/json', [CSRF_HEADER]: readCookie(CSRF_COOKIE) ?? '' },
+    headers: { 'content-type': 'application/json', [CSRF_HEADER]: readCookie(CSRF_COOKIE) ?? '', ...(isBackground() ? { [BACKGROUND_HEADER]: '1' } : {}) },
     body: '{}',
   })
     .then((r) => r.ok)
@@ -68,7 +85,7 @@ export interface RequestOptions {
 }
 
 export async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = { accept: 'application/json', ...(opts.headers ?? {}) };
+  const headers: Record<string, string> = { accept: 'application/json', ...(isBackground() ? { [BACKGROUND_HEADER]: '1' } : {}), ...(opts.headers ?? {}) };
   let body: BodyInit | undefined;
   if (opts.raw !== undefined) {
     body = opts.raw;

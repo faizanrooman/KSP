@@ -37,8 +37,8 @@ beforeAll(async () => {
   app = await getApp();
   await app.db
     .insertInto('system_settings')
-    .values({ key: 'sessionPolicy', value: JSON.stringify({ requireMfaForRoles: [] }) })
-    .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify({ requireMfaForRoles: [] }) }))
+    .values({ key: 'sessionPolicy', value: JSON.stringify({ requireMfaForRoles: [], mfaForPrivilegedPermissions: false }) })
+    .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify({ requireMfaForRoles: [], mfaForPrivilegedPermissions: false }) }))
     .execute();
   invalidateSettings();
   tmp = await mkdtemp(join(process.env.KSP_TEST_TMP ?? tmpdir(), 'ksp-media-api-'));

@@ -31,6 +31,7 @@ KSP_BRANCH=$BRANCH
 KSP_GITHUB_REPO=rooman-itsd/KSP
 KSP_REQUIRED_WORKFLOW=ci
 # KSP_GITHUB_TOKEN=   # optional (higher API rate limit / private repository): fine-grained token, Actions: read
+# KSP_INSTALL_ARGS="--ai-legal-gates off"   # optional extra install-in-lxc.sh flags for every deployment
 ENV
 chmod 600 /etc/ksp-autodeploy.env
 

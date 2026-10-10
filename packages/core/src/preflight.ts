@@ -120,6 +120,20 @@ export function staticPreflight(cfg: AppConfig, service: PreflightService, env: 
       if (cfg.OBJECT_LOCK_MODE === 'GOVERNANCE' && cfg.OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE) warn('OBJECT_LOCK_MODE', 'OBJECT_LOCK_MODE=GOVERNANCE accepted by OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE: privileged storage credentials can shorten retention', 'record the custodian decision (EXT-8)');
       else err('OBJECT_LOCK_MODE', `OBJECT_LOCK_MODE=${cfg.OBJECT_LOCK_MODE}; originals must be locked in COMPLIANCE mode`, 'OBJECT_LOCK_MODE=COMPLIANCE (or, by custodian decision, OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE=true)');
     }
+    // Governance-bypass deletes (disposal, tier moves) only with the worker's separate disposal identity: the API's
+    // credential must not be able to remove locked originals (deploy/s3/policies/app.json denies the bypass).
+    const disposalKey = cfg.S3_DISPOSAL_ACCESS_KEY && cfg.S3_DISPOSAL_SECRET_KEY;
+    if (disposalKey && cfg.S3_DISPOSAL_ACCESS_KEY === cfg.S3_ACCESS_KEY) err('S3_DISPOSAL_IDENTITY', 'S3_DISPOSAL_ACCESS_KEY is the application S3 identity', 'create a separate identity with deploy/s3/policies/disposal.json');
+    if (service === 'api' && disposalKey && isProdTier) err('S3_DISPOSAL_IDENTITY', 'the API process holds the disposal S3 identity', 'give S3_DISPOSAL_* to the worker only');
+    if ((service === 'worker' || service === 'all') && cfg.OBJECT_LOCK_MODE === 'GOVERNANCE' && !disposalKey) {
+      (isProdTier ? err : warn)('S3_DISPOSAL_IDENTITY', 'no separate disposal S3 identity: governance-bypass deletes would use the application identity', 'S3_DISPOSAL_ACCESS_KEY / S3_DISPOSAL_SECRET_KEY (worker only; deploy/s3/policies/disposal.json)');
+    }
+    // Encryption at rest (§6/§71): server-side encryption of every object, or a recorded infrastructure decision.
+    if (cfg.S3_SSE === 'aws:kms' && !cfg.S3_SSE_KMS_KEY_ID) err('S3_SSE', 'S3_SSE=aws:kms without S3_SSE_KMS_KEY_ID', 'set the KMS key id');
+    if (cfg.S3_SSE === 'none') {
+      if (isProdTier && !cfg.STORAGE_ENCRYPTION_AT_REST) err('STORAGE_ENCRYPTION', 'objects are written without server-side encryption (S3_SSE=none) and no infrastructure encryption is recorded', 'S3_SSE=AES256|aws:kms, or STORAGE_ENCRYPTION_AT_REST=infrastructure when the store/volumes encrypt');
+      else warn('STORAGE_ENCRYPTION', `S3_SSE=none${cfg.STORAGE_ENCRYPTION_AT_REST ? ' — encryption at rest provided by the infrastructure (recorded)' : ': objects are not server-side encrypted by the application'}`, 'S3_SSE=AES256|aws:kms');
+    }
     const s3 = weakSecretReason(cfg.S3_SECRET_KEY, 20);
     if (s3) err('DEV_SECRET_S3', `S3_SECRET_KEY ${s3}`, 'use the production application identity');
     if (KNOWN_DEV_VALUES.includes(cfg.S3_ACCESS_KEY.toLowerCase())) err('DEV_SECRET_S3', 'S3_ACCESS_KEY is a known development value');
@@ -143,7 +157,13 @@ export function staticPreflight(cfg: AppConfig, service: PreflightService, env: 
     const bad = origins.filter((o) => !o.startsWith('https://') || o === '*');
     if (bad.length) err('CORS_HTTPS', `CORS_ORIGINS contains non-https origins: ${bad.join(', ')}`, 'list only the https origin(s) of the SPA');
     if (!cfg.TRUST_PROXY) warn('TRUST_PROXY', 'TRUST_PROXY=false: client IPs in the audit trail will be the ingress address', 'TRUST_PROXY=true behind the ingress');
-    if (!cfg.ALLOWED_NETWORKS.trim()) warn('ALLOWED_NETWORKS', 'ALLOWED_NETWORKS is empty: the staff API answers from any network (tender §50 expects authorised internal networks only)', 'ALLOWED_NETWORKS=<KSP/VPN CIDRs>; the share portal and tokenised media stay exempt');
+    if (!cfg.ALLOWED_NETWORKS.trim()) {
+      const msg = 'ALLOWED_NETWORKS is empty: the staff API answers from any network (tender §50 expects authorised internal networks only)';
+      if (isProdTier && !cfg.ALLOWED_NETWORKS_WAIVED) err('ALLOWED_NETWORKS', msg, 'ALLOWED_NETWORKS=<KSP/VPN CIDRs> (or, by recorded decision, ALLOWED_NETWORKS_WAIVED=perimeter)');
+      else warn('ALLOWED_NETWORKS', `${msg}${cfg.ALLOWED_NETWORKS_WAIVED ? ' — waived: perimeter firewall only' : ''}`, 'ALLOWED_NETWORKS=<KSP/VPN CIDRs>; the share portal and tokenised media stay exempt');
+    } else if (!cfg.TRUST_PROXY && isProdTier) {
+      err('ALLOWED_NETWORKS_PROXY', 'ALLOWED_NETWORKS is set but TRUST_PROXY=false: behind the ingress every request carries the ingress address', 'TRUST_PROXY=true behind the ingress');
+    }
     if ((cfg.RATE_LIMIT_STORE ?? 'postgres') === 'memory') {
       if ((cfg.KSP_EXPECTED_API_REPLICAS ?? 2) > 1) err('RATE_LIMIT_STORE', 'RATE_LIMIT_STORE=memory with more than one API replica (or KSP_EXPECTED_API_REPLICAS unset): limits are per replica', 'RATE_LIMIT_STORE=postgres (default)');
       else warn('RATE_LIMIT_STORE', 'RATE_LIMIT_STORE=memory (single replica declared)');
@@ -219,11 +239,15 @@ export async function databasePreflight(db: Database, cfg: AppConfig, service: P
   else if (fixtures.length) warn('FIXTURE_INTEGRATION', `disabled fixture integration systems exist: ${fixtures.map((f) => f.code).join(', ')}`);
 
   // Settings that encode human decisions.
+  const isProdTier = (cfg.KSP_ENVIRONMENT ?? (cfg.NODE_ENV === 'production' ? 'production' : cfg.NODE_ENV)) === 'production';
   const rows = await db.selectFrom('system_settings').select(['key', 'value']).where('key', 'in', ['sessionPolicy', 'aiLegalApprovals', 'exportLegalApproval']).execute();
   const get = (k: string) => rows.find((x) => x.key === k)?.value as Record<string, unknown> | undefined;
-  const session = { ...DEFAULT_SETTINGS.sessionPolicy, ...(get('sessionPolicy') ?? {}) } as { requireMfaForRoles: string[] };
+  const session = { ...DEFAULT_SETTINGS.sessionPolicy, ...(get('sessionPolicy') ?? {}) } as { requireMfaForRoles: string[]; mfaForPrivilegedPermissions?: boolean };
+  const privilegedMfa = session.mfaForPrivilegedPermissions !== false;
   const missingMfa = ['SYSTEM_ADMINISTRATOR', 'SUPERVISOR', 'AUDITOR', 'EVIDENCE_CUSTODIAN'].filter((c) => !session.requireMfaForRoles.includes(c));
-  if (missingMfa.length) warn('MFA_POLICY', `MFA is not mandatory for: ${missingMfa.join(', ')}`, 'Settings → Session policy');
+  if (!privilegedMfa) (isProdTier ? err : warn)('MFA_PRIVILEGED', 'MFA for roles holding administrative / approval rights is switched off', 'Settings → Sessions & MFA');
+  if (!session.requireMfaForRoles.includes('SYSTEM_ADMINISTRATOR') && isProdTier) err('MFA_ADMIN', 'MFA is not mandatory for SYSTEM_ADMINISTRATOR', 'Settings → Sessions & MFA');
+  if (missingMfa.length && !privilegedMfa) warn('MFA_POLICY', `MFA is not mandatory for: ${missingMfa.join(', ')}`, 'Settings → Session policy');
   const approvals = { ...DEFAULT_SETTINGS.aiLegalApprovals, ...(get('aiLegalApprovals') ?? {}) } as Record<string, unknown>;
   const enabled = enabledAiTasks(cfg);
   for (const t of LEGALLY_GATED_AI_TASKS) {

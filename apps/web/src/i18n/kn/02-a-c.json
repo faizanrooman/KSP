@@ -371,5 +371,9 @@
   "e.g. PATROL, TRAFFIC, RAID": "ಉದಾ. PATROL, TRAFFIC, RAID",
   "e.g. Public Prosecutor, the court's evidence clerk": "ಉದಾ. ಸರ್ಕಾರಿ ಅಭಿಯೋಜಕರು, ನ್ಯಾಯಾಲಯದ ಸಾಕ್ಷ್ಯ ಗುಮಾಸ್ತರು",
   "e.g. Suspect enters frame": "ಉದಾ. ಶಂಕಿತ ಫ್ರೇಮ್‌ಗೆ ಪ್ರವೇಶಿಸುತ್ತಾನೆ",
-  "e.g. TRAFFIC, PUBLIC_ORDER": "ಉದಾ. TRAFFIC, PUBLIC_ORDER"
+  "e.g. TRAFFIC, PUBLIC_ORDER": "ಉದಾ. TRAFFIC, PUBLIC_ORDER",
+  "AI_LEGAL_GATES=off: face detection, face recognition and number plate recognition run without a recorded approval. Set AI_LEGAL_GATES=enforce (the default) so these tasks stay disabled until their approval is recorded here.": "AI_LEGAL_GATES=off: ಮುಖ ಪತ್ತೆ, ಮುಖ ಗುರುತಿಸುವಿಕೆ ಮತ್ತು ನಂಬರ್ ಪ್ಲೇಟ್ ಗುರುತಿಸುವಿಕೆ ದಾಖಲಿತ ಅನುಮೋದನೆ ಇಲ್ಲದೆಯೇ ಚಲಿಸುತ್ತವೆ. ಅನುಮೋದನೆಯನ್ನು ಇಲ್ಲಿ ದಾಖಲಿಸುವವರೆಗೆ ಈ ಕಾರ್ಯಗಳು ನಿಷ್ಕ್ರಿಯವಾಗಿರಲು AI_LEGAL_GATES=enforce (ಡೀಫಾಲ್ಟ್) ಎಂದು ಹೊಂದಿಸಿ.",
+  "{name} can open the items marked “own access” through their own jurisdiction or case access, so this share’s expiry, view limit and download setting do not restrict them. New shares to such recipients are refused.": "“ಸ್ವಂತ ಪ್ರವೇಶ” ಎಂದು ಗುರುತಿಸಿದ ಐಟಂಗಳನ್ನು {name} ತಮ್ಮ ಸ್ವಂತ ವ್ಯಾಪ್ತಿ ಅಥವಾ ಪ್ರಕರಣ ಪ್ರವೇಶದ ಮೂಲಕ ತೆರೆಯಬಹುದು; ಆದ್ದರಿಂದ ಈ ಹಂಚಿಕೆಯ ಅವಧಿ ಮುಕ್ತಾಯ, ವೀಕ್ಷಣೆ ಮಿತಿ ಮತ್ತು ಡೌನ್‌ಲೋಡ್ ಸೆಟ್ಟಿಂಗ್ ಅವುಗಳನ್ನು ನಿರ್ಬಂಧಿಸುವುದಿಲ್ಲ. ಇಂತಹ ಸ್ವೀಕರಿಸುವವರಿಗೆ ಹೊಸ ಹಂಚಿಕೆಗಳನ್ನು ನಿರಾಕರಿಸಲಾಗುತ್ತದೆ.",
+  "Before end of retention": "ಧಾರಣ ಅವಧಿ ಮುಗಿಯುವ ಮೊದಲು",
+  "Court order": "ನ್ಯಾಯಾಲಯದ ಆದೇಶ"
 }

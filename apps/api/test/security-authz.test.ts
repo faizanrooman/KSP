@@ -5,7 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeApp, createUser, getApp, login } from './helpers.js';
-import { auditChainIntact, createAdmin, lastAudit, loginWithMfa, orgId, roleId, type AdminSession } from './admin-helpers.js';
+import { auditChainIntact, createAdmin, enrolMfa, lastAudit, loginWithMfa, orgId, roleId, type AdminSession } from './admin-helpers.js';
 import { sql } from 'kysely';
 import { invalidatePrincipals } from '../src/lib/load-principal.js';
 
@@ -142,6 +142,7 @@ describe('administrator protections', () => {
     const ua = await createUser({ role: 'FIELD_OFFICER', org: 'ksp' });
     expect((await root.agent.post(`/api/v1/users/${ua.id}/roles`, { roleId: role.body.id, orgUnitId: await orgId('ksp') })).status).toBe(201);
     const userAdmin = await login(ua.username, ua.password);
+    await enrolMfa(userAdmin); // users:manage is privileged: MFA is mandatory whatever the role is called
     // Temporarily make `root` the only ACTIVE state-level roles:manage holder.
     const others = await app.db.selectFrom('users as u').innerJoin('user_roles as ur', 'ur.user_id', 'u.id').innerJoin('roles as r', 'r.id', 'ur.role_id').innerJoin('org_units as o', 'o.id', 'ur.org_unit_id')
       .select('u.id').distinct().where('o.parent_id', 'is', null).where('u.status', '=', 'ACTIVE').where('u.id', '<>', root.id)

@@ -52,6 +52,20 @@ describe('share creation rules', () => {
     expect((await meera.post('/api/v1/shares', await internal({ recipientUserId: await userId('io.meera') }))).status).toBe(400);
   });
 
+  it('refuses an internal share the recipient does not need: their own jurisdiction already covers the item', async () => {
+    // sup.kavya supervises Central Division, which includes Cubbon Park: expiry / view limit / download could not apply.
+    const r = await meera.post('/api/v1/shares', await internal({ recipientUserId: await userId('sup.kavya'), maxViews: 1 }));
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe('RECIPIENT_ALREADY_HAS_ACCESS');
+    expect(r.body.error.details.evidenceIds).toEqual([ev.id]);
+    // A recipient outside the jurisdiction gets a share whose limits do apply; the detail flags nothing.
+    const ok = await meera.post('/api/v1/shares', await internal({ maxViews: 1 }));
+    expect(ok.status).toBe(201);
+    const d = await meera.get(`/api/v1/shares/${ok.body.share.id}`);
+    expect(d.body.items.map((i: { recipientHasOwnAccess: boolean }) => i.recipientHasOwnAccess)).toEqual([false]);
+    await meera.post(`/api/v1/shares/${ok.body.share.id}/revoke`, { reason: 'test cleanup' });
+  });
+
   it('allowDownload requires the sharer to hold evidence:download_original', async () => {
     const r = await meera.post('/api/v1/shares', await internal({ allowDownload: true }));
     expect(r.status).toBe(403);

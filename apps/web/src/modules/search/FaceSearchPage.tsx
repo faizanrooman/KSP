@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import type { AiTaskDto } from '@ksp/shared';
 import { ScanFace, Upload } from 'lucide-react';
 import { api } from '@/lib/api';
 import { t } from '@/lib/i18n';
@@ -59,6 +60,11 @@ export function FaceSearchPage() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  // The same deployment / legal gate as face-recognition jobs: show it before the officer uploads a photo.
+  const tasks = useQuery({ queryKey: ['ai', 'tasks'], queryFn: () => api.get<{ items: AiTaskDto[] }>('/ai/tasks'), staleTime: 60_000 });
+  const recognition = tasks.data?.items.find((x) => x.task === 'FACE_RECOGNITION');
+  const blocked = recognition?.allowed === false;
+
   const create = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error(t('Choose a photo first'));
@@ -84,6 +90,7 @@ export function FaceSearchPage() {
       <PageHeader title={t('Suspect search by face')} subtitle={t('Upload a photograph of a person; every face detected in the evidence repository is compared and the closest matches you are allowed to see are listed. Matches are AI suggestions until a reviewer confirms them.')} />
       <div className="grid gap-5 lg:grid-cols-[22rem_1fr]">
         <Card title={t('Probe photograph')}>
+          {blocked && <Alert tone="amber" title={t('Face search is not available')}>{recognition?.gate.explanation}</Alert>}
           <form
             className="space-y-3"
             onSubmit={(e) => {
@@ -108,7 +115,7 @@ export function FaceSearchPage() {
             <Field label={t('Similarity threshold (optional)')} htmlFor="fs-thr" hint={t('0–1; leave empty to use the model default. Lower values return more, weaker matches.')}>
               <Input id="fs-thr" inputMode="decimal" value={threshold} onChange={(e) => setThreshold(e.target.value)} placeholder={t('model default')} />
             </Field>
-            <Button type="submit" className="w-full" loading={create.isPending} disabled={!file} icon={<ScanFace className="h-4 w-4" aria-hidden />}>
+            <Button type="submit" className="w-full" loading={create.isPending} disabled={!file || blocked} icon={<ScanFace className="h-4 w-4" aria-hidden />}>
               {t('Search repository')}
             </Button>
             {create.error ? <Alert tone="red">{(create.error as Error).message}</Alert> : null}

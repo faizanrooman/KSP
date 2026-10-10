@@ -384,11 +384,17 @@ export interface Devices {
 }
 
 export interface DisposalRequests {
+  authority_date: Timestamp | null;
   authority_ref: string | null;
+  authority_type: string | null;
   created_at: Generated<Timestamp>;
   decided_at: Timestamp | null;
   decided_by: string | null;
   decision_note: string | null;
+  /**
+   * true = requested before evidence.retain_until (or retention indefinite): requires a COURT_ORDER / GOVERNMENT_ORDER authority
+   */
+  early: Generated<boolean>;
   evidence_id: string;
   executed_at: Timestamp | null;
   execution_attempts: Generated<number>;
@@ -397,6 +403,7 @@ export interface DisposalRequests {
   id: Generated<string>;
   reason: string;
   requested_by: string;
+  retain_until_at_request: Timestamp | null;
   status: Generated<string>;
 }
 
@@ -1051,6 +1058,10 @@ export interface Users {
   mfa_pending_secret_enc: string | null;
   mfa_recovery_codes: Generated<string[]>;
   mfa_secret_enc: string | null;
+  /**
+   * true = the user enabled MFA while none of their roles required it; challenged at sign-in regardless of the role policy
+   */
+  mfa_self_enrolled: Generated<boolean>;
   must_change_password: Generated<boolean>;
   password_changed_at: Timestamp | null;
   password_hash: string | null;

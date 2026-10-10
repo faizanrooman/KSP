@@ -111,6 +111,11 @@ export interface DisposalRequest {
   requestedBy: Ref;
   reason: string;
   authorityRef: string | null;
+  authorityType: 'RETENTION_EXPIRED' | 'COURT_ORDER' | 'GOVERNMENT_ORDER' | null;
+  authorityDate: string | null;
+  /** Requested before the end of retention (or with indefinite retention): authorised by a court / government order. */
+  early: boolean;
+  retainUntilAtRequest: string | null;
   status: string;
   decidedBy: Ref | null;
   decidedAt: string | null;

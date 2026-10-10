@@ -33,6 +33,10 @@ x-app-env: &app-env
   DATABASE_TLS_WAIVED: ${DATABASE_TLS_WAIVED:-false}
   OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE: ${OBJECT_LOCK_MODE_ACCEPT_GOVERNANCE:-false}
   ALLOWED_NETWORKS: ${ALLOWED_NETWORKS:-}
+  ALLOWED_NETWORKS_WAIVED: ${ALLOWED_NETWORKS_WAIVED:-}
+  S3_SSE: ${S3_SSE:-none}
+  S3_SSE_KMS_KEY_ID: ${S3_SSE_KMS_KEY_ID:-}
+  STORAGE_ENCRYPTION_AT_REST: ${STORAGE_ENCRYPTION_AT_REST:-}
   AI_TASKS_ENABLED: ${AI_TASKS_ENABLED:-}        # empty = production default task list
   AI_LEGAL_GATES: ${AI_LEGAL_GATES:-enforce}      # demo: off (or record approvals in Settings → Legal approvals)
   DATABASE_URL: postgres://ksp_app:${KSP_APP_DB_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-ksp}
@@ -201,6 +205,9 @@ services:
       <<: *app-env
       FFMPEG_PATH: /usr/local/bin/ffmpeg
       FFPROBE_PATH: /usr/local/bin/ffprobe
+      # Governance-bypass deletes (authorised disposal, tier moves) — the worker only, never the API.
+      S3_DISPOSAL_ACCESS_KEY: ${S3_DISPOSAL_ACCESS_KEY:-}
+      S3_DISPOSAL_SECRET_KEY: ${S3_DISPOSAL_SECRET_KEY:-}
     secrets: *app-secrets
     volumes:
       # Transcoding scratch space: sized for the largest expected upload x WORKER_CONCURRENCY x ~2.

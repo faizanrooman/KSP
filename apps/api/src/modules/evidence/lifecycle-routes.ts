@@ -11,7 +11,7 @@ import { appendAudit, enqueue, type AuditActor, type Database } from '@ksp/core'
 import { QUEUES, type DisposalExecutePayload, type FixityCheckPayload, type QueueName, type TierMigratePayload } from '@ksp/shared';
 import { evidenceVisibleSql, loadEvidenceFor } from '../../lib/access.js';
 import { hasPermission, hasPermissionAt, type Principal } from '../../lib/principal.js';
-import { conflict, forbidden, notFound } from '../../lib/errors.js';
+import { AppError, conflict, forbidden, notFound, validationFailed } from '../../lib/errors.js';
 import { openCaseLinks, retainUntilSql, setStorageLegalHold } from './lifecycle.js';
 
 const idParams = z.object({ id: z.string().uuid() });
@@ -35,6 +35,10 @@ function disposalDto(r: DisposalRow, p: Principal) {
     requestedBy: { id: r.requested_by, fullName: r.req_name },
     reason: r.reason,
     authorityRef: r.authority_ref,
+    authorityType: r.authority_type,
+    authorityDate: r.authority_date,
+    early: r.early,
+    retainUntilAtRequest: r.retain_until_at_request,
     status: r.status,
     decidedBy: r.decided_by ? { id: r.decided_by, fullName: r.dec_name } : null,
     decidedAt: r.decided_at,
@@ -58,7 +62,7 @@ function disposalQuery(db: Database) {
     .innerJoin('users as rq', 'rq.id', 'dr.requested_by')
     .leftJoin('users as dc', 'dc.id', 'dr.decided_by')
     .select([
-      'dr.id', 'dr.evidence_id', 'dr.requested_by', 'dr.reason', 'dr.authority_ref', 'dr.status', 'dr.decided_by', 'dr.decided_at', 'dr.decision_note',
+      'dr.id', 'dr.evidence_id', 'dr.requested_by', 'dr.reason', 'dr.authority_ref', 'dr.authority_type', 'dr.authority_date', 'dr.early', 'dr.retain_until_at_request', 'dr.status', 'dr.decided_by', 'dr.decided_at', 'dr.decision_note',
       'dr.executed_at', 'dr.execution_attempts', 'dr.execution_error', 'dr.execution_result', 'dr.created_at',
       'e.evidence_number', 'e.title', 'e.status as ev_status', 'e.legal_hold', 'e.org_path', 'o.id as org_id', 'o.name as org_name',
       'rq.full_name as req_name', 'dc.full_name as dec_name',
@@ -262,19 +266,34 @@ export default async function lifecycleRoutes(fastify: FastifyInstance) {
   });
 
   app.post('/:id/disposal-requests', {
-    schema: { tags: ['evidence-lifecycle'], summary: 'Request authorised disposal (requires a different approver)', params: idParams, body: z.object({ reason: z.string().trim().min(10).max(4000), authorityRef: z.string().trim().min(1).max(300) }).strict() },
+    schema: {
+      tags: ['evidence-lifecycle'], summary: 'Request authorised disposal (requires a different approver; before the end of retention only with a court / government order)', params: idParams,
+      body: z.object({
+        reason: z.string().trim().min(10).max(4000), authorityRef: z.string().trim().min(1).max(300),
+        authorityType: z.enum(['COURT_ORDER', 'GOVERNMENT_ORDER']).optional(), authorityDate: z.coerce.date().optional(),
+      }).strict(),
+    },
   }, async (req, reply) => {
     const p = req.requirePrincipal();
     const ev = await loadEvidenceFor(app.db, p, req.params.id, 'evidence:dispose_request', req.actor());
     const created = await app.db.transaction().execute(async (tx) => {
-      const cur = await tx.selectFrom('evidence').select(['status', 'legal_hold']).where('id', '=', ev.id).forUpdate().executeTakeFirstOrThrow();
+      const cur = await tx.selectFrom('evidence').select(['status', 'legal_hold', 'retain_until']).where('id', '=', ev.id).forUpdate().executeTakeFirstOrThrow();
       if (cur.status !== 'REGISTERED') throw conflict(cur.status === 'DISPOSAL_PENDING' ? 'A disposal request is already open for this evidence' : `Evidence in status ${cur.status} cannot be disposed`);
       if (cur.legal_hold) throw conflict('Evidence is under legal hold and cannot be disposed');
       const open = await openCaseLinks(tx, ev.id);
       if (open.length) throw conflict(`Evidence is linked to open case(s): ${open.map((c) => c.case_number).join(', ')}`);
-      const row = await tx.insertInto('disposal_requests').values({ evidence_id: ev.id, requested_by: p.userId!, reason: req.body.reason, authority_ref: req.body.authorityRef }).returning('id').executeTakeFirstOrThrow();
+      // Before the end of retention (or with indefinite retention) only a court or government order authorises disposal.
+      const early = !cur.retain_until || cur.retain_until > new Date();
+      if (early && (!req.body.authorityType || !req.body.authorityDate)) {
+        throw new AppError(409, 'RETENTION_NOT_ENDED', `Retention ${cur.retain_until ? `runs until ${cur.retain_until.toISOString().slice(0, 10)}` : 'is indefinite'}: disposal before then needs a court or government order — give its type, reference and date`, { retainUntil: cur.retain_until?.toISOString() ?? null });
+      }
+      if (req.body.authorityDate && req.body.authorityDate > new Date()) throw validationFailed('authorityDate cannot be in the future');
+      const row = await tx.insertInto('disposal_requests').values({
+        evidence_id: ev.id, requested_by: p.userId!, reason: req.body.reason, authority_ref: req.body.authorityRef,
+        early, retain_until_at_request: cur.retain_until, authority_type: early ? req.body.authorityType! : (req.body.authorityType ?? 'RETENTION_EXPIRED'), authority_date: req.body.authorityDate ?? null,
+      }).returning('id').executeTakeFirstOrThrow();
       await tx.updateTable('evidence').set({ status: 'DISPOSAL_PENDING', status_reason: 'Disposal requested' }).where('id', '=', ev.id).execute();
-      await appendAudit(tx, req.actor(), { action: 'EVIDENCE_DISPOSAL_REQUESTED', resourceType: 'disposal_request', resourceId: row.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { reason: req.body.reason, authorityRef: req.body.authorityRef } });
+      await appendAudit(tx, req.actor(), { action: 'EVIDENCE_DISPOSAL_REQUESTED', resourceType: 'disposal_request', resourceId: row.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { reason: req.body.reason, authorityRef: req.body.authorityRef, authorityType: req.body.authorityType ?? null, authorityDate: req.body.authorityDate?.toISOString().slice(0, 10) ?? null, early, retainUntil: cur.retain_until?.toISOString() ?? null } });
       return row;
     });
     const row = await disposalQuery(app.db).where('dr.id', '=', created.id).executeTakeFirstOrThrow();
@@ -294,7 +313,7 @@ export default async function lifecycleRoutes(fastify: FastifyInstance) {
     }
   }
 
-  const decisionBody = z.object({ note: z.string().trim().min(3).max(4000) }).strict();
+  const decisionBody = z.object({ note: z.string().trim().min(3).max(4000), confirmEarly: z.boolean().optional() }).strict();
 
   app.post('/disposal-requests/:requestId/approve', { schema: { tags: ['evidence-lifecycle'], summary: 'Approve a disposal request (approver must differ from requester; blocked by legal hold)', params: reqParams, body: decisionBody } }, async (req) => {
     const p = req.requirePrincipal();
@@ -303,12 +322,13 @@ export default async function lifecycleRoutes(fastify: FastifyInstance) {
       const dr = await tx.selectFrom('disposal_requests').selectAll().where('id', '=', requestId).forUpdate().executeTakeFirstOrThrow();
       if (dr.status !== 'PENDING') throw conflict(`Request is ${dr.status.toLowerCase()}`);
       if (dr.requested_by === p.userId) throw forbidden('Separation of duties: you cannot approve your own disposal request');
+      if (dr.early && req.body.confirmEarly !== true) throw new AppError(409, 'EARLY_DISPOSAL_CONFIRMATION_REQUIRED', 'This disposal is before the end of the retention period: confirm that the court / government order has been checked (confirmEarly)');
       const cur = await tx.selectFrom('evidence').select(['legal_hold', 'status']).where('id', '=', ev.id).forUpdate().executeTakeFirstOrThrow();
       if (cur.legal_hold) throw conflict('Evidence is under legal hold; release the hold before approving disposal');
       const open = await openCaseLinks(tx, ev.id);
       if (open.length) throw conflict(`Evidence is linked to open case(s): ${open.map((c) => c.case_number).join(', ')}`);
       await tx.updateTable('disposal_requests').set({ status: 'APPROVED', decided_by: p.userId, decided_at: new Date(), decision_note: req.body.note }).where('id', '=', requestId).execute();
-      await appendAudit(tx, req.actor(), { action: 'EVIDENCE_DISPOSAL_APPROVED', resourceType: 'disposal_request', resourceId: requestId, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { note: req.body.note } });
+      await appendAudit(tx, req.actor(), { action: 'EVIDENCE_DISPOSAL_APPROVED', resourceType: 'disposal_request', resourceId: requestId, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { note: req.body.note, early: dr.early, ...(dr.early ? { confirmedEarly: true, authorityType: dr.authority_type, authorityRef: dr.authority_ref } : {}) } });
     });
     const payload: DisposalExecutePayload = { disposalRequestId: requestId };
     const job = await queueJob(app.db, QUEUES.DISPOSAL_EXECUTE, 'DISPOSE', payload, { evidenceId: ev.id, singletonKey: `dispose:${requestId}` });
