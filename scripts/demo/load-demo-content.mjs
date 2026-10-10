@@ -205,17 +205,18 @@ async function firOf(api, body) {
   catch (e) {
     if (e.status !== 409) throw e;
     const r = await api.get(`/firs?q=${encodeURIComponent(body.firNumber)}&pageSize=20`);
-    const f = r.items.find((x) => x.firNumber === body.firNumber && x.firYear === body.firYear);
+    // earlier loader versions stored the number with its year ("0412/2026"): match on the displayed number
+    const f = r.items.find((x) => x.firYear === body.firYear && (x.firNumber === body.firNumber || x.displayNumber === `${body.firNumber}/${body.firYear}`));
     if (!f) throw e;
     return f;
   }
 }
-const fir1 = await firOf(meera, { firNumber: '0412/2026', firYear: 2026, orgUnitId: cubbon, registeredAt: '2026-09-29T12:00:00+05:30', actsSections: ['BNS 304(1)'], complainant: 'Smt. Lakshmi R.', briefFacts: 'Gold chain (approx. 25 g) snatched by two persons on a black two-wheeler near Kasturba Road at about 10:05 hrs; complainant pushed to the ground.', placeOfOccurrence: 'Kasturba Road, near Cubbon Park metro', occurredFrom: '2026-09-29T10:05:00+05:30' });
+const fir1 = await firOf(meera, { firNumber: '0412', firYear: 2026, orgUnitId: cubbon, registeredAt: '2026-09-29T12:00:00+05:30', actsSections: ['BNS 304(1)'], complainant: 'Smt. Lakshmi R.', briefFacts: 'Gold chain (approx. 25 g) snatched by two persons on a black two-wheeler near Kasturba Road at about 10:05 hrs; complainant pushed to the ground.', placeOfOccurrence: 'Kasturba Road, near Cubbon Park metro', occurredFrom: '2026-09-29T10:05:00+05:30' });
 const case1 = await meera.post('/cases', { title: 'Chain snatching — Kasturba Road (FIR 0412/2026)', firId: fir1.id });
 await meera.post(`/cases/${case1.id}/evidence`, { evidenceIds: [byTitle('Chain-snatching').id, byTitle('Witness statement').id] });
 for (const body of ['Scene visited at 10:25 hrs; first-responder body-cam footage collected (KSP-FO-1001).', 'Eyewitness statement recorded on BWC-KA-1007; suspect description: two males, black Pulsar, partial plate KA-01.', 'CCTV request sent to Kasturba Road traders association; AI person/vehicle detection requested on scene footage.'])
   await meera.post(`/cases/${case1.id}/notes`, { body });
-const fir2 = await firOf(arjun, { firNumber: '0377/2026', firYear: 2026, orgUnitId: indiranagar, registeredAt: '2026-10-03T02:10:00+05:30', actsSections: ['BNS 115(2)', 'BNS 352'], complainant: 'Sri. Rahul M.', briefFacts: 'Assault outside a pub on 100 Feet Road at about 00:30 hrs; complainant injured; three persons detained at the spot.', placeOfOccurrence: '100 Feet Road, Indiranagar', occurredFrom: '2026-10-03T00:30:00+05:30' });
+const fir2 = await firOf(arjun, { firNumber: '0377', firYear: 2026, orgUnitId: indiranagar, registeredAt: '2026-10-03T02:10:00+05:30', actsSections: ['BNS 115(2)', 'BNS 352'], complainant: 'Sri. Rahul M.', briefFacts: 'Assault outside a pub on 100 Feet Road at about 00:30 hrs; complainant injured; three persons detained at the spot.', placeOfOccurrence: '100 Feet Road, Indiranagar', occurredFrom: '2026-10-03T00:30:00+05:30' });
 const case2 = await arjun.post('/cases', { title: 'Assault — 100 Feet Road (FIR 0377/2026)', firId: fir2.id });
 await arjun.post(`/cases/${case2.id}/evidence`, { evidenceIds: [byTitle('Brawl outside pub').id] });
 await arjun.post(`/cases/${case2.id}/notes`, { body: 'Injured shifted to Bowring hospital; wound certificate awaited. Body-cam footage of the detention linked.' });

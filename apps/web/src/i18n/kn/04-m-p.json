@@ -269,5 +269,6 @@
   "Purpose:": "ಉದ್ದೇಶ:",
   "Not enforced": "ಜಾರಿಯಲ್ಲಿಲ್ಲ",
   "Not enforced on this deployment: runs without an approval.": "ಈ ನಿಯೋಜನೆಯಲ್ಲಿ ಜಾರಿಯಲ್ಲಿಲ್ಲ: ಅನುಮೋದನೆ ಇಲ್ಲದೆಯೇ ಚಲಿಸುತ್ತದೆ.",
-  "own access": "ಸ್ವಂತ ಪ್ರವೇಶ"
+  "own access": "ಸ್ವಂತ ಪ್ರವೇಶ",
+  "Number only, without the year (e.g. 0142)": "ಸಂಖ್ಯೆ ಮಾತ್ರ, ವರ್ಷ ಇಲ್ಲದೆ (ಉದಾ. 0142)"
 }

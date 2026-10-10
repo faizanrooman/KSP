@@ -6,6 +6,7 @@
  * officer to complete and sign by hand. The template is an aid only; it does not claim legal compliance.
  */
 import { createDoc, gap, KSP_KN, finish, fmtBytes, fmtDuration, fmtTime, heading, keyValues, para, table, wrapToken, ensureSpace } from './pdf.js';
+import { firDisplayNumber } from '@ksp/shared';
 import { personLabel, type EvidenceRecord, type PersonRef } from './records.js';
 
 export interface FactSheetItem {
@@ -82,7 +83,7 @@ export async function renderFactSheet(d: FactSheetData): Promise<Buffer> {
       ['Status', c.status],
       ['Court (case record)', [c.courtName, c.courtCaseNumber].filter(Boolean).join(' / ') || null],
       ['Investigating officer', personLabel(c.investigatingOfficer)],
-      ['FIR', c.fir ? `${c.fir.firNumber}/${c.fir.firYear}${c.fir.station ? `, ${c.fir.station}` : ''}, registered ${fmtTime(c.fir.registeredAt)}` : null],
+      ['FIR', c.fir ? `${firDisplayNumber(c.fir.firNumber, c.fir.firYear)}${c.fir.station ? `, ${c.fir.station}` : ''}, registered ${fmtTime(c.fir.registeredAt)}` : null],
       ['Acts / sections', c.fir?.actsSections.join(', ') || null],
       ['Place of occurrence', c.fir?.placeOfOccurrence ?? null],
       ['Brief facts', c.fir?.briefFacts ? c.fir.briefFacts.slice(0, 1500) : null],

@@ -1,6 +1,6 @@
 /** Case read models (camelCase DTOs) and validation helpers shared by the case routes. */
 import { sql } from 'kysely';
-import type { Permission } from '@ksp/shared';
+import { firDisplayNumber, type Permission } from '@ksp/shared';
 import type { Database, Tx } from '@ksp/core';
 import { evidenceVisibleSql } from '../../lib/access.js';
 import type { Principal } from '../../lib/principal.js';
@@ -83,7 +83,7 @@ export async function listCases(db: Database, p: Principal, f: CaseFilters, sort
       status: r.status,
       priority: r.priority,
       orgUnit: { id: r.org_id, name: r.org_name, code: r.org_code },
-      fir: r.fir_id ? { id: r.fir_id, firNumber: r.fir_number, firYear: r.fir_year, displayNumber: `${r.fir_number}/${r.fir_year}` } : null,
+      fir: r.fir_id ? { id: r.fir_id, firNumber: r.fir_number, firYear: r.fir_year, displayNumber: firDisplayNumber(r.fir_number ?? '', r.fir_year ?? 0) } : null,
       investigatingOfficer: person(r.io_id, r.io_name, r.io_badge),
       supervisor: person(r.sv_id, r.sv_name, r.sv_badge),
       evidenceCount: Number(r.evidence_count),
@@ -142,7 +142,7 @@ export async function caseDetail(db: Database, p: Principal, id: string) {
     orgUnitId: r.org_unit_id,
     orgUnit: { id: r.org_unit_id, name: r.org_name, code: r.org_code },
     fir: r.fir_id
-      ? { id: r.fir_id, firNumber: r.fir_number, firYear: r.fir_year, displayNumber: `${r.fir_number}/${r.fir_year}`, status: r.fir_status, actsSections: r.acts_sections, registeredAt: r.fir_registered_at, source: r.fir_source }
+      ? { id: r.fir_id, firNumber: r.fir_number, firYear: r.fir_year, displayNumber: firDisplayNumber(r.fir_number ?? '', r.fir_year ?? 0), status: r.fir_status, actsSections: r.acts_sections, registeredAt: r.fir_registered_at, source: r.fir_source }
       : null,
     investigatingOfficer: person(r.io_id, r.io_name, r.io_badge),
     supervisor: person(r.sv_id, r.sv_name, r.sv_badge),

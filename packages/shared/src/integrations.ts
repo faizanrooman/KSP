@@ -50,3 +50,16 @@ export const FIR_TRANSITIONS: Record<string, readonly string[]> = {
   CLOSED: ['UNDER_INVESTIGATION'],
   TRANSFERRED: [],
 };
+
+/** FIR shown as "<number>/<year>" ("0412" + 2026 → "0412/2026"). A number that already ends with its year (records
+ *  created before normaliseFirNumber) is shown once, never "0412/2026/2026". */
+export function firDisplayNumber(firNumber: string, firYear: number): string {
+  return firNumber.endsWith(`/${firYear}`) ? firNumber : `${firNumber}/${firYear}`;
+}
+
+/** The FIR year is a separate field: a trailing "/<year>" typed into the number ("0412/2026") is removed. */
+export function normaliseFirNumber(firNumber: string, firYear: number): string {
+  const n = firNumber.trim();
+  const suffix = `/${firYear}`;
+  return n.length > suffix.length && n.endsWith(suffix) ? n.slice(0, -suffix.length) : n;
+}
