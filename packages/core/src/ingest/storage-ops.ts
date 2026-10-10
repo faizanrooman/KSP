@@ -52,7 +52,7 @@ export async function wormCopy(
   const lock = lockUntil && storage.cfg.OBJECT_LOCK_MODE !== 'NONE' ? { ObjectLockMode: storage.cfg.OBJECT_LOCK_MODE as 'GOVERNANCE' | 'COMPLIANCE', ObjectLockRetainUntilDate: lockUntil } : {};
   const partSize = Math.max(5 * 1024 * 1024, opts.partSize ?? COPY_PART_SIZE);
   const mp = await storage.s3.send(
-    new CreateMultipartUploadCommand({ Bucket: dst.bucket, Key: dst.key, ContentType: dst.contentType, Metadata: dst.metadata, ...lock }),
+    new CreateMultipartUploadCommand({ Bucket: dst.bucket, Key: dst.key, ContentType: dst.contentType, Metadata: dst.metadata, ...storage.sseParams(), ...lock }),
   );
   const uploadId = mp.UploadId!;
   try {

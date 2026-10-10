@@ -133,8 +133,9 @@ export default fp(async (app) => {
           const principal = await loadUserPrincipal(app.db, session.user_id, session.id, session.mfa_verified);
           if (principal) {
             req.principal = principal;
-            // Sliding idle timeout (throttled writes).
-            if (now.getTime() - session.last_seen_at.getTime() > 60_000) {
+            // Sliding idle timeout (throttled writes). Background requests (auto-refresh / polling sent without recent user
+            // activity, header x-ksp-background) do not extend it, so an unattended screen signs out after the idle timeout.
+            if (req.headers['x-ksp-background'] !== '1' && now.getTime() - session.last_seen_at.getTime() > 60_000) {
               const settings = await getSettings(app.db);
               const idle = new Date(Math.min(session.absolute_expires_at.getTime(), now.getTime() + settings.sessionPolicy.idleTimeoutMinutes * 60_000));
               await app.db.updateTable('sessions').set({ last_seen_at: now, idle_expires_at: idle }).where('id', '=', session.id).execute();

@@ -14,7 +14,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import Hls from 'hls.js';
 import { Camera, FastForward, Keyboard, Loader2, Maximize, Minimize, Pause, Play, Rewind, RotateCcw, StepBack, StepForward, ZoomIn, ZoomOut } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { errorMessage } from '@/lib/api';
+import { errorMessage, markUserActivity } from '@/lib/api';
 import { formatTimecode } from '@/lib/format';
 import { Alert, Button, clsx, ErrorState, ProgressBar, Spinner, useToast } from '@/components/ui';
 import { cueAt, frameOf, parseSpriteVtt, tokenFrom, useCreateSnapshot, usePlayback, withToken, type PlaybackInfo, type SpriteCue } from './api';
@@ -228,8 +228,11 @@ const ReadyPlayer = forwardRef<EvidencePlayerHandle, ReadyProps>(function ReadyP
     const v = videoRef.current;
     if (!v) return;
     let raf = 0;
+    let lastMark = 0;
     const tick = () => {
       const ms = v.currentTime * 1000;
+      // Watching evidence is activity: a playing video keeps the session alive (idle timeout), a paused one does not.
+      if (Date.now() - lastMark > 30_000) { lastMark = Date.now(); markUserActivity(); }
       setTime(ms);
       onTimeRef.current?.(ms);
       if (!v.paused) raf = requestAnimationFrame(tick);

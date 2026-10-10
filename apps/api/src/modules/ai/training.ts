@@ -6,10 +6,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { appendAudit, enqueue } from '@ksp/core';
+import { aiTaskGates, appendAudit, enqueue, loadConfig } from '@ksp/core';
 import { AI_TASKS, QUEUES, type AiTrainingExportPayload } from '@ksp/shared';
-import { scopePaths } from '../../lib/principal.js';
-import { notFound, unprocessable, AppError } from '../../lib/errors.js';
+import { hasPermissionAt, scopePaths } from '../../lib/principal.js';
+import { forbidden, notFound, unprocessable, AppError } from '../../lib/errors.js';
+import { getSettings } from '../../lib/settings.js';
 import { sendObject } from '../media/stream.js';
 
 const idParams = z.object({ id: z.string().uuid() });
@@ -41,7 +42,19 @@ export default async function trainingRoutes(fastify: FastifyInstance) {
       const m = await app.db.selectFrom('ai_models').select(['id', 'task']).where('id', '=', b.modelId).executeTakeFirst();
       if (!m || m.task !== b.task) throw unprocessable('modelId does not exist for this task');
     }
-    const paths = scopePaths(p, 'ai:models_manage');
+    // Biometric / licence-restricted tasks need the same recorded legal approval as running them (EXT-4/EXT-5).
+    const gate = aiTaskGates(loadConfig(), (await getSettings(app.db)).aiLegalApprovals)[b.task];
+    if (!gate.allowed) {
+      await appendAudit(app.db, req.actor(), { action: 'AI_TASK_REFUSED', outcome: 'FAILURE', resourceType: 'ai_training_export', details: { tasks: [b.task], reasons: { [b.task]: gate.reason }, context: 'training-export' } });
+      throw new AppError(422, 'AI_TASK_DISABLED', `Not permitted on this deployment: ${gate.explanation}`, { tasks: [{ task: b.task, reason: gate.reason, explanation: gate.explanation }] });
+    }
+    // A dataset carries evidence crops: only units where the requester may also read evidence are exported, so an
+    // administrator without evidence access (ai:models_manage only) cannot extract face or plate images through it.
+    const paths = scopePaths(p, 'ai:models_manage').filter((path) => hasPermissionAt(p, 'evidence:read', path));
+    if (!paths.length) {
+      await appendAudit(app.db, req.actor(), { action: 'ACCESS_DENIED', outcome: 'DENIED', resourceType: 'ai_training_export', details: { reason: 'training export requires evidence:read where ai:models_manage is held', task: b.task } });
+      throw forbidden('A training dataset contains evidence crops: you need evidence:read at the same units as ai:models_manage');
+    }
     const row = await app.db.transaction().execute(async (tx) => {
       const r = await tx.insertInto('ai_training_exports').values({
         task: b.task, model_id: b.modelId ?? null, created_by: p.userId!,

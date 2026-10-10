@@ -36,6 +36,9 @@ const schema = z.object({
    * (default: the external share portal and health probes).
    */
   ALLOWED_NETWORKS: z.string().default(''),
+  /** `perimeter`: recorded decision that the perimeter firewall alone restricts networks (production preflight then warns
+   *  instead of refusing an empty ALLOWED_NETWORKS). */
+  ALLOWED_NETWORKS_WAIVED: z.enum(['perimeter']).optional(),
   ALLOWED_NETWORKS_EXEMPT_PREFIXES: z.string().default('/api/v1/share-portal,/api/v1/media/stream,/api/v1/media/download,/health'),
 
   DATABASE_URL: z.string().min(1), // ksp_app
@@ -60,6 +63,20 @@ const schema = z.object({
   S3_BUCKET_REPORTS: z.string().default('ksp-reports'),
   /** S3 Object Lock for originals. NONE only permitted outside production. */
   OBJECT_LOCK_MODE: z.enum(['GOVERNANCE', 'COMPLIANCE', 'NONE']).default('GOVERNANCE'),
+  /**
+   * Encryption at rest of every object the application writes (tender §6/§71): `AES256` (store-managed keys, SSE-S3) or
+   * `aws:kms` (+ S3_SSE_KMS_KEY_ID). `none` only with STORAGE_ENCRYPTION_AT_REST=infrastructure in production.
+   */
+  S3_SSE: z.enum(['none', 'AES256', 'aws:kms']).default('none'),
+  S3_SSE_KMS_KEY_ID: z.string().optional(),
+  /** `infrastructure`: the object store / volumes encrypt at rest themselves (recorded decision; preflight warns). */
+  STORAGE_ENCRYPTION_AT_REST: z.enum(['infrastructure']).optional(),
+  /**
+   * Separate S3 identity for governance-bypass deletes (authorised disposal, superseded copies after tier moves). Given to
+   * the worker only — the API's identity has no s3:BypassGovernanceRetention (deploy/s3/policies/disposal.json).
+   */
+  S3_DISPOSAL_ACCESS_KEY: z.string().optional(),
+  S3_DISPOSAL_SECRET_KEY: z.string().optional(),
   OBJECT_LOCK_DAYS: z.coerce.number().int().positive().default(3650),
 
   /** Ed25519 PEM keys for access-token JWTs. */

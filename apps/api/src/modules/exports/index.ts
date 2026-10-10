@@ -29,7 +29,8 @@ import { readZip, verifyExport } from './verify.js';
 export const prefix = '/exports';
 
 export const EXPORT_DOWNLOAD_TTL_SECONDS = 120;
-const STORED = ['REGISTERED', 'DISPOSAL_PENDING'];
+// Items with an open disposal request are not exported (the package would outlive the authorised disposal).
+const STORED = ['REGISTERED'];
 const MAX_VERIFY_BYTES = 100 * 1024 * 1024;
 
 const idParams = z.object({ id: z.string().uuid() });

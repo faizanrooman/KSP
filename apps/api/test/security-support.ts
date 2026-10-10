@@ -47,6 +47,8 @@ export async function buildWorld(app: FastifyInstance): Promise<World> {
   ids.evidence2 = ev2.id;
   const ev3 = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: meeraId, title: `${MARK} dispose` });
   ids.evidence3 = ev3.id;
+  // routine disposal (retention ended); early disposal would need a court / government order
+  await app.db.updateTable('evidence').set({ retain_until: new Date(Date.now() - 86_400_000) }).where('id', '=', ev3.id).execute();
   must('tag', await owner.post(`/api/v1/evidence/${ev.id}/tags`, { tag: 'idor' }));
 
   ids.snapshot = must('snapshot', await owner.post(`/api/v1/media/evidence/${ev.id}/snapshots`, { timeMs: 1000 })).body.id;

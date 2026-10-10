@@ -9,7 +9,7 @@
  *  - after completion, polls until the item is REGISTERED or QUARANTINED.
  */
 import { ALLOWED_UPLOAD_EXTENSIONS, CHUNK_SHA256_HEADER, parseStatusReason, type DeclaredUploadMetadata, type UploadInitResponse, type UploadSessionView } from '@ksp/shared';
-import { ApiError, api, request } from '@/lib/api';
+import { ApiError, api, markUserActivity, request } from '@/lib/api';
 
 export type ItemState =
   | 'ready' | 'hashing' | 'uploading' | 'paused' | 'completing' | 'processing' | 'registered' | 'quarantined' | 'rejected' | 'failed' | 'cancelled';
@@ -324,6 +324,7 @@ export class UploadEngine {
           const buf = await blob.arrayBuffer();
           const sha = await sha256Hex(buf);
           const part = n;
+          markUserActivity(); // an upload in progress is user work: it keeps the session alive (idle timeout)
           await this.withRetry(key, () => request('PUT', `/uploads/${s.id}/parts/${part}`, {
             raw: buf, headers: { 'content-type': 'application/octet-stream', [CHUNK_SHA256_HEADER]: sha }, signal,
           }), signal);

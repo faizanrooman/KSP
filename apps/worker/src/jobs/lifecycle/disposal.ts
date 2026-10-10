@@ -8,7 +8,7 @@
  * between the checks and the storage deletion.
  */
 import { sql } from 'kysely';
-import { appendAudit } from '@ksp/core';
+import { appendAudit, type Storage, type Tx } from '@ksp/core';
 import type { DisposalExecutePayload } from '@ksp/shared';
 import { ProcessingTracker } from '../../lib/processing.js';
 import { ACTOR, errText, listVersions, noopLog, type LifecycleDeps } from './common.js';
@@ -22,6 +22,62 @@ export interface DisposalResult {
 }
 
 class DisposalBlocked extends Error {}
+
+/**
+ * Everything derived from the evidence outside its own prefixes (tender §57/§68): biometric / plate data on AI
+ * detections (the review record itself is kept), face-search results, court export packages and shares that still
+ * expose it, and crops copied into AI training datasets. Runs inside the disposal transaction.
+ */
+async function purgeDependents(tx: Tx, storage: Storage, ev: { id: string; org_unit_id: string }, requestId: string) {
+  const reason = `Evidence disposed under authorised request ${requestId}`;
+  // AI: drop face embeddings, crop references, plate text and watchlist matches; label / review history stay.
+  const ai = await sql<{ id: string }>`UPDATE ai_detections SET embedding = NULL, crop_key = NULL,
+      attributes = COALESCE(attributes, '{}'::jsonb) - 'plateText' - 'watchlistEntryId' - 'watchlistId' - 'similarity' - 'matches'
+    WHERE evidence_id = ${ev.id}::uuid RETURNING id`.execute(tx);
+  const detectionIds = ai.rows.map((r) => r.id);
+  // Repository face searches no longer list the item.
+  const fs = await sql`UPDATE face_searches SET result = (SELECT COALESCE(jsonb_agg(x), '[]'::jsonb) FROM jsonb_array_elements(result) x WHERE x->>'evidenceId' <> ${ev.id})
+    WHERE result IS NOT NULL AND result @> jsonb_build_array(jsonb_build_object('evidenceId', ${ev.id}::text))`.execute(tx);
+  // Court exports containing the item that are not finished or still downloadable: revoked, package deleted.
+  const exports = await tx.selectFrom('exports as x').innerJoin('export_items as xi', 'xi.export_id', 'x.id')
+    .select(['x.id', 'x.status', 'x.bucket', 'x.object_key', 'x.export_number']).where('xi.evidence_id', '=', ev.id)
+    .where('x.status', 'in', ['PENDING_APPROVAL', 'APPROVED', 'PROCESSING', 'READY']).execute();
+  const packageErrors: string[] = [];
+  for (const x of exports) {
+    await tx.updateTable('exports').set({ status: 'REVOKED', revoked_at: new Date(), revoke_reason: reason }).where('id', '=', x.id).execute();
+    await appendAudit(tx, ACTOR, { action: 'EXPORT_REVOKED', resourceType: 'export', resourceId: x.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { reason, previousStatus: x.status, exportNumber: x.export_number, packageDeleted: !!x.object_key } });
+    if (x.bucket && x.object_key) await storage.delete(x.bucket, x.object_key).catch((err) => packageErrors.push(`${x.export_number}: ${errText(err)}`));
+  }
+  // Shares whose every item is now disposed: revoked (the portal already hides disposed items of mixed shares).
+  const shares = await sql<{ id: string }>`UPDATE shares s SET status = 'REVOKED', revoked_at = now(), revoke_reason = ${reason}
+    WHERE s.status IN ('ACTIVE', 'LOCKED') AND EXISTS (SELECT 1 FROM share_items si WHERE si.share_id = s.id AND si.evidence_id = ${ev.id}::uuid)
+      AND NOT EXISTS (SELECT 1 FROM share_items si JOIN evidence e ON e.id = si.evidence_id WHERE si.share_id = s.id AND e.id <> ${ev.id}::uuid AND e.status <> 'DISPOSED')
+    RETURNING s.id`.execute(tx);
+  for (const s of shares.rows) {
+    await appendAudit(tx, ACTOR, { action: 'SHARE_REVOKED', resourceType: 'share', resourceId: s.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id, details: { reason } });
+  }
+  // Crops of this evidence copied into completed AI training datasets.
+  let trainingCrops = 0;
+  if (detectionIds.length) {
+    const sets = await tx.selectFrom('ai_training_exports').select(['bucket', 'object_key']).where('status', '=', 'COMPLETED').where('object_key', 'is not', null).execute();
+    for (const t of sets) {
+      for (const id of detectionIds) {
+        try {
+          if (await storage.head(t.bucket!, `${t.object_key}crops/${id}.jpg`)) {
+            await storage.delete(t.bucket!, `${t.object_key}crops/${id}.jpg`);
+            trainingCrops++;
+          }
+        } catch (err) {
+          packageErrors.push(`training crop ${id}: ${errText(err)}`);
+        }
+      }
+    }
+  }
+  return {
+    aiDetectionsCleared: detectionIds.length, faceSearchesUpdated: Number(fs.numAffectedRows ?? 0), exportsRevoked: exports.length,
+    sharesRevoked: shares.rows.length, trainingCropsDeleted: trainingCrops, ...(packageErrors.length ? { cleanupErrors: packageErrors.slice(0, 20) } : {}),
+  };
+}
 
 export async function runDisposal(deps: LifecycleDeps, payload: DisposalExecutePayload, queueJobId?: string): Promise<DisposalResult> {
   const { db, storage } = deps;
@@ -97,10 +153,11 @@ export async function runDisposal(deps: LifecycleDeps, payload: DisposalExecuteP
       } catch (err) {
         return { failed: true as const, failures: [`derived artefacts: ${errText(err)}`], versionsDeleted, remaining: 0 };
       }
+      const dependents = await purgeDependents(tx, storage, ev, dr.id);
       const now = new Date();
       await tx.updateTable('evidence').set({ status: 'DISPOSED', status_reason: `Disposed under authorised request ${dr.id}`, disposed_at: now }).where('id', '=', ev.id).execute();
       await tx.updateTable('evidence_storage_copies').set({ status: 'DISPOSED', status_note: 'deleted by authorised disposal' }).where('evidence_id', '=', ev.id).where('status', 'in', ['CURRENT', 'RETAINED']).execute();
-      const result = { versionsDeleted, derivedDeleted };
+      const result = { versionsDeleted, derivedDeleted, ...dependents };
       await tx.updateTable('disposal_requests').set({ status: 'EXECUTED', executed_at: now, execution_error: null, execution_result: JSON.stringify(result) }).where('id', '=', dr.id).execute();
       await appendAudit(tx, ACTOR, {
         action: 'EVIDENCE_DISPOSED', resourceType: 'evidence', resourceId: ev.id, evidenceId: ev.id, orgUnitId: ev.org_unit_id,

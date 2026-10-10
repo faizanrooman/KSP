@@ -208,7 +208,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const bodyToken = req.body?.refreshToken;
     const presented = bodyToken ?? req.cookies[REFRESH_COOKIE];
     if (!presented) throw unauthenticated('No refresh token');
-    const result = await rotateRefresh(db, presented);
+    const result = await rotateRefresh(db, presented, { slideIdle: req.headers['x-ksp-background'] !== '1' });
     if (!result.ok) {
       if (result.reason === 'REUSED') {
         invalidatePrincipals(result.userId);

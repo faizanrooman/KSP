@@ -79,10 +79,15 @@ export function RequestDisposalButton({ evidence }: { evidence: EvidenceSummary 
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [authorityRef, setAuthorityRef] = useState('');
+  const [authorityType, setAuthorityType] = useState('');
+  const [authorityDate, setAuthorityDate] = useState('');
   const toast = useToast();
   const refresh = useRefreshEvidence(evidence.id);
   const m = useMutation({
-    mutationFn: () => api.post(`/evidence/${evidence.id}/disposal-requests`, { reason: reason.trim(), authorityRef: authorityRef.trim() }),
+    mutationFn: () => api.post(`/evidence/${evidence.id}/disposal-requests`, {
+      reason: reason.trim(), authorityRef: authorityRef.trim(),
+      ...(authorityType ? { authorityType } : {}), ...(authorityDate ? { authorityDate } : {}),
+    }),
     onSuccess: () => {
       setOpen(false);
       toast.success('Disposal requested — awaiting approval by a different authorised officer');
@@ -92,7 +97,7 @@ export function RequestDisposalButton({ evidence }: { evidence: EvidenceSummary 
   const valid = reason.trim().length >= 10 && authorityRef.trim().length > 0;
   return (
     <>
-      <Button variant="danger" size="sm" icon={<Trash2 className="h-4 w-4" />} onClick={() => { m.reset(); setReason(''); setAuthorityRef(''); setOpen(true); }}>
+      <Button variant="danger" size="sm" icon={<Trash2 className="h-4 w-4" />} onClick={() => { m.reset(); setReason(''); setAuthorityRef(''); setAuthorityType(''); setAuthorityDate(''); setOpen(true); }}>
         {tr('Request disposal')}
       </Button>
       <Modal
@@ -112,6 +117,18 @@ export function RequestDisposalButton({ evidence }: { evidence: EvidenceSummary 
           <Field label={tr('Authority reference')} htmlFor="dr-auth" required hint={tr('Court order, government order or policy reference authorising disposal.')}>
             <Input id="dr-auth" value={authorityRef} onChange={(e) => setAuthorityRef(e.target.value)} maxLength={300} />
           </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={tr('Order type')} htmlFor="dr-type" hint={tr('Required when the retention period has not ended.')}>
+              <Select id="dr-type" value={authorityType} onChange={(e) => setAuthorityType(e.target.value)}>
+                <option value="">{tr('Retention period ended')}</option>
+                <option value="COURT_ORDER">{tr('Court order')}</option>
+                <option value="GOVERNMENT_ORDER">{tr('Government order')}</option>
+              </Select>
+            </Field>
+            <Field label={tr('Order date')} htmlFor="dr-date">
+              <Input id="dr-date" type="date" max={new Date().toISOString().slice(0, 10)} value={authorityDate} onChange={(e) => setAuthorityDate(e.target.value)} />
+            </Field>
+          </div>
           <Field label={tr('Reason')} htmlFor="dr-reason" required hint={tr('At least 10 characters; recorded in the chain of custody.')}>
             <Textarea id="dr-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={4000} />
           </Field>

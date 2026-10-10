@@ -31,7 +31,7 @@ function assertNoStorageLeak(body: unknown, evs: CreatedEvidence[]) {
 
 beforeAll(async () => {
   app = await evidenceTestSetup();
-  for (const u of ['fo.ravi', 'op.cubbon', 'io.meera', 'io.arjun', 'sup.kavya', 'aud.suresh', 'ec.latha', 'admin']) U[u] = await userId(u);
+  for (const u of ['fo.ravi', 'op.cubbon', 'io.meera', 'io.arjun', 'sup.kavya', 'aud.suresh', 'ec.latha', 'admin', 'io.mysuru']) U[u] = await userId(u);
   A = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: U['fo.ravi']!, officerId: U['fo.ravi']!, title: 'Traffic stop MG Road', category: 'TRAFFIC', gps: { lat: 12.9763, lon: 77.5929 } });
   B = await createRegisteredEvidence({ orgCode: 'ps_indiranagar', uploadedBy: U['io.arjun']!, title: 'Indiranagar market altercation' });
   C = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: U['op.cubbon']!, title: 'Station bulk upload clip' });
@@ -308,9 +308,33 @@ describe('integrity', () => {
 
 describe('disposal (separation of duties)', () => {
   const reason = 'Retention period elapsed; no case linkage';
+  /** Routine disposal happens after the retention period: move retain_until into the past for the test item. */
+  const retentionEnded = async (E: { id: string }) => { await app.db.updateTable('evidence').set({ retain_until: new Date(Date.now() - 86_400_000) }).where('id', '=', E.id).execute(); };
+
+  it('before the end of retention only a court / government order authorises disposal; the approver must confirm it', async () => {
+    const E = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: U['op.cubbon']! });
+    const latha = await as('ec.latha');
+    const plain = await latha.post(url(E, '/disposal-requests'), { reason, authorityRef: 'GO-EARLY-1' });
+    expect(plain.status).toBe(409);
+    expect(plain.body.error.code).toBe('RETENTION_NOT_ENDED');
+    const today = new Date().toISOString().slice(0, 10);
+    const r = await latha.post(url(E, '/disposal-requests'), { reason, authorityRef: 'CC 812/2026, ACMM Bengaluru', authorityType: 'COURT_ORDER', authorityDate: today });
+    expect(r.status, r.raw).toBe(201);
+    expect(r.body).toMatchObject({ early: true, authorityType: 'COURT_ORDER' });
+    expect(new Date(r.body.retainUntilAtRequest).getTime()).toBeGreaterThan(Date.now()); // default policy: 7 years
+    const kavya = await as('sup.kavya');
+    const unconfirmed = await kavya.post(`/api/v1/evidence/disposal-requests/${r.body.id}/approve`, { note: 'Order seen' });
+    expect(unconfirmed.status).toBe(409);
+    expect(unconfirmed.body.error.code).toBe('EARLY_DISPOSAL_CONFIRMATION_REQUIRED');
+    const ok = await kavya.post(`/api/v1/evidence/disposal-requests/${r.body.id}/approve`, { note: 'Order CC 812/2026 verified', confirmEarly: true });
+    expect(ok.status).toBe(200);
+    const audit = await app.db.selectFrom('audit_events').select('details').where('action', '=', 'EVIDENCE_DISPOSAL_APPROVED').where('resource_id', '=', r.body.id).executeTakeFirstOrThrow();
+    expect(audit.details).toMatchObject({ early: true, confirmedEarly: true, authorityType: 'COURT_ORDER' });
+  });
 
   it('enforces permissions, legal hold and single open request', async () => {
     const E = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: U['op.cubbon']! });
+    await retentionEnded(E);
     expect((await (await as('io.meera')).post(url(E, '/disposal-requests'), { reason, authorityRef: 'GO-1' })).status).toBe(403);
     expect((await (await as('io.arjun')).post(url(E, '/disposal-requests'), { reason, authorityRef: 'GO-1' })).status).toBe(404);
     const latha = await as('ec.latha');
@@ -350,6 +374,7 @@ describe('disposal (separation of duties)', () => {
     const city = await app.db.selectFrom('org_units').select('id').where('code', '=', 'blr_city').executeTakeFirstOrThrow();
     await app.db.insertInto('user_roles').values({ user_id: dual.id, role_id: sup.id, org_unit_id: city.id }).execute();
     const E = await createRegisteredEvidence({ orgCode: 'ps_highgrounds', uploadedBy: U['op.cubbon']! });
+    await retentionEnded(E);
     const ag = await login(dual.username);
     const r = await ag.post(url(E, '/disposal-requests'), { reason, authorityRef: 'GO-9' });
     expect(r.status).toBe(201);
@@ -366,7 +391,16 @@ describe('disposal (separation of duties)', () => {
 
   it('approves, executes (governance-bypass delete of all versions + derived) and keeps the record', async () => {
     const E = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: U['op.cubbon']! });
+    await retentionEnded(E);
     await app.storage.put(app.storage.bucket('derived'), `evidence/${E.id}/thumbnail/t.jpg`, Buffer.from('jpg'));
+    // A READY court export package and an active internal share of the item exist before the disposal request.
+    const exportsBucket = app.storage.bucket('exports');
+    const pkgKey = `exports/test/${E.id}.zip`;
+    await app.storage.put(exportsBucket, pkgKey, Buffer.from('zip'));
+    const xp = await app.db.insertInto('exports').values({ export_number: `EXP-T-${E.id.slice(0, 8)}`, created_by: U['io.meera']!, org_unit_id: E.orgUnitId, purpose: 'Court production', status: 'READY', bucket: exportsBucket, object_key: pkgKey }).returning('id').executeTakeFirstOrThrow();
+    await app.db.insertInto('export_items').values({ export_id: xp.id, evidence_id: E.id, expected_sha256: E.sha256 }).execute();
+    const sh = await app.db.insertInto('shares').values({ created_by: U['io.meera']!, org_unit_id: E.orgUnitId, recipient_type: 'INTERNAL_USER', recipient_user_id: U['io.mysuru']!, purpose: 'Assist', expires_at: new Date(Date.now() + 86_400_000) }).returning('id').executeTakeFirstOrThrow();
+    await app.db.insertInto('share_items').values({ share_id: sh.id, evidence_id: E.id }).execute();
     const latha = await as('ec.latha');
     const kavya = await as('sup.kavya');
     const r = await latha.post(url(E, '/disposal-requests'), { reason, authorityRef: 'Court order 55/2026' });
@@ -385,6 +419,13 @@ describe('disposal (separation of duties)', () => {
     expect(res.derivedDeleted).toBe(1);
     expect(await listVersions(app.storage, E.bucket, `originals/`).then((v) => v.filter((x) => x.key.includes(E.id)))).toEqual([]);
     expect(await app.storage.list(app.storage.bucket('derived'), `evidence/${E.id}/`)).toEqual([]);
+    // Nothing outside the evidence prefixes keeps a copy: the export is revoked with its package deleted, the share revoked.
+    expect(res).toMatchObject({ status: 'EXECUTED' });
+    expect((await app.db.selectFrom('exports').select(['status', 'revoke_reason']).where('id', '=', xp.id).executeTakeFirstOrThrow())).toMatchObject({ status: 'REVOKED' });
+    expect(await app.storage.head(exportsBucket, pkgKey)).toBeNull();
+    expect((await app.db.selectFrom('shares').select('status').where('id', '=', sh.id).executeTakeFirstOrThrow()).status).toBe('REVOKED');
+    const exec = (await app.db.selectFrom('disposal_requests').select('execution_result').where('id', '=', r.body.id).executeTakeFirstOrThrow()).execution_result as Record<string, number>;
+    expect(exec).toMatchObject({ exportsRevoked: 1, sharesRevoked: 1 });
 
     const row = await app.db.selectFrom('evidence').select(['status', 'disposed_at', 'sha256']).where('id', '=', E.id).executeTakeFirstOrThrow();
     expect(row.status).toBe('DISPOSED');
@@ -411,6 +452,7 @@ describe('disposal (separation of duties)', () => {
 
     // (a) DB legal hold placed after approval.
     const E1 = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: U['op.cubbon']! });
+    await retentionEnded(E1);
     const r1 = await latha.post(url(E1, '/disposal-requests'), { reason, authorityRef: 'GO-A' });
     await kavya.post(`/api/v1/evidence/disposal-requests/${r1.body.id}/approve`, { note: 'approved first' });
     expect((await kavya.post(url(E1, '/legal-hold'), { reason: 'Fresh court order' })).status).toBe(200);
@@ -424,6 +466,7 @@ describe('disposal (separation of duties)', () => {
 
     // (b) The object store itself refuses (S3 legal hold set directly on the object; bypass cannot override it).
     const E2 = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: U['op.cubbon']! });
+    await retentionEnded(E2);
     const r2 = await latha.post(url(E2, '/disposal-requests'), { reason, authorityRef: 'GO-B' });
     await kavya.post(`/api/v1/evidence/disposal-requests/${r2.body.id}/approve`, { note: 'approved second' });
     await app.storage.s3.send(new PutObjectLegalHoldCommand({ Bucket: E2.bucket, Key: E2.key, VersionId: E2.versionId, LegalHold: { Status: 'ON' } }));

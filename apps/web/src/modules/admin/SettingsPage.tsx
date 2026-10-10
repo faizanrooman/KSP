@@ -85,6 +85,12 @@ const GROUPS: Array<{ key: SettingKey; title: string; description: string; field
     ],
   },
   {
+    key: 'auditPolicy', title: 'Audit log retention', description: 'Audit records are append-only and the application never deletes them (enforced by the database). Any archival outside the system must keep them retrievable for at least this period.',
+    fields: [
+      { name: 'minimumRetentionYears', label: 'Minimum retention (years)', kind: 'int', min: 7, max: 100 },
+    ],
+  },
+  {
     key: 'integrityPolicy', title: 'Integrity (fixity) sweep', description: 'Every stored original and recorded secondary copy is re-hashed once per cycle.',
     fields: [
       { name: 'fullCycleDays', label: 'Full verification cycle (days)', kind: 'int', min: 1, max: 3650 },

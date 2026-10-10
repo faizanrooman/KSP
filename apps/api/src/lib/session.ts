@@ -109,7 +109,7 @@ export type RefreshOutcome =
   | { ok: false; reason: 'INVALID' | 'EXPIRED' | 'REUSED' | 'SESSION_ENDED'; userId?: string; sessionId?: string };
 
 /** Rotate a refresh token. Reuse of a consumed token revokes the entire family and its session. */
-export async function rotateRefresh(db: Database, presented: string): Promise<RefreshOutcome> {
+export async function rotateRefresh(db: Database, presented: string, opts: { slideIdle?: boolean } = {}): Promise<RefreshOutcome> {
   const cfg = loadConfig();
   const settings = await getSettings(db);
   return db.transaction().execute(async (tx): Promise<RefreshOutcome> => {
@@ -134,8 +134,11 @@ export async function rotateRefresh(db: Database, presented: string): Promise<Re
     const user = await tx.selectFrom('users').select(['status', 'locked_until']).where('id', '=', rt.user_id).executeTakeFirstOrThrow();
     if (user.status !== 'ACTIVE') return { ok: false, reason: 'SESSION_ENDED', userId: rt.user_id, sessionId: rt.session_id };
     await tx.updateTable('refresh_tokens').set({ used_at: now }).where('id', '=', rt.id).execute();
-    const idle = new Date(Math.min(rt.absolute_expires_at.getTime(), now.getTime() + settings.sessionPolicy.idleTimeoutMinutes * 60_000));
-    await tx.updateTable('sessions').set({ last_seen_at: now, idle_expires_at: idle }).where('id', '=', rt.session_id).execute();
+    // A refresh triggered by a background request (opts.slideIdle false) keeps the session's idle deadline unchanged.
+    if (opts.slideIdle !== false) {
+      const idle = new Date(Math.min(rt.absolute_expires_at.getTime(), now.getTime() + settings.sessionPolicy.idleTimeoutMinutes * 60_000));
+      await tx.updateTable('sessions').set({ last_seen_at: now, idle_expires_at: idle }).where('id', '=', rt.session_id).execute();
+    }
     const refreshExpiresAt = new Date(Math.min(rt.absolute_expires_at.getTime(), now.getTime() + cfg.REFRESH_TOKEN_TTL_HOURS * 3_600_000));
     const refreshToken = await newRefresh(tx, rt.session_id, rt.family_id, rt.id, refreshExpiresAt);
     const accessToken = await signJwt({ sub: rt.user_id, sid: rt.session_id, typ: 'access' }, cfg.ACCESS_TOKEN_TTL_SECONDS);

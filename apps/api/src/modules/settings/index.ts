@@ -85,6 +85,9 @@ export const SETTING_SCHEMAS = {
     minPerNight: int(1, 1_000_000),
     maxPerNight: int(1, 10_000_000),
   }).strict().refine((v) => v.maxPerNight >= v.minPerNight, { message: 'Maximum per night must be at least the minimum', path: ['maxPerNight'] }),
+  auditPolicy: z.object({
+    minimumRetentionYears: int(7, 100),
+  }).strict(),
   aiLegalApprovals: z.object({
     FACE_DETECTION: legalApproval.nullable(),
     FACE_RECOGNITION: legalApproval.nullable(),

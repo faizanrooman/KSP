@@ -172,6 +172,9 @@ test('retention policy + disposal: create/assign policy, request, second-officer
   await ec.getByRole('button', { name: 'Request disposal' }).click();
   const rd = ec.getByRole('dialog', { name: 'Request authorised disposal' });
   await rd.getByLabel('Authority reference').fill(`E2E-ORDER-${run}`);
+  // The 30-day policy has not ended: disposal now needs a court / government order (type + date).
+  await rd.getByLabel('Order type').selectOption('COURT_ORDER');
+  await rd.getByLabel('Order date').fill(new Date().toISOString().slice(0, 10));
   await rd.getByLabel('Reason').fill('E2E: duplicate recording, retention order applies');
   await rd.getByRole('button', { name: 'Submit request' }).click();
   await expect(ec.getByRole('status').filter({ hasText: 'Disposal requested' })).toBeVisible();

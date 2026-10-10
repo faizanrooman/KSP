@@ -64,6 +64,20 @@ describe('ksp_app cannot rewrite history', () => {
     expect(DENIED).toContain(await sqlstate(appPool, stmt));
   });
 
+  it('the ledger is protected by grants, not only by triggers; audit_append is SECURITY DEFINER and not executable by PUBLIC', async () => {
+    const priv = await appPool.query(`SELECT has_table_privilege(current_user, 'audit_events', 'INSERT') AS ins, has_table_privilege(current_user, 'audit_events', 'UPDATE') AS upd,
+      has_table_privilege(current_user, 'audit_events', 'DELETE') AS del, has_table_privilege(current_user, 'audit_events', 'TRUNCATE') AS trn`);
+    expect(priv.rows[0]).toEqual({ ins: false, upd: false, del: false, trn: false });
+    const fn = await appPool.query(`SELECT p.prosecdef, pg_get_userbyid(p.proowner) AS owner, p.proacl::text AS acl FROM pg_proc p WHERE p.proname = 'audit_append'`);
+    expect(fn.rows.length).toBeGreaterThan(0);
+    for (const r of fn.rows) {
+      expect(r.prosecdef).toBe(true);
+      expect(r.owner).not.toBe('ksp_app');
+      // An ACL entry "=X/<owner>" would be EXECUTE for PUBLIC.
+      expect(String(r.acl ?? '')).not.toMatch(/(^|[{,])=X/);
+    }
+  });
+
   it('registered evidence immutable columns are guarded by trigger', async () => {
     const ev = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: await userId('io.meera'), durationSeconds: 1 });
     const id = ev.id;

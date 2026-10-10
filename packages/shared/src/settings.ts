@@ -77,6 +77,14 @@ export interface ExportLegalApproval {
   approval: LegalApproval | null;
 }
 
+/**
+ * Audit log retention (tender §65). The ledger is append-only and the application never deletes it (enforced in the
+ * database); this is the minimum period records must remain available — any archival outside the system must keep
+ * them retrievable at least this long. Changing it is audited with old and new values.
+ */
+export interface AuditPolicy {
+  minimumRetentionYears: number;
+}
 export interface SystemSettings {
   passwordPolicy: PasswordPolicy;
   lockoutPolicy: LockoutPolicy;
@@ -86,6 +94,7 @@ export interface SystemSettings {
   shareExportPolicy: ShareExportPolicy;
   alertDeliveryPolicy: AlertDeliveryPolicy;
   integrityPolicy: IntegrityPolicy;
+  auditPolicy: AuditPolicy;
   aiLegalApprovals: AiLegalApprovals;
   exportLegalApproval: ExportLegalApproval;
 }
@@ -105,6 +114,7 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   shareExportPolicy: { maxShareDays: 30, exportRetentionDays: 30, excessiveDownloadsPerHour: 20 },
   alertDeliveryPolicy: { maxAttempts: 5, baseDelaySeconds: 60, emailAlertManagers: true, warningRecipients: [], criticalRecipients: [] },
   integrityPolicy: { fullCycleDays: 90, maxBytesPerNight: 2 * 1024 ** 4, minPerNight: 100, maxPerNight: 200_000 },
+  auditPolicy: { minimumRetentionYears: 10 },
   aiLegalApprovals: { FACE_DETECTION: null, FACE_RECOGNITION: null, ANPR: null },
   exportLegalApproval: { approval: null },
 };
