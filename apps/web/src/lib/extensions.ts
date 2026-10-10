@@ -39,6 +39,8 @@ export interface EvidenceAction {
   id: string;
   order: number;
   anyOf?: Permission[];
+  /** Rare or consequential actions live in the header's "More" menu instead of the main action row. */
+  more?: boolean;
   /** Renders a button (and any dialog it owns). */
   component: ComponentType<{ evidence: EvidenceSummary }>;
 }

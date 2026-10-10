@@ -171,7 +171,7 @@ test('integrity verify, lifecycle, chain of custody + signed PDF', async ({ as }
   await expect(page.getByRole('table', { name: 'Processing jobs' })).toBeVisible();
 
   await page.getByRole('tab', { name: 'Chain of custody' }).click();
-  await expect(page.getByText('Chain intact')).toBeVisible();
+  await expect(page.getByText('Chain intact', { exact: true })).toBeVisible();
   const timeline = page.getByRole('list', { name: 'Custody timeline' });
   await expect(timeline).toContainText(/registered/i);
   await expect(timeline).toContainText(/verif/i);
@@ -179,7 +179,7 @@ test('integrity verify, lifecycle, chain of custody + signed PDF', async ({ as }
   await expect(page.getByText(/^Showing \d+ of \d+ custody events$/)).toBeVisible();
   await page.getByLabel('Show').selectOption('all');
   await expect(page.getByText(/^Showing \d+ of \d+ linked events$/)).toBeVisible();
-  await expect(page.getByText('Chain intact')).toBeVisible();
+  await expect(page.getByText('Chain intact', { exact: true })).toBeVisible();
   const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Signed report (PDF)' }).click()]);
   const buf = readFileSync((await pdf.path())!);
   expect(buf.subarray(0, 5).toString()).toBe('%PDF-');

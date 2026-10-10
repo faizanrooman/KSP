@@ -50,6 +50,7 @@ test('IO requests analysis; job completes; detections listed', async ({ as }) =>
   const page = await as('io.meera');
   await waitForMediaReady(page, evAI());
   await page.goto(`/evidence/${evAI()}?tab=ai`);
+  await page.getByRole('button', { name: 'Request analysis' }).click(); // the request form opens on demand; results come first
   for (const t of ['Person detection', 'Face detection', 'Face recognition (watchlist)', 'Object & vehicle detection', 'Evidence tagging']) {
     await page.getByRole('checkbox', { name: new RegExp(`^${t.replace(/[()&]/g, '\\$&')}`) }).check();
   }
@@ -63,13 +64,12 @@ test('IO requests analysis; job completes; detections listed', async ({ as }) =>
   await expect(jobs.getByRole('listitem').first()).toContainText('Completed', { timeout: 360_000 });
   await expect(jobs.getByRole('listitem').first()).toContainText(/\d+ frames/);
 
-  const detections = page.getByRole('region', { name: /^Detections \(\d+\)/ });
-  await expect(detections).toBeVisible();
-  await expect(detections.getByRole('region', { name: 'Person detection' })).toBeVisible();
-  await expect(detections.getByRole('region', { name: 'Face detection' })).toBeVisible();
-  await expect(detections.getByRole('region', { name: 'Evidence tagging' })).toBeVisible();
-  // Every result is advisory until reviewed.
-  await expect(detections.getByRole('region', { name: 'Person detection' }).getByRole('listitem').first()).toContainText(/Pending/);
+  const detections = page.getByRole('region', { name: 'Detections' });
+  const byTask = detections.getByRole('table', { name: 'Detections by task and review state' });
+  for (const t of ['Person detection', 'Face detection', 'Evidence tagging']) await expect(byTask.getByRole('row', { name: new RegExp(`^${t}`) })).toBeVisible();
+  // Every result is advisory until reviewed: nothing is on the evidence record yet, all of it awaits review.
+  await expect(detections).toContainText('No approved detections yet');
+  await expect(detections).toContainText(/\d+ are awaiting review/);
 });
 
 test('reviewer approves and rejects with keyboard shortcuts; approved tag appears on the evidence', async ({ as }) => {

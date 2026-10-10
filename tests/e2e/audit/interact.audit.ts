@@ -58,6 +58,7 @@ test('interactions (audit A)', async ({ browser }) => {
     ['Reprocess media', /Reprocess media/],
   ] as const) {
     await check(`dialog "${button}": opens, locks body, Esc closes, focus returns`, async () => {
+      if (button === 'Reprocess media' && !(await io.getByRole('button', { name: button, exact: true }).first().isVisible())) await io.getByRole('button', { name: 'More actions' }).click();
       const opener = io.getByRole('button', { name: button, exact: true }).first();
       await opener.click();
       const dlg = io.getByRole('dialog', { name: dialog });

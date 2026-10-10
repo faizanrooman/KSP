@@ -23,14 +23,22 @@ export function AiTab({ evidence }: { evidence: EvidenceSummary }) {
   const { can } = useAuth();
   const canRequest = can('ai:request') && (ev.permissions?.canRequestAi ?? true);
   const canPlay = ev.permissions?.canPlay ?? false;
+  const [requesting, setRequesting] = useState(false);
   return (
     <div className="space-y-4">
       <Alert tone="amber" title={tr('Advisory results')}>
         {tr('AI output is never authoritative. Every detection stays')}{' '}<strong>{tr('pending')}</strong>{' '}{tr('until a reviewer approves or rejects it; face-recognition matches need two independent approvals.')}
       </Alert>
-      {canRequest && <RequestForm evidence={ev} />}
+      {canRequest && (
+        <div>
+          <Button variant={requesting ? 'secondary' : 'primary'} size="sm" icon={<Bot className="h-4 w-4" />} aria-expanded={requesting} onClick={() => setRequesting((v) => !v)}>
+            {requesting ? tr('Close request form') : tr('Request analysis')}
+          </Button>
+        </div>
+      )}
+      {canRequest && requesting && <RequestForm evidence={ev} />}
+      <DetectionsCard evidence={ev} canPlay={canPlay} canReview={can('ai:review')} />
       <JobsCard evidenceId={ev.id} canCancel={canRequest} />
-      <DetectionsCard evidence={ev} canPlay={canPlay} />
     </div>
   );
 }
@@ -168,16 +176,29 @@ function JobsCard({ evidenceId, canCancel }: { evidenceId: string; canCancel: bo
   );
 }
 
-const FILTERS = { task: '', reviewStatus: '', minConfidence: '' };
+const FILTERS = { task: '', reviewStatus: 'APPROVED', minConfidence: '' };
+const TASK_ORDER: AiTask[] = ['PERSON_DETECTION', 'OBJECT_DETECTION', 'FACE_DETECTION', 'FACE_RECOGNITION', 'ANPR', 'CLASSIFICATION'];
+const isPending = (d: AiDetectionDto) => d.reviewStatus === 'PENDING' || d.reviewStatus === 'NEEDS_SECOND_REVIEW';
 
-function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPlay: boolean }) {
+/**
+ * Machine output stays off the evidence record until a person has decided on it: the card summarises what each
+ * task produced and links pending items to the review queue; only approved (or, on request, rejected) detections
+ * are listed. One unfiltered fetch serves both, so opening the tab records a single AI_RESULTS_VIEWED event.
+ */
+function DetectionsCard({ evidence, canPlay, canReview }: { evidence: EvidenceDetail; canPlay: boolean; canReview: boolean }) {
   const [f, setF] = useState(FILTERS);
-  const q = useDetections(evidence.id, f);
+  const q = useDetections(evidence.id, {});
+  const all = useMemo(() => q.data?.items ?? [], [q.data]);
+  const summary = useMemo(() => TASK_ORDER.map((task) => {
+    const list = all.filter((d) => d.task === task);
+    return { task, total: list.length, pending: list.filter(isPending).length, approved: list.filter((d) => d.reviewStatus === 'APPROVED').length, rejected: list.filter((d) => d.reviewStatus === 'REJECTED').length };
+  }).filter((r) => r.total > 0), [all]);
+  const pendingTotal = summary.reduce((n, r) => n + r.pending, 0);
   const navigate = useNavigate();
   const player = useRef<EvidencePlayerHandle>(null);
   const [now, setNow] = useState(0);
   const [showPlayer, setShowPlayer] = useState(false);
-  const items = useMemo(() => q.data?.items ?? [], [q.data]);
+  const items = useMemo(() => all.filter((d) => d.reviewStatus === f.reviewStatus && (!f.task || d.task === f.task) && (!f.minConfidence || d.confidence >= Number(f.minConfidence))), [all, f]);
   const groups = useMemo(() => {
     const m = new Map<AiTask, AiDetectionDto[]>();
     for (const d of items) m.set(d.task, [...(m.get(d.task) ?? []), d]);
@@ -191,7 +212,39 @@ function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPl
   const visible = items.filter((d) => d.bbox && Math.abs(d.frameTimeMs - now) <= 600);
 
   return (
-    <Card title={q.data ? tr('Detections ({total})', { total: q.data.total }) : tr('Detections')} actions={canPlay && items.length > 0 ? <Button size="sm" variant="secondary" onClick={() => setShowPlayer((v) => !v)}>{showPlayer ? tr('Hide player') : tr('Show on video')}</Button> : undefined}>
+    <Card title={tr('Detections')} actions={canPlay && items.length > 0 ? <Button size="sm" variant="secondary" onClick={() => setShowPlayer((v) => !v)}>{showPlayer ? tr('Hide player') : tr('Show on video')}</Button> : undefined}>
+      {summary.length > 0 && (
+        <div className="mb-4 overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <caption className="sr-only">{tr('Detections by task and review state')}</caption>
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-ink-600">
+                <th scope="col" className="py-1.5 pr-4">{tr('Task')}</th>
+                <th scope="col" className="py-1.5 pr-4 text-right">{tr('Approved')}</th>
+                <th scope="col" className="py-1.5 pr-4 text-right">{tr('Rejected')}</th>
+                <th scope="col" className="py-1.5 pr-4 text-right">{tr('Awaiting review')}</th>
+                <th scope="col" className="py-1.5"><span className="sr-only">{tr('Review')}</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ink-100">
+              {summary.map((r) => (
+                <tr key={r.task}>
+                  <th scope="row" className="py-1.5 pr-4 text-left font-medium text-ink-900">
+                    <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: TASK_COLORS[r.task] }} aria-hidden />{taskLabel(r.task)}
+                  </th>
+                  <td className="py-1.5 pr-4 text-right tabular-nums">{r.approved}</td>
+                  <td className="py-1.5 pr-4 text-right tabular-nums">{r.rejected}</td>
+                  <td className="py-1.5 pr-4 text-right tabular-nums">{r.pending ? <span className="font-semibold text-amber-800">{r.pending}</span> : 0}</td>
+                  <td className="py-1.5 text-right">
+                    {canReview && r.pending > 0 && <Link className="whitespace-nowrap text-brand-700 hover:underline" to={`/review?evidenceId=${evidence.id}&task=${r.task}`}>{tr('Review {count} pending →', { count: r.pending })}</Link>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {q.data && q.data.total > all.length && <p className="mt-1 text-xs text-ink-500">{tr('Counts cover the first {count} of {total} detections.', { count: all.length, total: q.data.total })}</p>}
+        </div>
+      )}
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <Field label={tr('Task')} htmlFor="d-task">
           <Select id="d-task" value={f.task} onChange={(e) => setF({ ...f, task: e.target.value })}>
@@ -201,9 +254,6 @@ function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPl
         </Field>
         <Field label={tr('Review status')} htmlFor="d-rs">
           <Select id="d-rs" value={f.reviewStatus} onChange={(e) => setF({ ...f, reviewStatus: e.target.value })}>
-            <option value="">{tr('Any')}</option>
-            <option value="PENDING">{tr('Pending')}</option>
-            <option value="NEEDS_SECOND_REVIEW">{tr('Needs 2nd review')}</option>
             <option value="APPROVED">{tr('Approved')}</option>
             <option value="REJECTED">{tr('Rejected')}</option>
           </Select>
@@ -213,7 +263,11 @@ function DetectionsCard({ evidence, canPlay }: { evidence: EvidenceDetail; canPl
         </Field>
       </div>
       {q.isLoading ? <Spinner /> : q.error ? <ErrorState error={q.error} onRetry={() => void q.refetch()} /> : !items.length ? (
-        <EmptyState title={tr('No detections')} description={tr('Completed analyses with matching results appear here.')} />
+        <EmptyState
+          title={all.length === 0 ? tr('No detections') : f.reviewStatus === 'APPROVED' ? tr('No approved detections yet') : tr('No detections match these filters')}
+          description={all.length === 0 ? tr('Completed analyses with matching results appear here.') : pendingTotal > 0 ? tr('Detections appear on the record once a reviewer approves them; {count} are awaiting review.', { count: pendingTotal }) : undefined}
+          action={canReview && pendingTotal > 0 ? <Link className="text-brand-700 hover:underline" to={`/review?evidenceId=${evidence.id}`}>{tr('Open the review queue')}</Link> : undefined}
+        />
       ) : (
         <div className="space-y-4">
           {showPlayer && (
@@ -279,7 +333,7 @@ function Timeline({ items, durationMs, onPick }: { items: AiDetectionDto[]; dura
           </div>
         </div>
       ))}
-      <div className="ml-[10.5rem] flex justify-between text-[10px] text-ink-500"><span>0:00</span><span>{formatTimecode(durationMs)}</span></div>
+      <div className="ml-[10.5rem] flex justify-between text-[11px] text-ink-500"><span>0:00</span><span>{formatTimecode(durationMs)}</span></div>
     </div>
   );
 }

@@ -144,6 +144,7 @@ test('retention policy + disposal: create/assign policy, request, second-officer
 
   // Custodian requests disposal.
   await ec.goto(`/evidence/${evidenceId}?tab=lifecycle`);
+  await ec.getByRole('button', { name: 'More actions' }).click();
   await ec.getByRole('button', { name: 'Request disposal' }).click();
   const rd = ec.getByRole('dialog', { name: 'Request authorised disposal' });
   await rd.getByLabel('Authority reference').fill(`E2E-ORDER-${run}`);
