@@ -239,6 +239,7 @@ export async function databasePreflight(db: Database, cfg: AppConfig, service: P
   else if (fixtures.length) warn('FIXTURE_INTEGRATION', `disabled fixture integration systems exist: ${fixtures.map((f) => f.code).join(', ')}`);
 
   // Settings that encode human decisions.
+  const isProdTier = (cfg.KSP_ENVIRONMENT ?? (cfg.NODE_ENV === 'production' ? 'production' : cfg.NODE_ENV)) === 'production';
   const rows = await db.selectFrom('system_settings').select(['key', 'value']).where('key', 'in', ['sessionPolicy', 'aiLegalApprovals', 'exportLegalApproval']).execute();
   const get = (k: string) => rows.find((x) => x.key === k)?.value as Record<string, unknown> | undefined;
   const session = { ...DEFAULT_SETTINGS.sessionPolicy, ...(get('sessionPolicy') ?? {}) } as { requireMfaForRoles: string[]; mfaForPrivilegedPermissions?: boolean };
