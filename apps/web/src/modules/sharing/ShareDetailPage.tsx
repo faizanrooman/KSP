@@ -44,6 +44,11 @@ export function ShareDetailPage() {
         actions={<div className="flex flex-wrap gap-2"><ShareManageActions share={s} />{s.canRevoke && <Button variant="danger" onClick={() => { revoke.reset(); setRevoking(true); }}>{t('Revoke')}</Button>}</div>}
       />
       {s.status === 'LOCKED' && <Alert tone="red" title={t('Locked')}>{t('Too many wrong access codes were entered (')}{s.failedCodeAttempts}). {s.canUnlock ? 'Confirm with the recipient, then unlock it — or revoke it.' : 'Ask the sender to unlock or revoke it.'}</Alert>}
+      {s.items.some((i) => i.recipientHasOwnAccess) && (
+        <Alert tone="amber" title={t('This share does not limit the recipient’s access')}>
+          {t('{name} can open the items marked “own access” through their own jurisdiction or case access, so this share’s expiry, view limit and download setting do not restrict them. New shares to such recipients are refused.', { name: s.recipient.name ?? '' })}
+        </Alert>
+      )}
       <Card title={t('Share')}>
         <KeyValue items={[
           { label: t('Status'), value: <StatusBadge status={s.status} /> },
@@ -59,7 +64,7 @@ export function ShareDetailPage() {
       </Card>
       <Card title={`Items (${s.items.length})`}>
         <ul className="divide-y divide-ink-100 text-sm">
-          {s.items.map((i) => <li key={i.evidenceId} className="py-1.5"><Link className="mono text-brand-700 hover:underline" to={`/evidence/${i.evidenceId}`}>{i.evidenceNumber}</Link> {i.title && <span className="text-ink-600">— {i.title}</span>}</li>)}
+          {s.items.map((i) => <li key={i.evidenceId} className="py-1.5"><Link className="mono text-brand-700 hover:underline" to={`/evidence/${i.evidenceId}`}>{i.evidenceNumber}</Link> {i.title && <span className="text-ink-600">— {i.title}</span>}{i.recipientHasOwnAccess && <> <Badge tone="amber">{t('own access')}</Badge></>}</li>)}
         </ul>
       </Card>
       <Card title={t('Access log')} bodyClassName="p-0">

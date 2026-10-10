@@ -58,6 +58,15 @@ open of the item within 30 minutes counts one view (`view_count`, `share_access_
 covering the item means nothing is counted. Once `view_count ≥ max_views` and the last counted open is older than
 30 minutes, the share stops granting visibility (rule 4 in `lib/access.ts`, also for share-based downloads).
 
+### Internal recipients who already have access (2026-10-10)
+A share only *adds* access; it cannot restrict access the recipient already holds through their own jurisdiction,
+their own evidence or a case team. Such a share would show an expiry, a view limit and a download setting that do not
+apply, so `POST /shares` refuses it: **409 `RECIPIENT_ALREADY_HAS_ACCESS`** with `details.evidenceIds` /
+`evidenceNumbers` of the covered items (check: `evidenceVisibleSql(recipient, { shares: false })`). Shares created
+before this rule, or whose recipient gained access later, are flagged in `GET /shares/:id`
+(`items[].recipientHasOwnAccess`, managers only) and the detail page explains that the limits do not apply.
+Officers without `share:create` / `share:manage_all` see a receive-only **Shared with me** entry instead of **Shares**.
+
 ## External portal (`/api/v1/share-portal`, all `config.public`)
 
 | Method | Path | |

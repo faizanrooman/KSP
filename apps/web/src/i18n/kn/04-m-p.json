@@ -268,5 +268,6 @@
   "Purpose and destination": "ಉದ್ದೇಶ ಮತ್ತು ಗಮ್ಯಸ್ಥಾನ",
   "Purpose:": "ಉದ್ದೇಶ:",
   "Not enforced": "ಜಾರಿಯಲ್ಲಿಲ್ಲ",
-  "Not enforced on this deployment: runs without an approval.": "ಈ ನಿಯೋಜನೆಯಲ್ಲಿ ಜಾರಿಯಲ್ಲಿಲ್ಲ: ಅನುಮೋದನೆ ಇಲ್ಲದೆಯೇ ಚಲಿಸುತ್ತದೆ."
+  "Not enforced on this deployment: runs without an approval.": "ಈ ನಿಯೋಜನೆಯಲ್ಲಿ ಜಾರಿಯಲ್ಲಿಲ್ಲ: ಅನುಮೋದನೆ ಇಲ್ಲದೆಯೇ ಚಲಿಸುತ್ತದೆ.",
+  "own access": "ಸ್ವಂತ ಪ್ರವೇಶ"
 }

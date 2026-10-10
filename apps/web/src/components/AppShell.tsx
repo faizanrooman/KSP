@@ -8,7 +8,7 @@ import { NotificationBell } from '@/modules/alerts/NotificationBell';
 
 import { LanguageSwitcher, t } from '@/lib/i18n';
 function visibleNav(canAny: (...p: never[]) => boolean): Map<string, NavItem[]> {
-  const items = MODULES.flatMap((m) => m.nav ?? []).filter((n) => !n.anyOf || canAny(...(n.anyOf as never[])));
+  const items = MODULES.flatMap((m) => m.nav ?? []).filter((n) => (!n.anyOf || canAny(...(n.anyOf as never[]))) && !(n.noneOf && canAny(...(n.noneOf as never[]))));
   const bySection = new Map<string, NavItem[]>();
   for (const s of NAV_SECTIONS) {
     const list = items.filter((i) => i.section === s).sort((a, b) => (a.order ?? 100) - (b.order ?? 100));

@@ -64,7 +64,9 @@ outside your jurisdiction is simply not found.
 * **Court exports → New export** (or **Export case evidence** on a case) → select items, reason →
   **Submit for approval**. After a supervisor approves, the package builds; **Download package**. (E2E `08-export`)
 * **Shares → Share** from an evidence item — internal recipient, or external recipient with expiry, max views,
-  watermark and access code. Revoke at any time. (E2E `09-share`)
+  watermark and access code. Revoke at any time. A colleague who can already open the item in their own
+  jurisdiction (for example the division supervisor) cannot be sent an internal share: its expiry and view limit
+  could not restrict them, so the system refuses and names the items. (E2E `09-share`)
 
 ## Supervisor (`SUPERVISOR`)
 

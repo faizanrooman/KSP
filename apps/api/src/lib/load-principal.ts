@@ -87,6 +87,28 @@ export async function loadUserPrincipal(db: Database, userId: string, sessionId:
   return principal;
 }
 
+/**
+ * Another user's access as an authorisation check sees it (no session, no MFA/password restrictions): used to ask
+ * "could this user already open the evidence without the share?" before an internal share is created.
+ */
+export async function loadPrincipalForAccessCheck(db: Database, userId: string): Promise<Principal | null> {
+  const user = await db
+    .selectFrom('users as u')
+    .innerJoin('org_units as o', 'o.id', 'u.home_org_unit_id')
+    .select(['u.id', 'u.username', 'u.full_name', 'u.status', 'o.id as org_id', 'o.path'])
+    .where('u.id', '=', userId)
+    .executeTakeFirst();
+  if (!user || user.status !== 'ACTIVE') return null;
+  const grants = await loadGrants(db, userId);
+  const permissions = new Set<Permission>();
+  for (const g of grants) for (const p of g.permissions) permissions.add(p);
+  return {
+    kind: 'USER', userId: user.id, username: user.username, displayName: user.full_name, sessionId: null,
+    homeOrgUnitId: user.org_id, homeOrgPath: user.path, grants, permissions,
+    mustChangePassword: false, mfaEnrollmentRequired: false, mfaVerified: true,
+  };
+}
+
 export async function loadApiClientPrincipal(db: Database, client: { id: string; client_id: string; name: string; scopes: string[]; org_unit_id: string }): Promise<Principal> {
   const org = await db.selectFrom('org_units').select(['id', 'name', 'path']).where('id', '=', client.org_unit_id).executeTakeFirstOrThrow();
   const permissions = new Set(client.scopes.filter(isPermission));

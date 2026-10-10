@@ -91,10 +91,12 @@ echo "== images"
 if [ -n "$TOKEN" ]; then
   echo "$TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
   "${COMPOSE[@]}" pull -q
+  "${COMPOSE[@]}" --profile ops pull -q backup
 else
   echo "no --ghcr-token: building images from source (10–20 min on first run)"
   COMPOSE+=(-f deploy/compose/docker-compose.build.yml)
   "${COMPOSE[@]}" build -q
+  "${COMPOSE[@]}" --profile ops build -q backup
 fi
 
 echo "== database + storage + application"
@@ -131,7 +133,9 @@ fi
 envv() { grep "^$1=" deploy/compose/.env | tail -1 | cut -d= -f2-; }
 vgw_admin() { "${COMPOSE[@]}" run --rm --no-deps --entrypoint versitygw s3 admin -a "$(envv S3_ROOT_ACCESS_KEY)" -s "$(envv S3_ROOT_SECRET_KEY)" --er http://s3:7071 "$@"; }
 for _ in $(seq 1 30); do vgw_admin list-users >/dev/null 2>&1 && break; sleep 1; done
-for id in "$(envv S3_ACCESS_KEY):$(envv S3_SECRET_KEY)" "$(envv S3_AI_ACCESS_KEY):$(envv S3_AI_SECRET_KEY)"; do
+# The backup identity writes the encrypted database backups (bucket BACKUP_S3_BUCKET, versioned + Object Lock). In this
+# demo it lives in the same bundled store; production keeps backups on a separate site (docs/BACKUP-RESTORE-RUNBOOK.md).
+for id in "$(envv S3_ACCESS_KEY):$(envv S3_SECRET_KEY)" "$(envv S3_AI_ACCESS_KEY):$(envv S3_AI_SECRET_KEY)" "$(envv BACKUP_S3_ACCESS_KEY):$(envv BACKUP_S3_SECRET_KEY)"; do
   if vgw_admin list-users 2>/dev/null | grep -q "${id%%:*}"; then echo "s3 identity ${id%%:*}: present"
   else vgw_admin create-user -a "${id%%:*}" -s "${id#*:}" -r admin >/dev/null && echo "s3 identity ${id%%:*}: created"; fi
 done
@@ -146,6 +150,41 @@ if [ "$AI" = 1 ]; then
   "${COMPOSE[@]}" --profile ai up -d models   # one-shot download + SHA-256 verification of the pinned models
   "${COMPOSE[@]}" --profile ai up -d ai-worker
 fi
+
+echo "== backups"
+# Nightly encrypted database backup (scripts/backup/pg-backup.sh in the backup image): each run is recorded in
+# backup_runs and shown under System health → Backups. Compose has no scheduler, so a systemd timer runs it.
+cat > /etc/systemd/system/ksp-backup.service <<UNIT
+[Unit]
+Description=KSP VMS nightly encrypted database backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=$DIR
+ExecStart=/usr/bin/env ${COMPOSE[*]} --profile ops run --rm backup
+TimeoutStartSec=2h
+UNIT
+cat > /etc/systemd/system/ksp-backup.timer <<UNIT
+[Unit]
+Description=KSP VMS nightly database backup (01:30 IST)
+
+[Timer]
+OnCalendar=*-*-* 20:00:00 UTC
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now ksp-backup.timer >/dev/null
+# First run now when no backup has succeeded in the last 26 h (the System health threshold), so the status appears at once.
+ok_recent=$("${COMPOSE[@]}" exec -T postgres psql -U postgres -d "$PG_DB" -tAc "select count(*) from backup_runs where status = 'SUCCEEDED' and finished_at > now() - interval '26 hours'" 2>/dev/null | tr -d '[:space:]' || true)
+if [ "${ok_recent:-0}" = 0 ]; then systemctl start --no-block ksp-backup.service && echo "backup: first run started (journalctl -u ksp-backup)"
+else echo "backup: a successful run in the last 26 h is recorded"; fi
+echo "backup schedule: $(systemctl list-timers ksp-backup.timer --no-legend 2>/dev/null | awk '{print $1, $2, $3}')"
 
 # ready = web tier answers and the API container's own HEALTHCHECK (/health/live) reports healthy
 for _ in $(seq 1 90); do
