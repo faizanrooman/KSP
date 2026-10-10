@@ -1,0 +1,5 @@
+# Reviewed false positives (generic-api-key): configuration key NAMES and a config lookup, no secret values.
+# apps/api/test/preflight.test.ts:53 — list of env-var names checked by the production preflight test
+95b5e5ae1ec22e1771e2ee0ce98efb99ee1e631b:apps/api/test/preflight.test.ts:generic-api-key:53
+# packages/core/src/storage.ts:107 — disposal S3 client reads its keys from config (S3_DISPOSAL_*), no literal
+95b5e5ae1ec22e1771e2ee0ce98efb99ee1e631b:packages/core/src/storage.ts:generic-api-key:107
