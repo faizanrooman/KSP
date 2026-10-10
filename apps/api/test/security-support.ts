@@ -69,7 +69,8 @@ export async function buildWorld(app: FastifyInstance): Promise<World> {
   ids.annotation = must('annotation', await owner.post('/api/v1/workspaces/annotations', { evidenceId: ev.id, workspaceId: ids.workspace, kind: 'NOTE', startMs: 0, body: `${MARK} ann` })).body.id;
   ids.relation = must('relation', await owner.post('/api/v1/workspaces/relations', { evidenceA: ev.id, evidenceB: ev2.id, relation: 'RELATED', note: `${MARK} rel` })).body.id;
 
-  ids.share = must('share', await owner.post('/api/v1/shares', { evidenceIds: [ev.id], recipientType: 'INTERNAL_USER', recipientUserId: ids.kavya, purpose: `${MARK} share purpose`, expiresAt: new Date(Date.now() + 86_400_000).toISOString() })).body.share.id;
+  // the recipient must not already see the item (a share cannot limit jurisdiction access: RECIPIENT_ALREADY_HAS_ACCESS)
+  ids.share = must('share', await owner.post('/api/v1/shares', { evidenceIds: [ev.id], recipientType: 'INTERNAL_USER', recipientUserId: await userId('io.mysuru'), purpose: `${MARK} share purpose`, expiresAt: new Date(Date.now() + 86_400_000).toISOString() })).body.share.id;
   ids.export = must('export', await owner.post('/api/v1/exports', { evidenceIds: [ev.id], purpose: `${MARK} export purpose`, courtName: 'City Civil Court', options: { includeOriginal: false, includeWatermarked: true } })).body.id;
   if (!(await app.db.selectFrom('ai_models').select('id').where('task', '=', 'PERSON_DETECTION').where('status', '=', 'ACTIVE').executeTakeFirst())) {
     await app.db.insertInto('ai_models').values({ code: `idor-${randomUUID().slice(0, 6)}`, name: 'Synthetic', task: 'PERSON_DETECTION', version: '1', artifact_uri: 'file:///dev/null', status: 'ACTIVE' } as never).execute();
