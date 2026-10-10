@@ -19,6 +19,8 @@ export interface SessionPolicy {
   absoluteTimeoutHours: number;
   maxConcurrentSessions: number;
   requireMfaForRoles: string[]; // role codes for which MFA enrolment is mandatory
+  /** MFA also for every role holding a privileged permission (MFA_REQUIRED_PERMISSIONS); cannot be off in production. */
+  mfaForPrivilegedPermissions: boolean;
 }
 export interface UploadPolicy {
   maxFileSizeBytes: number;
@@ -96,6 +98,7 @@ export const DEFAULT_SETTINGS: SystemSettings = {
     absoluteTimeoutHours: 12,
     maxConcurrentSessions: 3,
     requireMfaForRoles: ['SYSTEM_ADMINISTRATOR', 'SUPERVISOR', 'AUDITOR', 'EVIDENCE_CUSTODIAN'],
+    mfaForPrivilegedPermissions: true,
   },
   uploadPolicy: { maxFileSizeBytes: 50 * 1024 ** 3, chunkSizeBytes: 16 * 1024 ** 2, sessionTtlHours: 72, maxConcurrentSessionsPerUser: 20 },
   storagePolicy: { warnThresholdPercent: 75, criticalThresholdPercent: 90, capacityBytes: 0 },

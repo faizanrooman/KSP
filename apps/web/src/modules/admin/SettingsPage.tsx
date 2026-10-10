@@ -46,6 +46,7 @@ const GROUPS: Array<{ key: SettingKey; title: string; description: string; field
       { name: 'absoluteTimeoutHours', label: 'Absolute session lifetime (hours)', kind: 'int', min: 1, max: 72 },
       { name: 'maxConcurrentSessions', label: 'Maximum concurrent sessions per user', kind: 'int', min: 1, max: 20 },
       { name: 'requireMfaForRoles', label: 'MFA mandatory for roles', kind: 'roles' },
+      { name: 'mfaForPrivilegedPermissions', label: 'Also require MFA for every role holding administrative, approval or audit rights (always on in production)', kind: 'bool' },
     ],
   },
   {

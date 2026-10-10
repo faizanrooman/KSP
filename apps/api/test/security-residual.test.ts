@@ -12,8 +12,12 @@ import { Agent, closeApp, createUser, login } from './helpers.js';
 import { evidenceTestSetup, evidenceTestTeardown, userId } from './evidence-setup.js';
 import { createRegisteredEvidence } from './fixtures/evidence.js';
 import { apiClientCacheSize } from '../src/lib/api-client-auth.js';
+import { integrationOfficer } from './admin-helpers.js';
 
 let app: FastifyInstance;
+// API clients can only receive rights their creator holds: evidence scopes need an Integration officer, not the admin.
+let officerAgent: Agent | undefined;
+const officer = async () => (officerAgent ??= (await integrationOfficer()).agent);
 const agents: Record<string, Agent> = {};
 const as = async (u: string) => (agents[u] ??= await login(u));
 const basic = (id: string, secret: string) => ({ authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}` });
@@ -50,7 +54,7 @@ describe('SEC-R7 public readiness probe', () => {
 describe('SEC-R8 API-client Basic auth', () => {
   const create = async () => {
     const org = await app.db.selectFrom('org_units').select('id').where('code', '=', 'ps_cubbonpark').executeTakeFirstOrThrow();
-    const r = await (await as('admin')).post('/api/v1/api-clients', { name: 'SEC-R8 client', scopes: ['evidence:read'], orgUnitId: org.id });
+    const r = await (await officer()).post('/api/v1/api-clients', { name: 'SEC-R8 client', scopes: ['evidence:read'], orgUnitId: org.id });
     expect(r.status, r.raw).toBe(201);
     return r.body as { client: { id: string }; clientId: string; clientSecret: string };
   };

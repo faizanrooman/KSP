@@ -89,6 +89,22 @@ describe('settings', () => {
     expect(await auditChainIntact()).toBe(true);
   });
 
+  it('a custom role holding administrative rights must enrol MFA whatever its name (privileged-permission rule)', async () => {
+    const app = await getApp();
+    await app.db.insertInto('roles').values({ code: 'TEST_USER_DESK', name: 'User desk (test)', description: 'custom privileged role', permissions: ['users:read', 'users:manage'], is_system: false })
+      .onConflict((oc) => oc.column('code').doNothing()).execute();
+    const u = await createUser({ role: 'TEST_USER_DESK', org: 'blr_city' });
+    const a = await login(u.username, u.password);
+    const blocked = await a.get('/api/v1/auth/sessions');
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.error.code).toBe('MFA_ENROLLMENT_REQUIRED');
+    // Switching the rule off is possible outside production only, audited like every settings change.
+    expect((await root.agent.put(`${S}/sessionPolicy`, { ...DEFAULT_SETTINGS.sessionPolicy, mfaForPrivilegedPermissions: false })).status).toBe(200);
+    expect((await a.get('/api/v1/auth/sessions')).status).toBe(200);
+    await root.agent.delete(`${S}/sessionPolicy`);
+    expect((await a.get('/api/v1/auth/sessions')).status).toBe(403);
+  });
+
   it('the sign-in MFA challenge follows the role policy; self-enrolled users stay challenged; re-adding a role ends code-less sessions', async () => {
     const app = await getApp();
     const step1 = async (u: { username: string; password: string }) => {

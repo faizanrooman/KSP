@@ -1,4 +1,4 @@
-import { isPermission, type Permission } from '@ksp/shared';
+import { isPermission, MFA_REQUIRED_PERMISSIONS, type Permission, type SessionPolicy } from '@ksp/shared';
 import type { Database } from '@ksp/core';
 import type { Grant, Principal } from './principal.js';
 import { getSettings } from './settings.js';
@@ -36,9 +36,14 @@ export async function loadGrants(db: Database, userId: string): Promise<Grant[]>
   }));
 }
 
-/** Whether the administrator's policy makes MFA mandatory for any of these role grants. */
-export function mfaMandatoryFor(grants: readonly Pick<Grant, 'roleCode'>[], requireMfaForRoles: readonly string[]): boolean {
-  return grants.some((g) => requireMfaForRoles.includes(g.roleCode));
+/**
+ * Whether MFA is mandatory for these role grants: the role is on the administrator's list, or (privileged-permission
+ * rule, default on) the role holds an administrative / approval / oversight permission — so a custom role cannot avoid
+ * MFA by its name.
+ */
+export function mfaMandatoryFor(grants: readonly Pick<Grant, 'roleCode' | 'permissions'>[], policy: Pick<SessionPolicy, 'requireMfaForRoles' | 'mfaForPrivilegedPermissions'>): boolean {
+  return grants.some((g) => policy.requireMfaForRoles.includes(g.roleCode)
+    || (policy.mfaForPrivilegedPermissions !== false && MFA_REQUIRED_PERMISSIONS.some((x) => g.permissions.has(x))));
 }
 
 /**
@@ -65,7 +70,7 @@ export async function loadUserPrincipal(db: Database, userId: string, sessionId:
   for (const g of grants) for (const p of g.permissions) permissions.add(p);
   const maxAge = settings.passwordPolicy.maxAgeDays;
   const expired = maxAge > 0 && !!user.password_changed_at && Date.now() - user.password_changed_at.getTime() > maxAge * 86_400_000;
-  const mfaRequired = mfaMandatoryFor(grants, settings.sessionPolicy.requireMfaForRoles);
+  const mfaRequired = mfaMandatoryFor(grants, settings.sessionPolicy);
   // A session that signed in without the second factor (allowed while MFA was not required for the user) ends as soon
   // as the policy requires it again: the user signs in once more and is asked for the code.
   if (mfaChallengeRequired(user, mfaRequired) && !mfaVerified) return null;

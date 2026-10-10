@@ -7,8 +7,8 @@ export async function evidenceTestSetup() {
   const app = await getApp();
   await app.db
     .insertInto('system_settings')
-    .values({ key: 'sessionPolicy', value: JSON.stringify({ requireMfaForRoles: [] }) })
-    .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify({ requireMfaForRoles: [] }) }))
+    .values({ key: 'sessionPolicy', value: JSON.stringify({ requireMfaForRoles: [], mfaForPrivilegedPermissions: false }) })
+    .onConflict((oc) => oc.column('key').doUpdateSet({ value: JSON.stringify({ requireMfaForRoles: [], mfaForPrivilegedPermissions: false }) }))
     .execute();
   invalidateSettings();
   // pg-boss must create/own its schema; the app role (DML only) cannot, so tests start it with the owner URL.

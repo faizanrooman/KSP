@@ -221,9 +221,12 @@ export async function databasePreflight(db: Database, cfg: AppConfig, service: P
   // Settings that encode human decisions.
   const rows = await db.selectFrom('system_settings').select(['key', 'value']).where('key', 'in', ['sessionPolicy', 'aiLegalApprovals', 'exportLegalApproval']).execute();
   const get = (k: string) => rows.find((x) => x.key === k)?.value as Record<string, unknown> | undefined;
-  const session = { ...DEFAULT_SETTINGS.sessionPolicy, ...(get('sessionPolicy') ?? {}) } as { requireMfaForRoles: string[] };
+  const session = { ...DEFAULT_SETTINGS.sessionPolicy, ...(get('sessionPolicy') ?? {}) } as { requireMfaForRoles: string[]; mfaForPrivilegedPermissions?: boolean };
+  const privilegedMfa = session.mfaForPrivilegedPermissions !== false;
   const missingMfa = ['SYSTEM_ADMINISTRATOR', 'SUPERVISOR', 'AUDITOR', 'EVIDENCE_CUSTODIAN'].filter((c) => !session.requireMfaForRoles.includes(c));
-  if (missingMfa.length) warn('MFA_POLICY', `MFA is not mandatory for: ${missingMfa.join(', ')}`, 'Settings → Session policy');
+  if (!privilegedMfa) (isProdTier ? err : warn)('MFA_PRIVILEGED', 'MFA for roles holding administrative / approval rights is switched off', 'Settings → Sessions & MFA');
+  if (!session.requireMfaForRoles.includes('SYSTEM_ADMINISTRATOR') && isProdTier) err('MFA_ADMIN', 'MFA is not mandatory for SYSTEM_ADMINISTRATOR', 'Settings → Sessions & MFA');
+  if (missingMfa.length && !privilegedMfa) warn('MFA_POLICY', `MFA is not mandatory for: ${missingMfa.join(', ')}`, 'Settings → Session policy');
   const approvals = { ...DEFAULT_SETTINGS.aiLegalApprovals, ...(get('aiLegalApprovals') ?? {}) } as Record<string, unknown>;
   const enabled = enabledAiTasks(cfg);
   for (const t of LEGALLY_GATED_AI_TASKS) {

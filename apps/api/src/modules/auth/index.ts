@@ -155,7 +155,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     }
     await record(true, null);
     // The second factor is asked when the role policy requires MFA for this user or the user opted in (My profile).
-    if (mfaChallengeRequired(user, mfaMandatoryFor(await loadGrants(db, user.id), settings.sessionPolicy.requireMfaForRoles))) {
+    if (mfaChallengeRequired(user, mfaMandatoryFor(await loadGrants(db, user.id), settings.sessionPolicy))) {
       const mfaToken = await signJwt({ sub: user.id, typ: 'mfa' }, 300);
       return { mfaRequired: true, mfaToken };
     }
@@ -317,7 +317,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const delta = authenticator.checkDelta(req.body.code, secret);
     if (delta === null) throw new AppError(400, 'INVALID_CODE', 'Invalid verification code');
     // Remember whether the user chose MFA (no role required it): a chosen enrolment is challenged whatever the policy.
-    const selfEnrolled = !mfaMandatoryFor(p.grants, (await getSettings(db)).sessionPolicy.requireMfaForRoles);
+    const selfEnrolled = !mfaMandatoryFor(p.grants, (await getSettings(db)).sessionPolicy);
     const codes = Array.from({ length: 10 }, () => randomToken(8).replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toLowerCase());
     const hashes = await Promise.all(codes.map((c) => hashSecret(c)));
     await db.transaction().execute(async (tx) => {
@@ -337,7 +337,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
     const p = req.requirePrincipal();
     if (!p.userId) throw badRequest('Only available to users');
     const settings = await getSettings(db);
-    if (mfaMandatoryFor(p.grants, settings.sessionPolicy.requireMfaForRoles)) throw new AppError(403, 'MFA_MANDATORY', 'MFA is mandatory for your role and cannot be disabled');
+    if (mfaMandatoryFor(p.grants, settings.sessionPolicy)) throw new AppError(403, 'MFA_MANDATORY', 'MFA is mandatory for your role and cannot be disabled');
     const u = await db.selectFrom('users').select(['password_hash', 'mfa_secret_enc']).where('id', '=', p.userId).executeTakeFirstOrThrow();
     // SEC-R5: the TOTP step is consumed exactly like at login (single use).
     if (!u.password_hash || !(await verifySecret(u.password_hash, req.body.password)) || !u.mfa_secret_enc || !(await consumeTotp(p.userId, u.mfa_secret_enc, req.body.code))) {

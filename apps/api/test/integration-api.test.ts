@@ -5,8 +5,12 @@ import { sql } from 'kysely';
 import { Agent, closeApp, login } from './helpers.js';
 import { evidenceTestSetup, evidenceTestTeardown, userId } from './evidence-setup.js';
 import { createRegisteredEvidence, type CreatedEvidence } from './fixtures/evidence.js';
+import { integrationOfficer } from './admin-helpers.js';
 
 let app: FastifyInstance;
+// API clients can only receive rights their creator holds: evidence scopes need an Integration officer, not the admin.
+let officerAgent: Agent | undefined;
+const officer = async () => (officerAgent ??= (await integrationOfficer()).agent);
 const agents: Record<string, Agent> = {};
 const as = async (u: string) => (agents[u] ??= await login(u));
 const org: Record<string, string> = {};
@@ -19,7 +23,7 @@ let caseNumber: string;
 const FIR_YEAR = 2033;
 
 async function mkClient(scopes: string[], extra: Record<string, unknown> = {}) {
-  const r = await (await as('admin')).post('/api/v1/api-clients', { name: `Client ${scopes.join('+')}`, scopes, orgUnitId: org.ps_cubbonpark, ...extra });
+  const r = await (await officer()).post('/api/v1/api-clients', { name: `Client ${scopes.join('+')}`, scopes, orgUnitId: org.ps_cubbonpark, ...extra });
   expect(r.status, r.raw).toBe(201);
   return { id: r.body.client.id as string, clientId: r.body.clientId as string, secret: r.body.clientSecret as string };
 }
@@ -129,7 +133,7 @@ describe('integration cases', () => {
     expect(r.json()).toMatchObject({ caseNumber, fir: { firNumber: '0321', firYear: FIR_YEAR }, hiddenEvidenceCount: 0 });
     expect(r.json().evidence.map((e: { id: string }) => e.id)).toEqual([A.id]);
     expect((await call(readOnly, `/cases/${caseNumber}`)).statusCode).toBe(403);
-    const naz = await (await as('admin')).post('/api/v1/api-clients', { name: 'Mysuru client', scopes: ['cases:read'], orgUnitId: org.ps_nazarbad });
+    const naz = await (await officer()).post('/api/v1/api-clients', { name: 'Mysuru client', scopes: ['cases:read'], orgUnitId: org.ps_nazarbad });
     expect((await call({ clientId: naz.body.clientId, secret: naz.body.clientSecret }, `/cases/${caseNumber}`)).statusCode).toBe(404);
   });
 });
