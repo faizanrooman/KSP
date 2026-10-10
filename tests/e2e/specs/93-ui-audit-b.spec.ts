@@ -35,7 +35,7 @@ test('UI-B-01/04: typing into a later dialog field keeps focus; the page behind 
 
 test('UI-B-02: tables with sr-only headers do not widen the page at 1024 px', async ({ as }) => {
   const page = await as('admin', { context: { viewport: { width: 1024, height: 768 } } });
-  for (const path of ['/reports', '/admin/api-clients', '/admin/users']) {
+  for (const path of ['/reports', '/admin/roles', '/admin/users']) {
     await page.goto(path);
     await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.getByRole('main').getByRole('table').first()).toBeVisible();

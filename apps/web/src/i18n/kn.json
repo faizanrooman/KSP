@@ -1753,6 +1753,7 @@
   "You already reviewed this — a different reviewer must decide.": "ನೀವು ಈಗಾಗಲೇ ಇದನ್ನು ಪರಿಶೀಲಿಸಿದ್ದೀರಿ — ಬೇರೆ ಪರಿಶೀಲಕರು ನಿರ್ಧರಿಸಬೇಕು.",
   "You are all caught up.": "ನೀವು ಎಲ್ಲವನ್ನೂ ನೋಡಿದ್ದೀರಿ.",
   "You become the owner. Colleagues you add see only the evidence their own access allows.": "ನೀವು ಮಾಲೀಕರಾಗುತ್ತೀರಿ. ನೀವು ಸೇರಿಸುವ ಸಹೋದ್ಯೋಗಿಗಳು ತಮ್ಮ ಸ್ವಂತ ಪ್ರವೇಶ ಅನುಮತಿಸುವ ಸಾಕ್ಷ್ಯವನ್ನು ಮಾತ್ರ ನೋಡುತ್ತಾರೆ.",
+  "You can only give a client rights you hold yourself at the chosen unit (e.g. an Integration officer holding evidence access). Every client is audited.": "ಆಯ್ಕೆ ಮಾಡಿದ ಘಟಕದಲ್ಲಿ ನೀವೇ ಹೊಂದಿರುವ ಹಕ್ಕುಗಳನ್ನು ಮಾತ್ರ ಕ್ಲೈಂಟ್‌ಗೆ ನೀಡಬಹುದು (ಉದಾ. ಸಾಕ್ಷ್ಯ ಪ್ರವೇಶ ಹೊಂದಿರುವ ಇಂಟಿಗ್ರೇಷನ್ ಅಧಿಕಾರಿ). ಪ್ರತಿ ಕ್ಲೈಂಟ್ ಲೆಕ್ಕಪರಿಶೋಧನೆಗೆ ಒಳಪಡುತ್ತದೆ.",
   "You can only view dashboards for units you are responsible for.": "ನೀವು ಜವಾಬ್ದಾರರಾಗಿರುವ ಘಟಕಗಳ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ಗಳನ್ನು ಮಾತ್ರ ವೀಕ್ಷಿಸಬಹುದು.",
   "You can view checkpoints; verifying the ledger requires the audit:verify permission.": "ನೀವು ಚೆಕ್‌ಪಾಯಿಂಟ್‌ಗಳನ್ನು ವೀಕ್ಷಿಸಬಹುದು; ಲೆಡ್ಜರ್ ಪರಿಶೀಲಿಸಲು audit:verify ಅನುಮತಿ ಬೇಕು.",
   "You do not have permission to view this page. If you need access, contact your supervisor or system administrator.": "ಈ ಪುಟ ವೀಕ್ಷಿಸಲು ನಿಮಗೆ ಅನುಮತಿಯಿಲ್ಲ. ಪ್ರವೇಶ ಅಗತ್ಯವಿದ್ದರೆ ನಿಮ್ಮ ಮೇಲ್ವಿಚಾರಕರು ಅಥವಾ ವ್ಯವಸ್ಥಾ ನಿರ್ವಾಹಕರನ್ನು ಸಂಪರ್ಕಿಸಿ.",

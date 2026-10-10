@@ -68,6 +68,7 @@ describe('disposal approval races', () => {
   const reason = 'Retention period expired per the retention schedule';
   it('two approvers + a rejecter concurrently: exactly one decision', async () => {
     const ev = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: await userId('io.meera') });
+    await app.db.updateTable('evidence').set({ retain_until: new Date(Date.now() - 86_400_000) }).where('id', '=', ev.id).execute(); // retention ended
     const dr = await latha.post(`/api/v1/evidence/${ev.id}/disposal-requests`, { reason, authorityRef: 'GO-RACE-1' });
     expect(dr.status).toBe(201);
     const rs = await Promise.all([
@@ -84,6 +85,7 @@ describe('disposal approval races', () => {
   it('concurrent self-approval of a disposal request is refused', async () => {
     const both = await login((await userWithPerms(['evidence:read', 'evidence:dispose_request', 'evidence:dispose_approve'], 'ps_cubbonpark')).username);
     const ev = await createRegisteredEvidence({ orgCode: 'ps_cubbonpark', uploadedBy: await userId('io.meera') });
+    await app.db.updateTable('evidence').set({ retain_until: new Date(Date.now() - 86_400_000) }).where('id', '=', ev.id).execute(); // retention ended
     const dr = await both.post(`/api/v1/evidence/${ev.id}/disposal-requests`, { reason, authorityRef: 'GO-RACE-2' });
     expect(dr.status).toBe(201);
     const rs = await Promise.all(Array.from({ length: 5 }, () => both.post(`/api/v1/evidence/disposal-requests/${dr.body.id}/approve`, { note: 'self' })));

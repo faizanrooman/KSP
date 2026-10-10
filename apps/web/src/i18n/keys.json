@@ -1729,6 +1729,7 @@
   "You already reviewed this — a different reviewer must decide.",
   "You are all caught up.",
   "You become the owner. Colleagues you add see only the evidence their own access allows.",
+  "You can only give a client rights you hold yourself at the chosen unit (e.g. an Integration officer holding evidence access). Every client is audited.",
   "You can only view dashboards for units you are responsible for.",
   "You can view checkpoints; verifying the ledger requires the audit:verify permission.",
   "You do not have permission to view this page. If you need access, contact your supervisor or system administrator.",
